@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG } from '../sim';
-import { DEFAULT_SETTINGS, loadStored, mergeSaved, resetInPlace, saveStored } from './settings';
+import { DEFAULT_SETTINGS, loadStored, mergeSaved, resetInPlace, saveStored, settingsDefaults } from './settings';
 
 describe('mergeSaved', () => {
   const defaults = { speed: 170, on: true, weights: { a: 1, b: 2 } };
@@ -22,6 +22,19 @@ describe('mergeSaved', () => {
     const out = mergeSaved(defaults, null);
     out.weights.a = 99;
     expect(defaults.weights.a).toBe(1);
+  });
+});
+
+describe('settingsDefaults', () => {
+  // Review Focus 2: honor prefers-reduced-motion until the player chooses.
+  it('turns on reduced motion when the system asks for it', () => {
+    expect(settingsDefaults(true).reduceMotion).toBe(true);
+    expect(settingsDefaults(false)).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it("lets a player's saved choice win over the system default", () => {
+    const storage = { getItem: () => JSON.stringify({ reduceMotion: false }) };
+    expect(loadStored(storage, 'k', settingsDefaults(true)).reduceMotion).toBe(false);
   });
 });
 

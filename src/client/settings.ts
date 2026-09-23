@@ -6,6 +6,13 @@ export interface ClientSettings {
   shakeScale: number;
   masterVolume: number;
   muted: boolean;
+  /** Freeze-frame at the moment of death. */
+  hitStopSeconds: number;
+  /** Effect speed during the slow-motion shatter. */
+  slowMoScale: number;
+  slowMoSeconds: number;
+  /** No shake, flashes or camera punch. */
+  reduceMotion: boolean;
 }
 
 export const DEFAULT_SETTINGS: ClientSettings = {
@@ -15,7 +22,16 @@ export const DEFAULT_SETTINGS: ClientSettings = {
   shakeScale: 1,
   masterVolume: 0.6,
   muted: false,
+  hitStopSeconds: 0.12,
+  slowMoScale: 0.3,
+  slowMoSeconds: 0.8,
+  reduceMotion: false,
 };
+
+/** Defaults for this device: reduced motion follows the system preference until the player chooses. */
+export function settingsDefaults(prefersReducedMotion: boolean): ClientSettings {
+  return { ...DEFAULT_SETTINGS, reduceMotion: prefersReducedMotion };
+}
 
 export const CONFIG_KEY = 'snakeboom.config.v1';
 export const SETTINGS_KEY = 'snakeboom.settings.v1';
