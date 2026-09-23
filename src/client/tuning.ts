@@ -1,6 +1,7 @@
 import GUI from 'lil-gui';
 import { DEFAULT_CONFIG, type Config, type PickupKind } from '../sim';
-import { DEFAULT_SETTINGS, resetInPlace, type ClientSettings } from './settings';
+import { DEFAULT_SETTINGS, OPPONENT_MODES, resetInPlace, type ClientSettings } from './settings';
+import { describeOpponent } from './text';
 
 export interface TuningPanel {
   show(): void;
@@ -12,6 +13,11 @@ export interface TuningPanel {
 /** Live sliders for every M1 tunable. The sim reads `cfg` each tick, so changes apply at once. */
 export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: { onChange(): void }): TuningPanel {
   const gui = new GUI({ title: 'SnakeBoom tuning  ( ` to hide )' });
+
+  const opponent = gui.addFolder('Opponent');
+  opponent
+    .add(settings, 'opponent', Object.fromEntries(OPPONENT_MODES.map((m) => [describeOpponent(m), m])))
+    .name('PINK is');
 
   const move = gui.addFolder('Movement');
   move.add(cfg, 'baseSpeed', 60, 400, 5).name('speed');

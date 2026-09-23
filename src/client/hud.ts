@@ -52,6 +52,12 @@ export class Hud {
     this.clock = root.querySelector<HTMLElement>('.clock')!;
   }
 
+  /** Adds a tag after a player's name (like AI) or clears it with an empty string. */
+  setTag(player: number, tag: string): void {
+    const name = this.root.querySelectorAll<HTMLElement>('.name')[player];
+    if (name) name.textContent = tag ? `${PLAYER_NAMES[player]} · ${tag}` : PLAYER_NAMES[player];
+  }
+
   update(state: MatchState | null, cfg: Config, t = 0): void {
     this.root.classList.toggle('on', state !== null);
     if (!state) return;

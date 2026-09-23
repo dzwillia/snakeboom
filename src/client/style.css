@@ -215,6 +215,23 @@ body {
   color: var(--text);
 }
 
+.controls p.dim {
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.selector + .selector {
+  margin-top: 10px;
+}
+
+.selector .mode {
+  display: inline-block;
+  min-width: 6em;
+  font-size: 16px;
+  font-weight: 900;
+  text-shadow: 0 0 10px currentColor;
+}
+
 kbd {
   display: inline-block;
   min-width: 1.6em;

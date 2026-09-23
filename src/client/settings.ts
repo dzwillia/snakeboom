@@ -1,5 +1,13 @@
-/** Client-only preferences (effects and audio); gameplay values live in the sim Config. */
+import { DIFFICULTIES, type Difficulty } from '../sim';
+
+/** Who steers PINK: a second human on the keyboard, or the local AI at a difficulty. */
+export type OpponentMode = 'human' | Difficulty;
+
+export const OPPONENT_MODES: readonly OpponentMode[] = ['human', ...DIFFICULTIES];
+
+/** Client-only preferences (effects, audio and who the opponent is); gameplay values live in the sim Config. */
 export interface ClientSettings {
+  opponent: OpponentMode;
   bloom: boolean;
   bloomStrength: number;
   bloomThreshold: number;
@@ -16,6 +24,7 @@ export interface ClientSettings {
 }
 
 export const DEFAULT_SETTINGS: ClientSettings = {
+  opponent: 'human',
   bloom: true,
   bloomStrength: 1.5,
   bloomThreshold: 0.2,
@@ -51,6 +60,8 @@ export function mergeSaved<T extends object>(defaults: T, saved: unknown): T {
       if (typeof v === 'number' && Number.isFinite(v)) out[key] = v;
     } else if (typeof d === 'boolean') {
       if (typeof v === 'boolean') out[key] = v;
+    } else if (typeof d === 'string') {
+      if (typeof v === 'string') out[key] = v;
     } else if (d && typeof d === 'object' && !Array.isArray(d)) {
       out[key] = mergeSaved(d, v);
     }
@@ -71,6 +82,13 @@ export function resetInPlace<T extends object>(target: T, defaults: T): void {
       t[key] = structuredClone(dv);
     }
   }
+}
+
+/** Saved settings with any unknown opponent mode (from an older or edited save) put back to human. */
+export function loadSettings(storage: Pick<Storage, 'getItem'> | undefined, defaults: ClientSettings): ClientSettings {
+  const settings = loadStored(storage, SETTINGS_KEY, defaults);
+  if (!OPPONENT_MODES.includes(settings.opponent)) settings.opponent = 'human';
+  return settings;
 }
 
 export function loadStored<T extends object>(
