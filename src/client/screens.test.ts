@@ -3,6 +3,19 @@ import { Screens } from './screens';
 
 const fakeRoot = () => ({ innerHTML: '' }) as unknown as HTMLElement;
 
+describe('Screens title', () => {
+  it('shows PINK’s keys for a human and the AI level otherwise', () => {
+    const root = fakeRoot();
+    const screens = new Screens(root);
+    screens.title(5, 3, 'human');
+    expect(root.innerHTML).toContain('HUMAN');
+    expect(root.innerHTML).toContain('use item</p></div>\n          <div class="p2">');
+    screens.title(5, 3, 'hard');
+    expect(root.innerHTML).toContain('AI · HARD');
+    expect(root.innerHTML).toContain('plays this seat');
+  });
+});
+
 describe('Screens pause/resume', () => {
   it('restores the round banner the pause panel covered', () => {
     const root = fakeRoot();

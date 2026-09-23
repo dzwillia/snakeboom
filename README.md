@@ -14,7 +14,19 @@ pnpm dev        # opens the game in your browser (http://localhost:5199)
 | **CYAN** | A / D | W | S |
 | **PINK** | ← / → | ↑ | ↓ |
 
-On the title screen, ← / → picks the match length (first to 1–10). <kbd>Space</kbd> starts or rematches, <kbd>Esc</kbd> pauses, <kbd>M</kbd> mutes, and <kbd>`</kbd> opens the tuning panel, where every gameplay number is a live slider.
+On the title screen, ← / → picks the match length (first to 1–10) and ↑ / ↓ picks who plays PINK: a second human, or the local AI at easy, normal or hard. <kbd>Space</kbd> starts or rematches, <kbd>Esc</kbd> pauses, <kbd>M</kbd> mutes, and <kbd>`</kbd> opens the tuning panel, where every gameplay number is a live slider.
+
+### Playing solo against the AI
+
+Pick an AI level on the title screen (or in the tuning panel under **Opponent**) and PINK steers itself; you play CYAN on WASD. The choice is remembered, and changing it during a match takes effect at the next match.
+
+| Level | How it plays |
+|---|---|
+| **Easy** | Looks under a second ahead, reacts slowly, wanders toward pickups, uses items at random and stays confused by Reverse for a full second. Good for testing a mechanic in peace. |
+| **Normal** | Looks further, replans quickly when something lands in its path, fights for territory and times Slow and Reverse for when you're boxed in. |
+| **Hard** | Plans two and a half seconds ahead every other tick, fights for territory (the floor it can reach before you can), cuts across your line just ahead of your head, boosts to get there, bombs you when you're cornered and reads Reverse instantly. |
+
+The AI lives in the rules engine (`src/sim/bots/opponent.ts`), so it is deterministic and works headlessly: `pnpm soak --bots hard,easy` pits two levels against each other and prints win counts and who hurt whom, `--profile '{"aggression":0.5}'` overrides knobs on the first AI seat, and `--debug 1` prints what the first AI was seeing when it hurt itself. The same code could drive a server-side bot online later. Difficulty levels are a table of knobs (look-ahead, reaction time, aggression, greed, boost use, item skill, mistake rate) at the top of that file.
 
 ## How it plays
 
@@ -44,6 +56,7 @@ pnpm test                 # unit tests (rules engine + client helpers)
 pnpm typecheck
 pnpm build                # static site in dist/
 pnpm soak --rounds 100    # headless bot-vs-bot stats: round lengths, deaths, pickups, speed
+pnpm soak --bots hard,normal --rounds 40   # pit two AI levels (or `simple`, the soak bot) and count wins
 ```
 
 - `src/sim` is the rules engine. It's deterministic, pure TypeScript with no browser APIs: fixed 60 Hz ticks, seeded random numbers, its own trig functions, and plain-data state. The same code can run on a game server, which is the next milestone: online 1v1 duels with invite links.

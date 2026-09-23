@@ -5,3 +5,12 @@ export { cloneState, createMatch } from './state';
 export { rematch, step } from './step';
 export { checkInvariants } from './invariants';
 export { botInput, createBot, type BotState } from './bots/simple-bot';
+export {
+  createOpponent,
+  opponentInput,
+  DIFFICULTIES,
+  PROFILES,
+  type Difficulty,
+  type OpponentProfile,
+  type OpponentState,
+} from './bots/opponent';
