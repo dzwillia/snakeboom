@@ -45,13 +45,13 @@ describe('step with bombs and pickups', () => {
 
   it('pressing Use with a bomb throws it ahead of the opponent', () => {
     const s = toPlaying();
-    s.snakes[0].item = createItem('bomb', cfg);
+    s.snakes[0].items = [createItem('bomb', cfg)];
     const { x, y } = s.snakes[0];
     const events = run(s, 1, [{ turn: 0, boost: false, use: true }, NO_INPUT]);
     expect(events).toContainEqual(expect.objectContaining({ type: 'bombThrown', player: 0, fromX: x, fromY: y }));
     expect(s.bombs).toHaveLength(1);
     expect(s.bombs[0].x).toBeLessThan(s.snakes[1].x);
-    expect(s.snakes[0].item).toEqual({ kind: 'bomb', charges: 2 });
+    expect(s.snakes[0].items).toEqual([{ kind: 'bomb', charges: 2 }]);
   });
 
   it('a blast opens a gap you can drive through', () => {
@@ -93,13 +93,13 @@ describe('step with bombs and pickups', () => {
     const s = toPlaying();
     s.pickups = [{ id: 1, kind: 'bomb', x: 900, y: 600, ttl: 10_000 }];
     s.bombs.push({ id: 2, owner: 1, x: 900, y: 300, fuse: 500, maxFuse: 500, chainDepth: 0, flight: 0, flightTotal: 0, fromX: 900, fromY: 300 });
-    s.snakes[0].item = createItem('bomb', cfg);
+    s.snakes[0].items = [createItem('bomb', cfg)];
     Object.assign(s.snakes[0], { x: 20, y: 500, heading: PI });
     run(s, 10 + Math.round(cfg.roundOverSeconds * TICK_RATE));
     expect(s.round).toBe(2);
     expect(s.pickups).toEqual([]);
     expect(s.bombs).toEqual([]);
-    expect(s.snakes.map((sn) => sn.item)).toEqual([null, null]);
+    expect(s.snakes.map((sn) => sn.items)).toEqual([[], []]);
   });
 
   it('spawns pickups during play', () => {

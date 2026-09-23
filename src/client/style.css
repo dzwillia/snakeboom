@@ -11,6 +11,7 @@
   --turbo: #ffe14d;
   --slow: #4d7cff;
   --reverse: #b44dff;
+  --dozer: #ff9f1c;
   --hud-h: 64px;
 }
 
@@ -92,7 +93,7 @@ body {
 }
 
 .boost {
-  width: 110px;
+  width: 90px;
   height: 8px;
   border: 1px solid currentColor;
   border-radius: 4px;
@@ -220,19 +221,33 @@ kbd {
   letter-spacing: 0.08em;
 }
 
+.slots {
+  display: flex;
+  gap: 4px;
+}
+
+.side.p2 .slots {
+  flex-direction: row-reverse;
+}
+
 .slot {
-  min-width: 96px;
-  padding: 3px 8px;
+  min-width: 58px;
+  padding: 2px 6px;
   border: 1px solid currentColor;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-align: center;
-  opacity: 0.35;
+  opacity: 0.3;
 }
 
 .slot.full {
+  opacity: 0.7;
+}
+
+.slot.next,
+.slot.chip {
   opacity: 1;
   box-shadow: 0 0 10px currentColor;
   text-shadow: 0 0 8px currentColor;
@@ -260,6 +275,10 @@ kbd {
 
 .slot[data-kind='reverse'] {
   color: var(--reverse);
+}
+
+.slot[data-kind='dozer'] {
+  color: var(--dozer);
 }
 
 .fatal {

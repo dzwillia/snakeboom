@@ -3,6 +3,7 @@ import { detectHit } from './collision';
 import { TICK_RATE, type Config } from './config';
 import { tickItemTimers, useItem } from './items';
 import { MAPS } from './maps';
+import { plow } from './dozer';
 import { collectPickups, updatePickups } from './pickups';
 import { createRng } from './rng';
 import { advanceSnake, growthRate } from './snake';
@@ -65,8 +66,11 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
 
   const growth = growthRate(cfg, state.overtime);
   state.snakes.forEach((s, i) => {
-    if (s.alive && advanceSnake(s, i, inputs[i] ?? NO_INPUT, cfg, growth, state.grid)) {
-      events.push({ type: 'boostStarted', player: i });
+    if (!s.alive) return;
+    if (advanceSnake(s, i, inputs[i] ?? NO_INPUT, cfg, growth, state.grid)) events.push({ type: 'boostStarted', player: i });
+    if (s.effects.dozer > 0) {
+      const { moved, crushed } = plow(state, i, cfg);
+      if (moved > 0 || crushed.length > 0) events.push({ type: 'plowed', player: i, moved, crushed });
     }
   });
 

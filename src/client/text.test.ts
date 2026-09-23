@@ -30,6 +30,7 @@ describe('text', () => {
     expect(describeItem({ kind: 'turbo', charges: 1 })).toBe('TURBO');
     expect(describeItem({ kind: 'slow', charges: 1 })).toBe('SLOW');
     expect(describeItem({ kind: 'reverse', charges: 1 })).toBe('REVERSE');
+    expect(describeItem({ kind: 'dozer', charges: 1 })).toBe('DOZER');
   });
 
   it('formats the round clock', () => {

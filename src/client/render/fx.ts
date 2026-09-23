@@ -78,6 +78,12 @@ export class Fx {
       const c = k % 4 === 0 ? 0xffffff : k % 2 === 0 ? PALETTE.bomb : PALETTE.fuse;
       this.spark(x, y, c, 150 + Math.random() * 380, 0.3 + Math.random() * 0.6, 2 + Math.random() * 3);
     }
+    this.debris(tiles);
+    this.addShake(8 + 4 * Math.min(chainDepth, 4));
+  }
+
+  /** Amber rubble from blocks that were blown up or crushed. */
+  debris(tiles: readonly number[]): void {
     for (const index of tiles) {
       const tx = (index % TILE_COLS) * TILE_SIZE + TILE_SIZE / 2;
       const ty = Math.floor(index / TILE_COLS) * TILE_SIZE + TILE_SIZE / 2;
@@ -85,7 +91,6 @@ export class Fx {
         this.spark(tx, ty, PALETTE.obstacle, 60 + Math.random() * 180, 0.5 + Math.random() * 0.7, 3 + Math.random() * 2);
       }
     }
-    this.addShake(8 + 4 * Math.min(chainDepth, 4));
   }
 
   /** A Shield soaking up a hit: a bright green ring, sparks and a little shake. */

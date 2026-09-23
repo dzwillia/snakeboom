@@ -31,6 +31,7 @@ const ITEM_SOUNDS: Partial<Record<PickupKind, SoundName>> = {
   turbo: 'turbo',
   slow: 'slow',
   reverse: 'reverse',
+  dozer: 'dozer',
 };
 
 function element(id: string): HTMLElement {
@@ -141,6 +142,10 @@ async function boot(): Promise<void> {
         }
         case 'effectEnded':
           if (e.effect === 'ghost') sound.play('ghostEnd', 0.7);
+          break;
+        case 'plowed':
+          fx.debris(e.crushed);
+          sound.play('scrape', 0.6);
           break;
         case 'shieldBlocked':
           fx.shieldBurst(e.x, e.y);

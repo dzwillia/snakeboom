@@ -38,6 +38,7 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
 
   const pickups = gui.addFolder('Pickups');
   pickups.add(cfg, 'maxPickups', 0, 10, 1).name('max on field');
+  pickups.add(cfg, 'itemSlots', 1, 5, 1).name('item slots');
   pickups.add(cfg, 'firstPickupDelay', 0, 20, 0.5).name('first spawn (s)');
   pickups.add(cfg, 'pickupInterval', 1, 30, 0.5).name('spawn every (s)');
   pickups.add(cfg, 'pickupLifetime', 3, 60, 1).name('lifetime (s)');
@@ -62,6 +63,7 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   power.add(cfg, 'slowDuration', 0.5, 15, 0.5).name('slow (s)');
   power.add(cfg, 'slowFactor', 0.1, 1, 0.05).name('slow speed ×');
   power.add(cfg, 'reverseDuration', 0.5, 15, 0.5).name('reverse (s)');
+  power.add(cfg, 'dozerDuration', 0.5, 15, 0.5).name('bulldozer (s)');
 
   const mix = gui.addFolder('Pickup mix');
   for (const kind of Object.keys(cfg.pickupWeights) as PickupKind[]) mix.add(cfg.pickupWeights, kind, 0, 100, 1);

@@ -6,14 +6,14 @@ import { headCum } from './trail';
 import type { DeathCause, MatchState, SimEvent, SnakeState } from './types';
 
 /**
- * Spends a held Shield to survive `cause`. A blast is simply absorbed; a wall turns the head to
+ * Pops a Shield bubble to survive `cause`. A blast is simply absorbed; a wall turns the head to
  * slide along it; anything else pushes the head clear and turns it along the surface. Grants
  * shieldGrace. Returns false (changing nothing) when the snake holds no Shield.
  */
 export function tryShield(state: MatchState, idx: number, cause: DeathCause, cfg: Config, events: SimEvent[]): boolean {
   const s = state.snakes[idx];
-  if (s.item?.kind !== 'shield') return false;
-  s.item = null;
+  if (!s.shield) return false;
+  s.shield = false;
   if (cause === 'wall') slideAlongWall(s, cfg.snakeRadius);
   else if (cause !== 'blast') pushClear(state, idx, cause, cfg);
   s.effects.grace = Math.max(1, Math.round(cfg.shieldGrace * TICK_RATE));

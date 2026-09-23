@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, TICK_RATE, type Config } from './config';
 import { HALF_PI, PI } from './detmath';
-import { createItem } from './items';
 import { createMatch, rebuildGrid } from './state';
 import { step } from './step';
 import { createTrail, trailPush } from './trail';
@@ -28,13 +27,13 @@ describe('step with power-ups', () => {
   it('a Shield saves you from a wall once; the next crash kills', () => {
     const s = toPlaying();
     const cyan = s.snakes[0];
-    cyan.item = createItem('shield', cfg);
+    cyan.shield = true;
     Object.assign(cyan, { x: 12, y: 500, heading: PI });
     const first = run(s, 3);
     expect(first).toContainEqual(expect.objectContaining({ type: 'shieldBlocked', player: 0, cause: 'wall' }));
     expect(deaths(first)).toEqual([]);
     expect(cyan.alive).toBe(true);
-    expect(cyan.item).toBeNull();
+    expect(cyan.shield).toBe(false);
     Object.assign(cyan, { x: 12, y: 500, heading: PI });
     expect(deaths(run(s, 3))).toEqual([[0, 'wall']]);
   });
@@ -42,7 +41,7 @@ describe('step with power-ups', () => {
   it('grace shrugs off a blast right after a Shield save', () => {
     const s = toPlaying();
     const cyan = s.snakes[0];
-    cyan.item = createItem('shield', cfg);
+    cyan.shield = true;
     Object.assign(cyan, { x: 12, y: 500, heading: PI });
     run(s, 3);
     s.bombs.push({ id: 99, owner: 1, x: cyan.x, y: cyan.y, fuse: 1, maxFuse: 1, chainDepth: 0, flight: 0, flightTotal: 0, fromX: cyan.x, fromY: cyan.y });
@@ -73,7 +72,7 @@ describe('step with power-ups', () => {
   it('head-on: the shielded snake bounces off and the other dies', () => {
     const s = toPlaying();
     const [a, b] = s.snakes;
-    a.item = createItem('shield', cfg);
+    a.shield = true;
     Object.assign(a, { x: 790, y: 500, heading: 0 });
     Object.assign(b, { x: 806, y: 500, heading: PI });
     const events = run(s, 1);
@@ -85,8 +84,8 @@ describe('step with power-ups', () => {
   it('head-on with two Shields: both bounce off and live', () => {
     const s = toPlaying();
     const [a, b] = s.snakes;
-    a.item = createItem('shield', cfg);
-    b.item = createItem('shield', cfg);
+    a.shield = true;
+    b.shield = true;
     Object.assign(a, { x: 790, y: 500, heading: 0 });
     Object.assign(b, { x: 806, y: 500, heading: PI });
     const events = run(s, 1);
