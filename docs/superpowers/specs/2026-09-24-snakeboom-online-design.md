@@ -1,8 +1,8 @@
 # SnakeBoom Online: Design Spec
 
 - **Date:** 2026-09-24
-- **Status:** Draft, awaiting review
-- **Scope:** Online 1v1 duels started from invite links, plus quick-match, hosted at `snakeboom.com`. Builds on the v1 local prototype (`2026-09-23-snakeboom-v1-design.md`, v0.7.0). Local play stays exactly as it is.
+- **Status:** Reviewed 2026-09-24; decisions 10, 11 and 13 confirmed by the developer
+- **Scope:** Online 1v1 duels started from invite links, plus quick-match, hosted at `snakeboom.com`. Builds on the v1 local prototype (`2026-09-23-snakeboom-v1-design.md`, v0.7.0) and the local AI opponent (PR #9). Local play stays exactly as it is.
 
 ## 1. Goal
 
@@ -24,6 +24,7 @@ The rules engine (`src/sim`) already runs the same way in every browser and in N
 - Touch and phone play. A link opened on a touch-only device shows a "play this on a computer" page that keeps the link. (The v1 spec expected touch in this spec; that's deferred to keep this milestone set small. Nothing here prevents it.)
 - Spectating.
 - Accounts, ranking, stats and match history. The relay logs results to stdout only.
+- Playing the AI online. The AI is a local fallback (section 3.3); an online match is always two people.
 - More than two players in a room.
 - WebRTC peer-to-peer transport. The protocol is transport-agnostic and this could be added later.
 - Server-side simulation for cheat detection. The relay compares state hashes (section 5.7); replaying inputs on the server is a possible later step.
@@ -44,21 +45,25 @@ The rules engine (`src/sim`) already runs the same way in every browser and in N
 | 7 | Config | The default config only. The room creator picks first-to-N. The tuning panel is disabled online. |
 | 8 | Anti-cheat | The relay is the referee: it logs every input and compares state hashes from both clients. A mismatch voids the match. |
 | 9 | Domain | `snakeboom.com`, registered in Route 53 with DNS in Route 53. The relay is at `api.snakeboom.com`. |
-| 10 | Environments | **Assumed, please confirm:** prod only. A `v*` tag deploys to prod. There's no database to migrate and the game is its own smoke test. Stage can be added later with the same files. |
-| 11 | Lobby | **Assumed, please confirm:** a ready-up lobby. Both players see names, match length and ping, and each presses Space to ready up. The same lobby serves invite links, quick-match pairs and rematches. |
+| 10 | Environments | Prod only. A `v*` tag deploys to prod. There's no database to migrate and the game is its own smoke test. Stage can be added later with the same files. |
+| 11 | Lobby | A ready-up lobby. Both players see names, match length and ping, and each presses Space to ready up. The same lobby serves invite links, quick-match pairs and rematches. |
 | 12 | Repo | Same repo, same package. New folders `src/net` (shared protocol) and `src/server` (the relay). Two Docker images: web (static) and api (relay), following the ClearDeal layout. |
+| 13 | AI fallback | The local AI opponent (PR #9, `src/sim/bots/opponent.ts`, Easy/Normal/Hard) is offered while quick-match is waiting, so nobody is stuck on an empty queue. It plays locally, not through the relay. |
 
 ## 3. Player experience
 
 ### 3.1 Title screen
 
-The title screen gains a menu under the logo, moved with ↑/↓ and chosen with Space:
+Today the title screen uses ← / → for the match length and ↑ / ↓ for the opponent (Human, Easy, Normal, Hard). It becomes a short menu of rows, moved between with ↑ / ↓ and highlighted in the player color. ← / → adjusts the highlighted row, and Space confirms:
 
-- **LOCAL** — the v1 game, unchanged.
-- **CREATE LINK** — makes a room and shows the lobby with the link.
-- **QUICK MATCH** — joins the queue.
+| Row | ← / → | Space |
+|---|---|---|
+| **LOCAL · HUMAN / EASY / NORMAL / HARD** | picks the opponent | starts a local match |
+| **FIRST TO N** | picks the match length | starts a local match |
+| **CREATE LINK** | | makes a room and shows the lobby with the link |
+| **QUICK MATCH** | | joins the queue |
 
-The first-to-N selector (← / →) stays on the title screen. It applies to LOCAL and to rooms you create. The first time you pick an online option, a name box appears: 1–12 characters, letters, digits and spaces, saved in `localStorage`. Empty means you play as CYAN or PINK.
+The match length applies to local play and to rooms you create. The row you were on last is remembered. The first time you pick an online row, a name box appears: 1–12 characters, letters, digits and spaces, saved in `localStorage`. Empty means you play as CYAN or PINK.
 
 ### 3.2 Rooms and the lobby
 
@@ -71,6 +76,7 @@ The first-to-N selector (← / →) stays on the title screen. It applies to LOC
 ### 3.3 Quick-match
 
 - QUICK MATCH shows "Looking for an opponent…" with the number of players online, a Cancel button, and your own invite link so you can pull a friend in while you wait. If a friend joins your link, you leave the queue.
+- After 10 s with nobody, the screen adds "or play the AI now · press A", which leaves the queue and starts a local match against the Hard opponent at your first-to-N. Nothing online happens after that; it's the v1 local game.
 - When two players are in the queue, the relay puts them in a fresh room, and both see the lobby. The player who queued first is CYAN, and the match length is that player's first-to-N choice. The lobby shows it, so the other player can leave if they don't like it.
 - Cancel or Esc leaves the queue.
 
@@ -302,10 +308,11 @@ Each ends with a playable checkpoint. Version numbers continue from v0.7.0.
 - `src/net`: protocol, codec, `Room`, `NetSession`, `fakeRelay`, and the rollback test suite.
 - `src/server`: the Node relay with rooms, `/health`, ping, hashes and the forfeit countdown. Dev script.
 - Client: `LocalGame` / `OnlineGame` split, title menu, name box, CREATE LINK lobby, join by link, the online HUD ping and the reconnect overlay.
+- The title-screen menu rework, keeping the opponent selector from PR #9.
 - Playtest: two windows on one machine, then two machines on the same network.
 
 **M6: Match (v0.9.0)**
-- Quick-match queue and screen.
+- Quick-match queue and screen, with the AI fallback.
 - Rejoin with replay. Rematch and leave flows. Desync and server-restart outcomes.
 - Time sync tuning and the stall caption. `bench:rollback` and any `cloneState` work it calls for.
 - Abuse limits and result logging.
