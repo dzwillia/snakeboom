@@ -1,7 +1,18 @@
 import '@fontsource/orbitron/700.css';
 import '@fontsource/orbitron/900.css';
 import './style.css';
-import { createMatch, DEFAULT_CONFIG, rematch, step, type MatchState, type PickupKind, type SimEvent } from '../sim';
+import {
+  createMatch,
+  createOpponent,
+  DEFAULT_CONFIG,
+  opponentInput,
+  rematch,
+  step,
+  type MatchState,
+  type OpponentState,
+  type PickupKind,
+  type SimEvent,
+} from '../sim';
 import { Sound, type SoundName } from './audio';
 import { PICKUP_COLORS, PLAYER_COLORS } from './colors';
 import { Hud } from './hud';
@@ -12,8 +23,8 @@ import { Renderer } from './render/renderer';
 import { applyBloom, createWorld } from './render/world';
 import { Screens } from './screens';
 import { deathBeatAt } from './deathBeat';
-import { browserStorage, CONFIG_KEY, loadStored, saveStored, SETTINGS_KEY, settingsDefaults } from './settings';
-import { describeRound, nextWins } from './text';
+import { browserStorage, CONFIG_KEY, loadSettings, loadStored, saveStored, SETTINGS_KEY, settingsDefaults } from './settings';
+import { describeRound, nextOpponent, nextWins } from './text';
 import { createTuningPanel } from './tuning';
 
 declare global {
@@ -45,7 +56,7 @@ async function boot(): Promise<void> {
   const storage = browserStorage();
   const cfg = loadStored(storage, CONFIG_KEY, DEFAULT_CONFIG);
   const prefersCalm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const settings = loadStored(storage, SETTINGS_KEY, settingsDefaults(prefersCalm));
+  const settings = loadSettings(storage, settingsDefaults(prefersCalm));
 
   const world = await createWorld(element('game'), settings);
   const renderer = new Renderer(world);
@@ -56,6 +67,9 @@ async function boot(): Promise<void> {
   const input = new KeyboardInput(window);
 
   let state: MatchState | null = null;
+  /** Steers PINK when the opponent setting isn't human. */
+  let ai: OpponentState | null = null;
+  const AI_SEAT = 1;
   let paused = false;
   let tuningOpen = false;
   const fuseStage = new Map<number, number>();
@@ -66,12 +80,18 @@ async function boot(): Promise<void> {
     saveStored(storage, CONFIG_KEY, cfg);
     saveStored(storage, SETTINGS_KEY, settings);
   };
+  const showTitle = () => screens.title(cfg.winsToWin, cfg.hearts, settings.opponent);
+  /** Seats the AI (or a human) for a new match, so a mid-match setting change waits for the next one. */
+  const seatOpponent = () => {
+    ai = settings.opponent === 'human' ? null : createOpponent(settings.opponent, newSeed());
+    hud.setTag(AI_SEAT, ai ? 'AI' : '');
+  };
 
   const tuning = createTuningPanel(cfg, settings, {
     onChange: () => {
       applyBloom(world, settings);
       persist();
-      if (!state) screens.title(cfg.winsToWin);
+      if (!state) showTitle();
     },
   });
 
@@ -157,6 +177,10 @@ async function boot(): Promise<void> {
           fx.debris(e.crushed);
           sound.play('scrape', 0.6);
           break;
+        case 'heartLost':
+          fx.heartBurst(e.x, e.y);
+          sound.play('hurt');
+          break;
         case 'shieldBlocked':
           fx.shieldBurst(e.x, e.y);
           sound.play('shield');
@@ -198,7 +222,7 @@ async function boot(): Promise<void> {
         if (state?.phase === 'matchOver') {
           state = null;
           fx.clear();
-          screens.title(cfg.winsToWin);
+          showTitle();
         } else {
           setPaused(!paused);
         }
@@ -211,15 +235,29 @@ async function boot(): Promise<void> {
           cfg.winsToWin = nextWins(cfg.winsToWin, code === 'ArrowLeft' || code === 'KeyA' ? -1 : 1);
           tuning.refresh();
           persist();
-          screens.title(cfg.winsToWin);
+          showTitle();
+        }
+        return;
+      case 'ArrowUp':
+      case 'KeyW':
+      case 'ArrowDown':
+      case 'KeyS':
+        if (!state) {
+          settings.opponent = nextOpponent(settings.opponent, code === 'ArrowUp' || code === 'KeyW' ? -1 : 1);
+          tuning.refresh();
+          persist();
+          showTitle();
         }
         return;
       case 'Space':
         if (!state) {
           state = createMatch(cfg, newSeed());
+          seatOpponent();
+          input.clearLatches();
           screens.clear();
         } else if (state.phase === 'matchOver') {
           rematch(state, cfg, newSeed());
+          seatOpponent();
           fx.clear();
           screens.clear();
         }
@@ -239,10 +277,13 @@ async function boot(): Promise<void> {
     };
   }
 
-  screens.title(cfg.winsToWin);
+  showTitle();
   new FixedLoop(
     () => {
-      if (state && !paused) handle(step(state, input.sample(), cfg));
+      if (!state || paused) return;
+      const inputs = input.sample();
+      if (ai) inputs[AI_SEAT] = opponentInput(ai, state, AI_SEAT, cfg);
+      handle(step(state, inputs, cfg));
     },
     (alpha, frameSeconds) => {
       const f = beat ? deathBeatAt(now() - beat.start, settings) : null;
@@ -252,7 +293,7 @@ async function boot(): Promise<void> {
       fx.setFlash(f ? f.flash : 0);
       renderer.draw(state, alpha, cfg, performance.now() / 1000);
       fx.update(frameSeconds);
-      hud.update(state, cfg);
+      hud.update(state, cfg, performance.now() / 1000);
       tickFuses();
     },
   ).start();

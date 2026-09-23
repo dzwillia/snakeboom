@@ -1,6 +1,7 @@
 import GUI from 'lil-gui';
 import { DEFAULT_CONFIG, type Config, type PickupKind } from '../sim';
-import { DEFAULT_SETTINGS, resetInPlace, type ClientSettings } from './settings';
+import { DEFAULT_SETTINGS, OPPONENT_MODES, resetInPlace, type ClientSettings } from './settings';
+import { describeOpponent } from './text';
 
 export interface TuningPanel {
   show(): void;
@@ -12,6 +13,11 @@ export interface TuningPanel {
 /** Live sliders for every M1 tunable. The sim reads `cfg` each tick, so changes apply at once. */
 export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: { onChange(): void }): TuningPanel {
   const gui = new GUI({ title: 'SnakeBoom tuning  ( ` to hide )' });
+
+  const opponent = gui.addFolder('Opponent');
+  opponent
+    .add(settings, 'opponent', Object.fromEntries(OPPONENT_MODES.map((m) => [describeOpponent(m), m])))
+    .name('PINK is');
 
   const move = gui.addFolder('Movement');
   move.add(cfg, 'baseSpeed', 60, 400, 5).name('speed');
@@ -33,6 +39,8 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
 
   const match = gui.addFolder('Match');
   match.add(cfg, 'winsToWin', 1, 10, 1).name('first to');
+  match.add(cfg, 'hearts', 1, 5, 1).name('hearts');
+  match.add(cfg, 'heartGrace', 0, 3, 0.1).name('grace after a hit (s)');
   match.add(cfg, 'countdownSeconds', 1, 5, 1).name('countdown (s)');
   match.add(cfg, 'roundOverSeconds', 1, 6, 0.5).name('round banner (s)');
 
@@ -57,7 +65,7 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
 
   const power = gui.addFolder('Power-ups');
   power.add(cfg, 'ghostDuration', 0.5, 10, 0.25).name('ghost (s)');
-  power.add(cfg, 'ghostWarning', 0, 3, 0.25).name('ghost warning (s)');
+  power.add(cfg, 'effectWarning', 0, 10, 0.25).name('expiry warning (s)');
   power.add(cfg, 'shieldGrace', 0, 3, 0.1).name('shield grace (s)');
   power.add(cfg, 'turboDuration', 0.5, 15, 0.5).name('turbo (s)');
   power.add(cfg, 'slowDuration', 0.5, 15, 0.5).name('slow (s)');

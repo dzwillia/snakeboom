@@ -1,6 +1,18 @@
 import type { DeathRecord, ItemState } from '../sim';
+import { OPPONENT_MODES, type OpponentMode } from './settings';
 
 export const PLAYER_NAMES: readonly string[] = ['CYAN', 'PINK'];
+
+/** The title screen's opponent selector: HUMAN, then the AI difficulties, wrapping around. */
+export function nextOpponent(current: OpponentMode, delta: number): OpponentMode {
+  const n = OPPONENT_MODES.length;
+  const i = Math.max(0, OPPONENT_MODES.indexOf(current));
+  return OPPONENT_MODES[(((i + delta) % n) + n) % n];
+}
+
+export function describeOpponent(mode: OpponentMode): string {
+  return mode === 'human' ? 'HUMAN' : `AI · ${mode.toUpperCase()}`;
+}
 
 export function describeDeath(d: DeathRecord, names: readonly string[] = PLAYER_NAMES): string {
   const victim = names[d.player];
@@ -32,7 +44,8 @@ export function describeRound(
     const line = describeDeath(d, names);
     if (!lines.includes(line)) lines.push(line);
   }
-  return { title, detail: lines.length > 0 ? lines.join(' · ') : 'Time ran out' };
+  if (lines.length > 0) return { title, detail: lines.join(' · ') };
+  return { title, detail: winner === null ? 'Time ran out' : `Time's up · ${names[winner]} had more hearts` };
 }
 
 /** HUD label for an item slot; empty string when the slot is empty. */

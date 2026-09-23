@@ -25,7 +25,8 @@ export type SoundName =
   | 'reverse'
   | 'dozer'
   | 'scrape'
-  | 'nearMiss';
+  | 'nearMiss'
+  | 'hurt';
 
 // ZzFX parameters: volume, randomness, frequency, attack, sustain, release, shape, shapeCurve,
 // slide, deltaSlide, pitchJump, pitchJumpTime, repeatTime, noise, modulation, bitCrush, delay,
@@ -54,6 +55,7 @@ const BANK: Record<SoundName, number[]> = {
   dozer: [0.6, 0.05, 90, 0.05, 0.3, 0.2, 2, 1, 0, 0, 0, 0, 0, 0.2, 0, 0, 0, 1, 0, 0.3],
   scrape: [0.25, 0.2, 120, 0, 0.03, 0.06, 4, 1, 0, 0, 0, 0, 0, 2],
   nearMiss: [0.3, 0.05, 1100, 0, 0.02, 0.09, 0, 1, -24],
+  hurt: [0.9, 0.1, 200, 0.01, 0.06, 0.3, 2, 2, -12, 0, 0, 0, 0, 0.5, 0, 0.1],
 };
 
 /** Synthesized sound effects (no audio files). */

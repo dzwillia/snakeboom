@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DeathCause, DeathRecord } from '../sim';
-import { describeDeath, describeItem, describeRound, formatClock, nextWins } from './text';
+import { describeDeath, describeItem, describeOpponent, describeRound, formatClock, nextOpponent, nextWins } from './text';
 
 const d = (player: number, cause: DeathCause, killer: number | null): DeathRecord => ({ player, cause, killer, x: 0, y: 0 });
 
@@ -20,6 +20,7 @@ describe('text', () => {
     expect(describeRound(null, [d(0, 'headOn', 1), d(1, 'headOn', 0)])).toEqual({ title: 'DRAW', detail: 'Head-on collision' });
     expect(describeRound(null, [d(0, 'wall', null), d(1, 'wall', null)]).detail).toBe('CYAN hit the wall · PINK hit the wall');
     expect(describeRound(null, [])).toEqual({ title: 'DRAW', detail: 'Time ran out' });
+    expect(describeRound(0, [])).toEqual({ title: 'CYAN SCORES', detail: "Time's up · CYAN had more hearts" });
   });
 
   it('labels held items for the HUD', () => {
@@ -40,6 +41,15 @@ describe('text', () => {
     expect(nextWins(10, 1)).toBe(10);
     expect(nextWins(1, -1)).toBe(1);
     expect(nextWins(3.4, 1)).toBe(4);
+  });
+
+  it('cycles the opponent selector through human and every AI level', () => {
+    expect(nextOpponent('human', 1)).toBe('easy');
+    expect(nextOpponent('easy', 1)).toBe('normal');
+    expect(nextOpponent('hard', 1)).toBe('human');
+    expect(nextOpponent('human', -1)).toBe('hard');
+    expect(describeOpponent('human')).toBe('HUMAN');
+    expect(describeOpponent('normal')).toBe('AI · NORMAL');
   });
 
   it('formats the round clock', () => {

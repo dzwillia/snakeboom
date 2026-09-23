@@ -1,5 +1,6 @@
 import { PLAYER_CSS } from './colors';
-import { PLAYER_NAMES } from './text';
+import type { OpponentMode } from './settings';
+import { describeOpponent, PLAYER_NAMES } from './text';
 
 type ScreenKind = 'none' | 'title' | 'countdown' | 'banner' | 'matchOver' | 'paused';
 
@@ -15,7 +16,11 @@ export class Screens {
     this.show('', 'none');
   }
 
-  title(winsToWin: number): void {
+  title(winsToWin: number, hearts: number, opponent: OpponentMode = 'human'): void {
+    const pink =
+      opponent === 'human'
+        ? `<p><kbd>←</kbd> <kbd>→</kbd> steer</p><p><kbd>↑</kbd> boost</p><p><kbd>↓</kbd> use item</p>`
+        : `<p>${describeOpponent(opponent)}</p><p class="dim">plays this seat</p>`;
     this.show(
       `
       <div class="panel">
@@ -23,12 +28,13 @@ export class Screens {
         <div class="controls">
           <div class="p1"><h3>${PLAYER_NAMES[0]}</h3>
             <p><kbd>A</kbd> <kbd>D</kbd> steer</p><p><kbd>W</kbd> boost</p><p><kbd>S</kbd> use item</p></div>
-          <div class="p2"><h3>${PLAYER_NAMES[1]}</h3>
-            <p><kbd>←</kbd> <kbd>→</kbd> steer</p><p><kbd>↑</kbd> boost</p><p><kbd>↓</kbd> use item</p></div>
+          <div class="p2"><h3>${PLAYER_NAMES[1]}</h3>${pink}</div>
         </div>
         <div class="small">PICKUPS: BOMB · GHOST · SHIELD · TURBO · SLOW · REVERSE · DOZER</div>
         <div class="hint">PRESS SPACE TO START</div>
         <div class="selector">FIRST TO <kbd>◀</kbd> <span class="wins">${winsToWin}</span> <kbd>▶</kbd></div>
+        <div class="selector">${PLAYER_NAMES[1]} <kbd>▲</kbd> <span class="mode">${describeOpponent(opponent)}</span> <kbd>▼</kbd></div>
+        <div class="small">${hearts} ${hearts === 1 ? 'HEART' : 'HEARTS'} EACH PER ROUND</div>
         <div class="small"><kbd>ESC</kbd> PAUSE · <kbd>M</kbd> MUTE · <kbd>\`</kbd> TUNING</div>
       </div>`,
       'title',

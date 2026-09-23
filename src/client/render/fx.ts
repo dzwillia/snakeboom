@@ -105,6 +105,14 @@ export class Fx {
     }
   }
 
+  /** Losing a heart: a red burst and a jolt. */
+  heartBurst(x: number, y: number): void {
+    this.ring(x, y, 50, 0.4, 0xff3b5c);
+    this.ring(x, y, 24, 0.25, 0xffffff);
+    for (let k = 0; k < 36; k++) this.spark(x, y, k % 3 === 0 ? 0xffffff : 0xff3b5c, 120 + Math.random() * 220, 0.3 + Math.random() * 0.4, 2.5);
+    this.addShake(10);
+  }
+
   /** A Shield soaking up a hit: a bright green ring, sparks and a little shake. */
   shieldBurst(x: number, y: number): void {
     this.ring(x, y, 46, 0.4, PICKUP_COLORS.shield);

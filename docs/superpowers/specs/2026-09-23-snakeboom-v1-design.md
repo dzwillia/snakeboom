@@ -68,26 +68,34 @@ The long-term goal is a hosted web game with 1v1 duels started from invite links
 
 ### 3.2 Snakes
 
-- **Body:** a snake is a head (a circle of radius `r` = 7) plus a **trail**, which is the ordered list of points the head has passed through, one per tick. Trail points stay fixed in the world. The snake moves by adding a point at the head and dropping points from the tail.
+- **Body:** a snake is a head (a circle of radius `r` = 8) plus a **trail**, which is the ordered list of points the head has passed through, one per tick. Trail points stay fixed in the world. The snake moves by adding a point at the head and dropping points from the tail.
 - **Growth:** the target length grows every tick at `growthPerSecond`, measured from GO. After `overtimeAt`, the rate is multiplied by `overtimeGrowthMultiplier`. Tail points are trimmed so that the trail's path length never exceeds the target.
 - **Steering:** the turn input is −1, 0 or +1. Holding both turn keys counts as 0. Each tick the heading rotates by `turnRate × dt`. The turn rate never changes, so faster snakes make wider turns.
 - **Speed:** `baseSpeed × (boosting ? boostMultiplier : 1) × (slowed ? slowFactor : 1)`.
 - **Boost meter:** the meter runs from 0 to 1. The snake is boosting while the boost key is held and the meter is above 0, and the meter drains at `1 / boostMeterSeconds` per second. It refills at `1 / boostRefillSeconds` per second, but only while the key is released. Turbo stops the drain.
 - **Spawning:** each map sets a spawn cell and heading for each player. A snake starts as a lone head, and its body grows out behind it as it moves.
-- **Reset:** everything round-specific resets at the start of each round: length, trail, meter, items, effects, bombs, pickups, and the map's tiles.
+- **Reset:** everything round-specific resets at the start of each round: length, trail, meter, hearts, items, effects, bombs, pickups, and the map's tiles.
 
-### 3.3 Death
+### 3.3 Hits and death
 
-A head dies if any of the following is true at the end of a tick:
+A head is **hit** if any of the following is true at the end of a tick:
 
 - **Wall:** the head circle crosses the arena border.
 - **Obstacle:** the head circle overlaps a solid tile. Ghost prevents this.
 - **Body:** the head is within `2r` of a solid trail point of another snake. Ghost prevents this.
 - **Self:** the head is within `2r` of a solid point on its own trail, not counting the newest `neckLength` units of path. Ghost prevents this.
-- **Head-on:** the head is within `2r` of another head, and neither snake is a ghost. Both snakes die.
+- **Head-on:** the head is within `2r` of another head, and neither snake is a ghost. Both snakes are hit.
 - **Blast:** the head is caught in an explosion (section 3.6). Ghost does not prevent this.
 
-A Shield absorbs any one of these deaths (section 3.5).
+A Shield absorbs any one of these hits (section 3.5). Otherwise a spare heart does, and a hit with neither kills.
+
+**Hearts:** each snake starts every round with `hearts` (3). A hit the Shield doesn't absorb costs a heart instead of killing, as long as the snake has more than one heart left:
+
+- The snake deflects exactly as a Shield deflects it (section 3.5) and gets `heartGrace` seconds of invulnerability to everything except walls.
+- A `heartLost` event is sent, with the hearts left and the cause.
+- A hit on the last heart kills.
+- In a head-on collision, each snake pays for its own hit: both lose a heart, or both die if it was their last.
+- Setting `hearts` to 1 gives the original one-hit rules.
 
 If several causes apply in the same tick, the reported cause is the first one in this order: `blast` (resolved first, in tick step 6), then `headOn`, then `body` / `self`, then `obstacle`, then `wall`.
 
@@ -95,7 +103,7 @@ If several causes apply in the same tick, the reported cause is the first one in
 
 **Death events** record a cause (`wall`, `obstacle`, `body`, `self`, `headOn` or `blast`) and a killer, where there is one: the owner of the body that was hit, or the owner of the bomb. The round banner uses these, for example "PINK hit CYAN's body" or "CYAN blew themselves up."
 
-**The neck is safe.** At minimum turning radius (`baseSpeed / turnRate` = 50 units, or 30 while slowed), the trail point `neckLength` = 24 units back is about 23 units from the head. That is safely more than `2r` = 14, so a snake can never clip its own neck. It can still circle into its own tail once it is long enough, which is intended.
+**The neck is safe.** At minimum turning radius (`baseSpeed / turnRate` ≈ 44 units, or about 27 while slowed), the trail point `neckLength` = 30 units back is about 29 units from the head (28 while slowed). That is safely more than `2r` = 16, so a snake can never clip its own neck. It can still circle into its own tail once it is long enough, which is intended.
 
 ### 3.4 Pickups
 
@@ -103,7 +111,7 @@ Pickups are the only source of bombs and power-ups.
 
 - **Spawning:** the first pickup appears `firstPickupDelay` after GO. After that, every `pickupInterval` seconds a new pickup spawns if fewer than `maxPickups` are on the field.
 - **Placement:** the spawn point comes from the seeded random generator. It must be at least `pickupClearance` from walls, solid tiles, solid trail points and bombs, and at least `pickupMinHeadDistance` from every head. The game tries up to 50 random points. If none fit, it skips that spawn.
-- **Kind:** chosen by weight. The defaults are Bomb 25 and 15 each for the other five kinds.
+- **Kind:** chosen by weight. The defaults are Bulldozer 35, Bomb 25, Shield, Turbo and Slow 20 each, Ghost 13 and Reverse 12.5.
 - **Lifetime:** `pickupLifetime`. The pickup blinks for its last 3 seconds (a client-side effect) and then disappears. This stops pickups that get walled in from blocking new spawns.
 - **Collecting:** a head collects a pickup on contact (`distance < r + pickupRadius`) if it has room: a free item slot, or, for a Shield, no bubble already. Bodies never collect pickups. When both heads reach the same pickup, the closer one gets it.
 
@@ -114,12 +122,14 @@ Each player carries up to `itemSlots` (3) items in a queue, oldest first, and bo
 | Item | What Use does | Details |
 |---|---|---|
 | **Bomb ×3** | Throws a bomb ahead of your opponent | It arcs through the air for `bombFlightTime` and lands where they'll be if they hold course, then blasts `bombFuse` later. A reticle marks the blast zone from the moment it's thrown. The slot empties after the third bomb, and throws must be at least `bombThrowCooldown` apart. |
-| **Ghost** | For `ghostDuration`, your **head** passes through bodies, other heads and obstacles | Walls and blasts still kill. Your body stays solid to your opponent. The head flickers for the final `ghostWarning`. If the head is inside something when Ghost ends, it dies. |
-| **Shield** | (never in the queue) | Picking it up puts a bubble on you straight away. The bubble absorbs your next death of any kind, then pops. You can only have one at a time; while you have one, Shield pickups stay on the field. |
+| **Ghost** | For `ghostDuration`, your **head** passes through bodies, other heads and obstacles | Walls and blasts still hit you. Your body stays solid to your opponent. If the head is inside something when Ghost ends, that's a hit. |
+| **Shield** | (never in the queue) | Picking it up puts a bubble on you straight away. The bubble absorbs your next hit of any kind before it costs a heart, then pops. You can only have one at a time; while you have one, Shield pickups stay on the field. |
 | **Turbo** | For `turboDuration`, boosting doesn't drain the meter | You still hold the boost key to go fast. |
 | **Slow** | For `slowDuration`, every opponent moves at `slowFactor` speed | Using it again restarts the timer. |
 | **Reverse** | For `reverseDuration`, every opponent's left and right are swapped | The sim applies the swap to inputs, so a future server does it too. |
-| **Bulldozer** | For `dozerDuration`, a plow on your head shoves blocks | Blocks the plow touches move one tile ahead along your heading's main axis, pushing rows of up to 4 blocks. A block that can't move (a longer row, or one at the arena edge) is crushed. While plowing, blocks can't hurt you, but bodies, heads and walls still can. Shoving a block into your opponent's head kills them. It never spawns on maps without blocks. |
+| **Bulldozer** | For `dozerDuration`, a plow on your head shoves blocks | Blocks the plow touches move one tile ahead along your heading's main axis, pushing rows of up to 4 blocks. A block that can't move (a longer row, or one at the arena edge) is crushed. While plowing, blocks can't hurt you, but bodies, heads and walls still can. Shoving a block into your opponent's head hits them. It never spawns on maps without blocks. |
+
+**Expiry warning:** every timed special (Ghost, Turbo, Slow, Reverse and Bulldozer) flashes on and off for its final `effectWarning` seconds, both on the snake and on its HUD chip. The flashing speeds up as the time runs out. Setting `effectWarning` to 0 turns the warning off.
 
 **How a Shield deflects:**
 
@@ -127,7 +137,7 @@ Each player carries up to `itemSlots` (3) items in a queue, oldest first, and bo
 - **Body, obstacle, head-on, or ending a Ghost inside something:** the game finds the contact normal, which points from the nearest contact point (on a trail point, tile or head) to the head's center. The head is pushed out along the normal until it is clear. Its heading is set along the surface, perpendicular to the normal, in whichever direction is closer to the old heading.
 - **Blast:** the Shield absorbs it without changing direction.
 - **Afterward:** the snake gets `shieldGrace` seconds of invulnerability to everything except walls. A `shieldBlocked` event is sent.
-- **Head-on with Shields:** if both snakes have a Shield, both deflect. If only one does, it deflects and the other snake dies.
+- **Head-on with Shields:** if both snakes have a Shield, both deflect. If only one does, it deflects and the other snake loses a heart (or dies on its last).
 
 ### 3.6 Bombs and blasts
 
@@ -144,8 +154,8 @@ Each player carries up to `itemSlots` (3) items in a queue, oldest first, and bo
 
 - **Phases:** `countdown` (`countdownSeconds`: the snakes are shown frozen at their spawns) → `playing` → `roundOver` (`roundOverSeconds`: gameplay is frozen and the banner shows) → the next `countdown`, or `matchOver`.
 - **Scoring:** winning a round scores 1 and a draw scores nothing. The first player to reach `winsToWin` wins the match. `winsToWin` defaults to 5 and can be set from 1 to 10.
-- **Overtime:** it starts after `overtimeAt` seconds of round time. Growth is multiplied as described in section 3.2, the HUD clock turns red, and an `overtime` event is sent.
-- **Safety net:** if a round reaches `roundMaxSeconds`, it ends in a draw. This should never happen in real play.
+- **Overtime:** it starts after `overtimeAt` seconds of round time. Growth is multiplied as described in section 3.2, the HUD clock turns red, and an `overtime` event is sent. With the default time limit (90 s) ending rounds before `overtimeAt` (180 s), overtime only happens if the time limit is raised.
+- **Time limit:** a round lasts at most `roundMaxSeconds`. If both snakes are still alive then, the one with more hearts left wins the round, and equal hearts is a draw. The banner says "Time's up · CYAN had more hearts" or "Time ran out".
 - **Map rotation:** round 1 is always on "Open". Later rounds draw maps from a shuffle of all five, seeded by the match, and never use the same map twice in a row.
 - **Match over:** the winner is shown. Space starts a rematch (scores reset, new seed), and Esc goes back to the title screen.
 
@@ -191,6 +201,7 @@ Effects run only in the client. The sim reports events, and the client reacts to
 - **Explosion:** an additive flash, an expanding shockwave ring, 40–80 sparks, debris from destroyed tiles, and screen shake. Shake adds up across a chain reaction, with a cap. Each chained blast plays at a slightly higher pitch.
 - **Death:** a hit-stop of about 120 ms (freeze plus a white flash). Then the dead snake's body shatters into particles along its whole length while effects play at 0.3× speed for about 0.8 s, with a small camera punch-in. The round banner follows.
   - Gameplay itself is frozen during `roundOver`. The slow motion applies only to effects and the camera, which is how the "beat of slow-mo" from the design discussion is delivered.
+- **Losing a heart:** a red ring, sparks, a jolt of screen shake and a "hurt" sound. The head then flashes a white ring while its grace lasts.
 - **Small effects:** a burst when a pickup is collected, a "thunk" when a bomb is dropped, and sparks while boosting.
 - **Stretch goal (M4):** sparks for near misses, when a head passes within a few units of a body and survives.
 
@@ -198,9 +209,9 @@ Effects run only in the client. The sim reports events, and the client reacts to
 
 The HUD and screens are HTML/CSS overlays on top of the canvas.
 
-- **Top bar:** CYAN's score pips, boost meter, Shield chip and item queue are on the left. The next item is highlighted, and bomb charges show on the bomb's slot. The round clock is in the center and shows "OVERTIME" in red. PINK's side mirrors CYAN's on the right.
+- **Top bar:** CYAN's side is on the left, in two rows. The first row has the name, hearts (spent ones are dimmed) and score pips. The second has the boost meter, a chip for each running special with its seconds left, the Shield chip and the item queue. Special chips flash during the expiry warning. The next item is highlighted, and bomb charges show on the bomb's slot. The round clock is in the center and shows "OVERTIME" in red. PINK's side mirrors CYAN's on the right.
 - **Screens:**
-  - **Title:** the logo, both players' controls, a "First to N" selector, and "SPACE to start".
+  - **Title:** the logo, both players' controls, a "First to N" selector, the hearts per round, and "SPACE to start".
   - **Countdown:** 3-2-1-GO.
   - **Round banner:** the result and cause of death.
   - **Match over:** the winner and final score, with "SPACE rematch · ESC menu".
@@ -210,7 +221,7 @@ The HUD and screens are HTML/CSS overlays on top of the canvas.
 ### 4.4 Audio
 
 - Every sound is generated at runtime with ZzFX (MIT license). There are no audio files.
-- **Sound list:** countdown beeps and GO, boost start, pickup spawn (soft), pickup collect, bomb drop, fuse ticks in the last 0.5 s, explosion (higher pitch for chain links), ghost on and off, shield block, turbo, slow, reverse, death, round win, match win, and an overtime alarm.
+- **Sound list:** countdown beeps and GO, boost start, pickup spawn (soft), pickup collect, bomb drop, fuse ticks in the last 0.5 s, explosion (higher pitch for chain links), ghost on and off, shield block, heart lost, turbo, slow, reverse, death, round win, match win, and an overtime alarm.
 - M mutes the sound, and the master volume is in the tuning panel. Audio starts on the first key press, because browsers block autoplay.
 
 ### 4.5 Controls
@@ -323,13 +334,13 @@ type PlayerInput = {
 
 1. Advance the phase timers (countdown, round over).
 2. Advance the effect timers. Apply Reverse to the inputs.
-3. Use items (drop bombs, start effects).
-4. Steer, move, add the new trail point, grow, and trim the tail.
+3. Use items (throw bombs, start effects).
+4. Steer, move, add the new trail point, grow, and trim the tail. A running Bulldozer then plows.
 5. Collect pickups.
 6. Advance bomb fuses, then resolve explosions and chain reactions.
-7. Check collisions and apply Shield deflections.
-8. Resolve deaths into a round result.
-9. Spawn new pickups and expire old ones.
+7. Check collisions. Each hit is absorbed by a Shield, then by a spare heart, and otherwise kills.
+8. Resolve deaths (or the time limit) into a round result.
+9. Detect near misses, then spawn new pickups and expire old ones.
 10. Return the events.
 
 **Events:**
@@ -338,9 +349,9 @@ type PlayerInput = {
 |---|---|
 | Round flow | `countdown{n}`, `go`, `overtime`, `roundOver{winner \| null, deaths}`, `matchOver{winner}` |
 | Pickups | `pickupSpawned{id, kind, x, y}`, `pickupCollected{id, kind, player}`, `pickupExpired{id}` |
-| Items and effects | `itemUsed{player, kind}`, `effectStarted{player, effect}`, `effectEnded{player, effect}`, `boostStarted{player}` |
-| Bombs | `bombDropped{id, player, x, y}`, `explosion{id, owner, x, y, radius, chainDepth, tilesDestroyed}` |
-| Damage | `shieldBlocked{player, x, y, cause}`, `death{player, cause, killer \| null, x, y}` |
+| Items and effects | `itemUsed{player, kind}`, `effectStarted{player, effect}`, `effectEnded{player, effect}`, `boostStarted{player}`, `plowed{player, moved, crushed}` |
+| Bombs | `bombThrown{id, player, fromX, fromY, x, y}`, `bombLanded{id, x, y}`, `explosion{id, owner, x, y, radius, chainDepth, tilesDestroyed}` |
+| Damage | `shieldBlocked{player, x, y, cause}`, `heartLost{player, heartsLeft, cause, x, y}`, `death{player, cause, killer \| null, x, y}`, `nearMiss{player, x, y}` |
 
 ### 5.4 Client (`src/client`)
 
@@ -353,39 +364,43 @@ type PlayerInput = {
 
 Because the engine is deterministic and each player's input per tick is tiny (about 1 byte), it can support either an authoritative server or rollback netcode over a relay. The online spec will make that choice. Online, the config is fixed for the whole match. Invite links will open on phones, so the online spec also has to cover touch controls.
 
-## 6. Tunable defaults (starting values)
+## 6. Tunable defaults
+
+These are the v0.7.0 defaults, taken from a playtest tuning session.
 
 | Group | Setting | Default |
 |---|---|---|
 | Arena | `arenaWidth` × `arenaHeight` · `tileSize` · map cell | 1600 × 1000 · 20 · 40 (fixed in v1) |
-| Snake | `snakeRadius` (r) | 7 |
-| | `baseSpeed` | 170 units/s |
-| | `turnRate` | 3.4 rad/s (~195°/s, 50-unit turning radius) |
-| | `neckLength` | 24 units |
-| Growth | `startLength` | 120 units |
-| | `growthPerSecond` | 40 units/s |
-| | `overtimeAt` · `overtimeGrowthMultiplier` | 150 s · ×3 |
-| | `roundMaxSeconds` (safety net) | 300 s |
-| Boost | `boostMultiplier` | 1.6 |
+| Snake | `snakeRadius` (r) | 8 |
+| | `baseSpeed` | 240 units/s |
+| | `turnRate` | 5.4 rad/s (~309°/s, ~44-unit turning radius) |
+| | `neckLength` | 30 units |
+| Growth | `startLength` | 60 units |
+| | `growthPerSecond` | 20 units/s |
+| | `overtimeAt` · `overtimeGrowthMultiplier` | 180 s · ×3 |
+| | `roundMaxSeconds` (time limit) | 90 s |
+| Boost | `boostMultiplier` | 2 |
 | | `boostMeterSeconds` (full → empty) | 2.0 s |
 | | `boostRefillSeconds` (empty → full, key released) | 6.0 s |
 | Pickups | `maxPickups` · `firstPickupDelay` · `pickupInterval` | 4 · 1 s · 2.5 s |
 | | `pickupLifetime` · `pickupRadius` | 12 s · 14 |
 | | `pickupMinHeadDistance` · `pickupClearance` | 150 · 40 |
-| | Weights | bomb 25 · ghost 12.5 · shield 12.5 · turbo 12.5 · slow 12.5 · reverse 12.5 · dozer 12.5 |
+| | Weights | bomb 25 · ghost 13 · shield 20 · turbo 20 · slow 20 · reverse 12.5 · dozer 35 |
 | | `itemSlots` | 3 |
 | Bombs | `bombCharges` · `bombThrowCooldown` · `bombFlightTime` | 3 · 0.5 s · 0.45 s |
 | | `bombFuse` (after landing) · `blastRadius` · `chainDelay` · `bombLeadFactor` | 1 s · 70 · 0.12 s · 1 |
-| Items | `ghostDuration` · `ghostWarning` | 3 s · 0.75 s |
+| Items | `ghostDuration` | 3 s |
+| | `effectWarning` (specials flash before they run out) | 3 s |
 | | `shieldGrace` | 0.5 s |
 | | `turboDuration` | 4 s |
 | | `slowDuration` · `slowFactor` | 4 s · 0.6 |
 | | `reverseDuration` | 4 s |
 | | `dozerDuration` | 5 s |
+| Hearts | `hearts` · `heartGrace` | 3 · 1 s |
 | Match | `winsToWin` · `countdownSeconds` · `roundOverSeconds` | 5 · 3 s · 2.5 s |
 | Effects (client) | bloom on · strength · threshold | on · 1.5 · 0.2 |
-| | `shakeScale` · `hitStopSeconds` · `slowMoScale` · `slowMoSeconds` | 1.0 · 0.12 s · 0.3 · 0.8 s |
-| Audio (client) | `masterVolume` · `muted` | 0.6 · false |
+| | `shakeScale` · `hitStopSeconds` · `slowMoScale` · `slowMoSeconds` | 2.0 · 0.12 s · 0.3 · 0.8 s |
+| Audio (client) | `masterVolume` · `muted` | 0.8 · false |
 
 The tick rate is fixed at 60 Hz and can't be tuned.
 
@@ -394,10 +409,11 @@ The tick rate is fixed at 60 Hz and can't be tuned.
 - **TDD with Vitest** for every rule in section 3:
   - steering and turning radius
   - speed with boost, Slow and Turbo, and the boost meter draining and refilling
-  - growth, overtime, the safety net, and tail trimming
+  - growth, overtime, the time limit, and tail trimming
   - every cause of death, the neck being safe, head-on draws, and simultaneous deaths
   - Ghost, including dying when it ends inside something
   - Shield deflection and grace for every kind of hit
+  - hearts: a hit costs one and deflects, the last one kills, a Shield is spent first, they refill each round, and a timed-out round goes to the snake with more
   - pickup spawn timing, the pickup limit, clearance, expiry, and collecting only with an empty slot
   - each item's effect and timers
   - bomb fuses, blast kills including your own bomb, holes that stay until the tail passes, tile destruction, and chain reactions with the delay
@@ -501,3 +517,4 @@ Playtest focus: the "one more match" test.
 
 - **v0.4.0.** Bombs are thrown, not dropped. The old drop-at-your-head bomb felt random. A thrown bomb lands where the opponent is heading, shows a reticle over its blast zone, and gives them about 1.45 s to react. More pickups spawn: up to 4 on the field, the first after 1 s, then one every 2.5 s, each lasting 12 s. Power-ups have more weight relative to bombs.
 - **v0.5.0.** Snakes carry up to 3 items in a queue, and Use fires the oldest. A Shield becomes a bubble that never takes a slot. There's a new **Bulldozer** power-up: for 5 s your plow shoves blocks, pushing rows of up to 4 and crushing any it can't move. It can shove a block into your opponent's head.
+- **v0.7.0.** Each snake has 3 **hearts** per round. A hit costs a heart instead of killing: the snake deflects as if it had a Shield and gets 1 s of grace, and only a hit on the last heart kills. A Shield is still spent before a heart. Timed specials flash on and off for their last `effectWarning` seconds (3 s), on the snake and on the HUD, where each running special now shows its seconds left. Rounds end after 90 s; the snake with more hearts left wins, and equal hearts is a draw. The defaults come from a playtest tuning session: faster, tighter-turning snakes that start shorter and grow more slowly (speed 240, turn rate 5.4, start length 60, growth 20/s), boost ×2, a bigger head (r = 8), more Bulldozers, Shields, Turbos and Slows, double screen shake, and volume 0.8.

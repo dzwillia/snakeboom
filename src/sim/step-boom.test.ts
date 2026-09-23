@@ -8,7 +8,8 @@ import { createTrail, trailPush } from './trail';
 import { NO_INPUT, type MatchState, type PlayerInput, type SimEvent } from './types';
 
 // Keep random pickups out of the way unless a test places them.
-const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000 };
+// One heart: these tests exercise the one-hit death rules (hearts have their own tests).
+const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000, hearts: 1 };
 const idle: PlayerInput[] = [NO_INPUT, NO_INPUT];
 
 function run(s: MatchState, ticks: number, inputs: PlayerInput[] = idle): SimEvent[] {
@@ -59,7 +60,7 @@ describe('step with bombs and pickups', () => {
     const [cyan, pink] = s.snakes;
     pink.trail = createTrail();
     for (let y = 200; y <= 800; y += 3) trailPush(pink.trail, 800, y);
-    Object.assign(pink, { x: 800, y: 800, prevX: 800, prevY: 800, heading: PI / 2, targetLength: 1e9 });
+    Object.assign(pink, { x: 800, y: 800, prevX: 800, prevY: 800, heading: PI, targetLength: 1e9 }); // away from every wall
     cyan.trail = createTrail();
     trailPush(cyan.trail, 700, 500);
     Object.assign(cyan, { x: 700, y: 500, prevX: 700, prevY: 500, heading: 0 });

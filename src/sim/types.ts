@@ -107,6 +107,8 @@ export interface SnakeState {
   items: ItemState[];
   /** A Shield bubble: absorbs the next death. Never takes an item slot. */
   shield: boolean;
+  /** Hits left this round; the snake dies on the hit that takes the last one. */
+  hearts: number;
   /** Ticks until Use works again. */
   useCooldown: number;
   /** Bumped whenever a blast punches holes in this trail, so the renderer redraws it. */
@@ -177,6 +179,7 @@ export type SimEvent =
   | { type: 'shieldBlocked'; player: number; x: number; y: number; cause: DeathCause }
   | { type: 'nearMiss'; player: number; x: number; y: number }
   | { type: 'plowed'; player: number; moved: number; crushed: number[] }
+  | { type: 'heartLost'; player: number; heartsLeft: number; cause: DeathCause; x: number; y: number }
   | {
       type: 'explosion';
       id: number;
