@@ -51,7 +51,7 @@ describe('soak', () => {
     ['fast, long snakes', { baseSpeed: 400, startLength: 600 }],
     [
       'bomb chaos',
-      { maxPickups: 6, pickupInterval: 1, firstPickupDelay: 0, bombCharges: 10, bombDropCooldown: 0, blastRadius: 200, chainDelay: 0.02 },
+      { maxPickups: 6, pickupInterval: 1, firstPickupDelay: 0, bombCharges: 10, bombThrowCooldown: 0, blastRadius: 200, chainDelay: 0.02 },
     ],
     ['no pickups at all', { maxPickups: 0 }],
     [

@@ -37,7 +37,7 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   match.add(cfg, 'roundOverSeconds', 1, 6, 0.5).name('round banner (s)');
 
   const pickups = gui.addFolder('Pickups');
-  pickups.add(cfg, 'maxPickups', 0, 6, 1).name('max on field');
+  pickups.add(cfg, 'maxPickups', 0, 10, 1).name('max on field');
   pickups.add(cfg, 'firstPickupDelay', 0, 20, 0.5).name('first spawn (s)');
   pickups.add(cfg, 'pickupInterval', 1, 30, 0.5).name('spawn every (s)');
   pickups.add(cfg, 'pickupLifetime', 3, 60, 1).name('lifetime (s)');
@@ -47,8 +47,10 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
 
   const bombs = gui.addFolder('Bombs');
   bombs.add(cfg, 'bombCharges', 1, 10, 1).name('bombs per pickup');
-  bombs.add(cfg, 'bombDropCooldown', 0, 2, 0.05).name('drop cooldown (s)');
-  bombs.add(cfg, 'bombFuse', 0.3, 5, 0.1).name('fuse (s)');
+  bombs.add(cfg, 'bombThrowCooldown', 0, 2, 0.05).name('throw cooldown (s)');
+  bombs.add(cfg, 'bombFlightTime', 0.1, 2, 0.05).name('flight time (s)');
+  bombs.add(cfg, 'bombFuse', 0.2, 5, 0.1).name('fuse after landing (s)');
+  bombs.add(cfg, 'bombLeadFactor', 0, 2, 0.05).name('aim ahead ×');
   bombs.add(cfg, 'blastRadius', 20, 200, 5).name('blast radius');
   bombs.add(cfg, 'chainDelay', 0.02, 1, 0.02).name('chain delay (s)');
 

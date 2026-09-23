@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, TICK_RATE } from './config';
+import { PI } from './detmath';
 import { createItem, tickItemTimers, useItem } from './items';
 import { createMatch } from './state';
 import type { MatchState, SimEvent } from './types';
 
 const cfg = DEFAULT_CONFIG;
+const FLIGHT = Math.round(cfg.bombFlightTime * TICK_RATE);
+const FUSE = Math.round(cfg.bombFuse * TICK_RATE);
 
 function withBombs(): MatchState {
   const s = createMatch(cfg, 1);
@@ -18,24 +21,45 @@ describe('items', () => {
     expect(createItem('bomb', cfg)).toEqual({ kind: 'bomb', charges: 3 });
   });
 
-  it('drops a bomb at the head with a full fuse and reports it', () => {
+  it('throws a bomb to where the opponent will be when it goes off, and reports it', () => {
     const s = withBombs();
+    const [cyan, pink] = s.snakes;
     const events: SimEvent[] = [];
-    const { x, y } = s.snakes[0];
     useItem(s, 0, cfg, events);
-    const fuse = Math.round(cfg.bombFuse * TICK_RATE);
-    expect(s.bombs).toEqual([{ id: 1, owner: 0, x, y, fuse, maxFuse: fuse, chainDepth: 0 }]);
-    expect(events).toEqual([{ type: 'bombDropped', id: 1, player: 0, x, y }]);
+    const lead = cfg.baseSpeed * (cfg.bombFlightTime + cfg.bombFuse) * cfg.bombLeadFactor;
+    const bomb = s.bombs[0];
+    expect(bomb).toMatchObject({
+      id: 1,
+      owner: 0,
+      fromX: cyan.x,
+      fromY: cyan.y,
+      flight: FLIGHT,
+      flightTotal: FLIGHT,
+      fuse: FUSE,
+      maxFuse: FUSE,
+      chainDepth: 0,
+    });
+    expect(bomb.x).toBeCloseTo(pink.x - lead, 6); // PINK is heading west
+    expect(bomb.y).toBeCloseTo(pink.y, 6);
+    expect(events).toEqual([{ type: 'bombThrown', id: 1, player: 0, fromX: cyan.x, fromY: cyan.y, x: bomb.x, y: bomb.y }]);
     expect(s.snakes[0].item).toEqual({ kind: 'bomb', charges: 2 });
   });
 
-  it('waits bombDropCooldown between drops', () => {
+  it('keeps the landing spot inside the arena', () => {
+    const s = withBombs();
+    Object.assign(s.snakes[1], { x: 60, y: 500, heading: PI });
+    useItem(s, 0, cfg, []);
+    expect(s.bombs[0].x).toBe(cfg.snakeRadius);
+    expect(s.bombs[0].y).toBeCloseTo(500, 6);
+  });
+
+  it('waits bombThrowCooldown between throws', () => {
     const s = withBombs();
     const events: SimEvent[] = [];
     useItem(s, 0, cfg, events);
     useItem(s, 0, cfg, events);
     expect(s.bombs).toHaveLength(1);
-    for (let t = 0; t < Math.round(cfg.bombDropCooldown * TICK_RATE); t++) tickItemTimers(s, []);
+    for (let t = 0; t < Math.round(cfg.bombThrowCooldown * TICK_RATE); t++) tickItemTimers(s, []);
     useItem(s, 0, cfg, events);
     expect(s.bombs).toHaveLength(2);
   });

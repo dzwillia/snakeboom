@@ -69,9 +69,16 @@ export interface PickupState {
 export interface BombState {
   id: number;
   owner: number;
+  /** Where it lands (and blasts). */
   x: number;
   y: number;
-  /** Ticks until it explodes. */
+  /** Where it was thrown from, for drawing the arc. */
+  fromX: number;
+  fromY: number;
+  /** Ticks left in the air; 0 once it has landed. */
+  flight: number;
+  flightTotal: number;
+  /** Ticks from landing until it explodes (counts down only after landing). */
   fuse: number;
   /** The fuse it started from, for drawing the countdown ring. */
   maxFuse: number;
@@ -155,7 +162,8 @@ export type SimEvent =
   | { type: 'pickupSpawned'; id: number; kind: PickupKind; x: number; y: number }
   | { type: 'pickupCollected'; id: number; kind: PickupKind; player: number }
   | { type: 'pickupExpired'; id: number }
-  | { type: 'bombDropped'; id: number; player: number; x: number; y: number }
+  | { type: 'bombThrown'; id: number; player: number; fromX: number; fromY: number; x: number; y: number }
+  | { type: 'bombLanded'; id: number; x: number; y: number }
   | { type: 'itemUsed'; player: number; kind: PickupKind }
   | { type: 'effectStarted'; player: number; effect: EffectName }
   | { type: 'effectEnded'; player: number; effect: EffectName }

@@ -54,6 +54,6 @@ export class Renderer {
       if (s.alive) view.update(s, state.phase === 'playing' ? alpha : 1, cfg, timeSeconds);
       else view.hide();
     });
-    this.bombs.draw(state.bombs, timeSeconds);
+    this.bombs.draw(state.bombs, cfg, timeSeconds);
   }
 }

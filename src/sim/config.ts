@@ -43,8 +43,17 @@ export interface Config {
   pickupWeights: Record<PickupKind, number>;
   /** Bombs in one bomb pickup. */
   bombCharges: number;
-  bombDropCooldown: number;
+  /** Seconds between throws. */
+  bombThrowCooldown: number;
+  /** Seconds a thrown bomb spends in the air before it lands. */
+  bombFlightTime: number;
+  /** Seconds from landing to the blast. */
   bombFuse: number;
+  /**
+   * Where a bomb lands: 1 aims at the spot the opponent will reach, holding course, by the time it
+   * blasts; 0 lands it on their head; values in between lead them partway.
+   */
+  bombLeadFactor: number;
   blastRadius: number;
   /** Fuse given to a bomb caught in another bomb's blast. */
   chainDelay: number;
@@ -76,17 +85,19 @@ export const DEFAULT_CONFIG: Config = {
   boostMultiplier: 1.6,
   boostMeterSeconds: 2,
   boostRefillSeconds: 6,
-  maxPickups: 2,
-  firstPickupDelay: 3,
-  pickupInterval: 6,
-  pickupLifetime: 15,
+  maxPickups: 4,
+  firstPickupDelay: 1,
+  pickupInterval: 2.5,
+  pickupLifetime: 12,
   pickupRadius: 14,
   pickupMinHeadDistance: 150,
   pickupClearance: 40,
-  pickupWeights: { bomb: 35, ghost: 13, shield: 13, turbo: 13, slow: 13, reverse: 13 },
+  pickupWeights: { bomb: 25, ghost: 15, shield: 15, turbo: 15, slow: 15, reverse: 15 },
   bombCharges: 3,
-  bombDropCooldown: 0.3,
-  bombFuse: 1.5,
+  bombThrowCooldown: 0.5,
+  bombFlightTime: 0.45,
+  bombFuse: 1,
+  bombLeadFactor: 1,
   blastRadius: 70,
   chainDelay: 0.12,
   ghostDuration: 3,

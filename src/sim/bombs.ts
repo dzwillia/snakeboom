@@ -4,17 +4,25 @@ import { TICK_RATE, type Config } from './config';
 import type { BombState, MatchState, SimEvent } from './types';
 
 /**
- * Advances every fuse and resolves due explosions in bomb-id order. Blasts punch holes in
- * trails, destroy blocks and cut nearby fuses to chainDelay. Heads caught in a blast are
- * returned (victim index → bomb owner) so the caller applies them with the collision deaths.
+ * Flies thrown bombs to their landing spots (reporting each landing), burns landed fuses and
+ * resolves due explosions in bomb-id order. Blasts punch holes in trails, destroy blocks and cut
+ * nearby landed fuses to chainDelay (bombs still in the air are untouched). Heads caught in a
+ * blast are returned (victim index → bomb owner) so the caller applies them with the collision deaths.
  */
 export function updateBombs(state: MatchState, cfg: Config, events: SimEvent[]): Map<number, number> {
   const blasted = new Map<number, number>();
   if (state.bombs.length === 0) return blasted;
-  for (const b of state.bombs) b.fuse--;
-  const due = state.bombs.filter((b) => b.fuse <= 0).sort((a, b) => a.id - b.id);
+  for (const b of state.bombs) {
+    if (b.flight > 0) {
+      b.flight--;
+      if (b.flight === 0) events.push({ type: 'bombLanded', id: b.id, x: b.x, y: b.y });
+    } else {
+      b.fuse--;
+    }
+  }
+  const due = state.bombs.filter((b) => b.flight === 0 && b.fuse <= 0).sort((a, b) => a.id - b.id);
   for (const bomb of due) explode(state, bomb, cfg, events, blasted);
-  state.bombs = state.bombs.filter((b) => b.fuse > 0);
+  state.bombs = state.bombs.filter((b) => b.flight > 0 || b.fuse > 0);
   return blasted;
 }
 
@@ -47,7 +55,7 @@ function explode(
 
   const chainFuse = Math.max(1, Math.round(cfg.chainDelay * TICK_RATE));
   for (const other of state.bombs) {
-    if (other.fuse <= chainFuse) continue;
+    if (other.flight > 0 || other.fuse <= chainFuse) continue;
     const dx = other.x - bomb.x;
     const dy = other.y - bomb.y;
     if (dx * dx + dy * dy < R * R) {

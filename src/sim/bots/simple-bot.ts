@@ -53,6 +53,8 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
   let use = false;
   switch (me.item?.kind) {
     case 'bomb':
+      use = rngNext(bot.rng) < (state.snakes.some((o, j) => j !== idx && o.alive) ? 0.03 : 0);
+      break;
     case 'slow':
     case 'reverse':
       use = rngNext(bot.rng) < (near ? 0.08 : 0.005);
@@ -114,7 +116,7 @@ function clearSteps(state: MatchState, idx: number, turn: -1 | 0 | 1, cfg: Confi
     });
     if (probe.blocked) return k - 1;
     const danger = cfg.blastRadius + r;
-    for (const b of state.bombs) if (dist2(b, x, y) < danger * danger && b.fuse < 45) return k - 1;
+    for (const b of state.bombs) if (dist2(b, x, y) < danger * danger && b.flight + b.fuse < 60) return k - 1;
     for (let j = 0; j < state.snakes.length; j++) {
       const other = state.snakes[j];
       if (j === idx || !other.alive) continue;
