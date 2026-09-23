@@ -5,69 +5,85 @@ import { PALETTE } from '../colors';
 /** Points per body chunk. Only the tail and head chunks are redrawn each frame. */
 const CHUNK = 128;
 
+/** One chunk's two strokes; they live in separate layers so every core sits above every tube. */
+interface Chunk {
+  tube: Graphics;
+  core: Graphics;
+}
+
 /** Draws one snake as a neon tube (colored stroke + bright core) with a glowing head. */
 export class SnakeView {
-  private readonly body = new Container();
+  private readonly tubes = new Container();
+  private readonly cores = new Container();
   private readonly head = new Graphics();
-  private readonly chunks = new Map<number, Graphics>();
+  private readonly chunks = new Map<number, Chunk>();
+  private lastHoleVersion = -1;
 
   constructor(
     parent: Container,
     private readonly color: number,
   ) {
     const layer = new Container();
-    layer.addChild(this.body, this.head);
+    layer.addChild(this.tubes, this.cores, this.head);
     parent.addChild(layer);
   }
 
   reset(): void {
-    for (const g of this.chunks.values()) g.destroy();
+    for (const chunk of this.chunks.values()) destroyChunk(chunk);
     this.chunks.clear();
+    this.lastHoleVersion = -1;
     this.head.clear();
-    this.body.visible = true;
-    this.head.visible = true;
+    this.setVisible(true);
   }
 
   hide(): void {
-    this.body.visible = false;
-    this.head.visible = false;
+    this.setVisible(false);
   }
 
   update(s: SnakeState, alpha: number, radius: number): void {
-    this.body.visible = true;
-    this.head.visible = true;
+    this.setVisible(true);
     const t = s.trail;
     const startSeq = t.baseSeq + t.start;
     const headSeq = t.baseSeq + t.xs.length - 1;
     const firstChunk = Math.floor(startSeq / CHUNK);
     const lastChunk = Math.floor(headSeq / CHUNK);
 
-    for (const [k, g] of this.chunks) {
+    for (const [k, chunk] of this.chunks) {
       if (k < firstChunk) {
-        g.destroy();
+        destroyChunk(chunk);
         this.chunks.delete(k);
       }
     }
 
+    // Blasts punch holes anywhere along the body, so a new hole redraws every chunk once.
+    const holesChanged = s.holeVersion !== this.lastHoleVersion;
+    this.lastHoleVersion = s.holeVersion;
     const hx = s.prevX + (s.x - s.prevX) * alpha;
     const hy = s.prevY + (s.y - s.prevY) * alpha;
     for (let k = firstChunk; k <= lastChunk; k++) {
-      let g = this.chunks.get(k);
-      const fresh = !g;
-      if (!g) {
-        g = new Graphics();
-        this.chunks.set(k, g);
-        this.body.addChild(g);
+      let chunk = this.chunks.get(k);
+      const fresh = !chunk;
+      if (!chunk) {
+        chunk = { tube: new Graphics(), core: new Graphics() };
+        this.chunks.set(k, chunk);
+        this.tubes.addChild(chunk.tube);
+        this.cores.addChild(chunk.core);
       }
-      if (fresh || k === firstChunk || k >= lastChunk - 1) {
-        this.drawChunk(g, t, k, startSeq, headSeq, hx, hy, radius);
+      if (fresh || holesChanged || k === firstChunk || k >= lastChunk - 1) {
+        this.drawChunk(chunk, t, k, startSeq, headSeq, hx, hy, radius);
       }
     }
     this.drawHead(hx, hy, s.heading, radius);
   }
 
+  private setVisible(visible: boolean): void {
+    this.tubes.visible = visible;
+    this.cores.visible = visible;
+    this.head.visible = visible;
+  }
+
   private drawChunk(
-    g: Graphics,
+    chunk: Chunk,
     t: Trail,
     k: number,
     startSeq: number,
@@ -76,7 +92,6 @@ export class SnakeView {
     hy: number,
     radius: number,
   ): void {
-    g.clear();
     // Overlap one point with the previous chunk so chunks join seamlessly.
     const from = Math.max(k * CHUNK - 1, startSeq);
     const to = Math.min((k + 1) * CHUNK, headSeq);
@@ -94,20 +109,8 @@ export class SnakeView {
     }
     if (run.length > 0) runs.push(run);
 
-    for (const pass of [
-      { width: radius * 2, color: this.color, alpha: 1 },
-      { width: Math.max(1.5, radius * 0.7), color: PALETTE.core, alpha: 0.85 },
-    ]) {
-      for (const pts of runs) {
-        if (pts.length === 2) {
-          g.circle(pts[0], pts[1], pass.width / 2).fill({ color: pass.color, alpha: pass.alpha });
-          continue;
-        }
-        g.moveTo(pts[0], pts[1]);
-        for (let j = 2; j < pts.length; j += 2) g.lineTo(pts[j], pts[j + 1]);
-        g.stroke({ width: pass.width, color: pass.color, alpha: pass.alpha, cap: 'round', join: 'round' });
-      }
-    }
+    strokeRuns(chunk.tube, runs, radius * 2, this.color);
+    strokeRuns(chunk.core, runs, Math.max(1.5, radius * 0.7), PALETTE.core);
   }
 
   private drawHead(x: number, y: number, heading: number, radius: number): void {
@@ -119,4 +122,23 @@ export class SnakeView {
     const ey = y + Math.sin(heading) * radius * 0.55;
     g.circle(ex, ey, Math.max(1.2, radius * 0.28)).fill({ color: PALETTE.background });
   }
+}
+
+/** Opaque strokes, so the one-point overlap between chunks never shows a seam. */
+function strokeRuns(g: Graphics, runs: readonly number[][], width: number, color: number): void {
+  g.clear();
+  for (const pts of runs) {
+    if (pts.length === 2) {
+      g.circle(pts[0], pts[1], width / 2).fill({ color });
+      continue;
+    }
+    g.moveTo(pts[0], pts[1]);
+    for (let j = 2; j < pts.length; j += 2) g.lineTo(pts[j], pts[j + 1]);
+    g.stroke({ width, color, cap: 'round', join: 'round' });
+  }
+}
+
+function destroyChunk(chunk: Chunk): void {
+  chunk.tube.destroy();
+  chunk.core.destroy();
 }

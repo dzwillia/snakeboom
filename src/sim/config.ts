@@ -9,6 +9,9 @@ export const MAP_ROWS = 25;
 export const TICK_RATE = 60;
 export const DT = 1 / TICK_RATE;
 
+/** What a pickup can contain. M3 adds the power-ups. */
+export type PickupKind = 'bomb';
+
 /** Tunable gameplay values. Seconds and world units unless noted. */
 export interface Config {
   snakeRadius: number;
@@ -27,6 +30,24 @@ export interface Config {
   boostMeterSeconds: number;
   /** Seconds (key released) that refill an empty meter. */
   boostRefillSeconds: number;
+  maxPickups: number;
+  firstPickupDelay: number;
+  pickupInterval: number;
+  pickupLifetime: number;
+  pickupRadius: number;
+  /** Pickups never spawn closer than this to a head. */
+  pickupMinHeadDistance: number;
+  /** Pickups spawn at least this far from walls, blocks, bodies, bombs and other pickups. */
+  pickupClearance: number;
+  /** Relative spawn chance per kind. */
+  pickupWeights: Record<PickupKind, number>;
+  /** Bombs in one bomb pickup. */
+  bombCharges: number;
+  bombDropCooldown: number;
+  bombFuse: number;
+  blastRadius: number;
+  /** Fuse given to a bomb caught in another bomb's blast. */
+  chainDelay: number;
   winsToWin: number;
   countdownSeconds: number;
   roundOverSeconds: number;
@@ -45,6 +66,19 @@ export const DEFAULT_CONFIG: Config = {
   boostMultiplier: 1.6,
   boostMeterSeconds: 2,
   boostRefillSeconds: 6,
+  maxPickups: 2,
+  firstPickupDelay: 3,
+  pickupInterval: 6,
+  pickupLifetime: 15,
+  pickupRadius: 14,
+  pickupMinHeadDistance: 150,
+  pickupClearance: 40,
+  pickupWeights: { bomb: 35 },
+  bombCharges: 3,
+  bombDropCooldown: 0.3,
+  bombFuse: 1.5,
+  blastRadius: 70,
+  chainDelay: 0.12,
   winsToWin: 5,
   countdownSeconds: 3,
   roundOverSeconds: 2.5,

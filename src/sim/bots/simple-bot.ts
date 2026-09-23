@@ -1,10 +1,10 @@
 import { circleHitsTiles, circleHitsWall } from '../arena';
 import { forEachSolidPointNear } from '../collision';
 import { DT, type Config } from '../config';
-import { detCos, detSin } from '../detmath';
+import { detAtan2, detCos, detSin, wrapAngle } from '../detmath';
 import { createRng, rngInt, rngNext, type RngState } from '../rng';
 import { headCum } from '../trail';
-import { NO_INPUT, type MatchState, type PlayerInput } from '../types';
+import { NO_INPUT, type MatchState, type PlayerInput, type SnakeState } from '../types';
 
 /** A cheap look-ahead bot for soak tests (and the seed of a future AI opponent). */
 export interface BotState {
@@ -21,6 +21,8 @@ export function createBot(seed: number): BotState {
 const LOOK_STEPS = 30;
 const STEP_TICKS = 3;
 const TURNS = [-1, 0, 1] as const;
+const SEEK_RANGE = 450;
+const BOMB_RANGE = 220;
 
 export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Config): PlayerInput {
   const me = state.snakes[idx];
@@ -34,8 +36,10 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
     bot.wanderTurn = rngNext(bot.rng) < 0.5 ? -1 : 1;
   }
 
+  const seek = seekTurn(state, me);
   let turn: -1 | 0 | 1;
-  if (bot.wanderTicks > 0 && clear[bot.wanderTurn + 1] === LOOK_STEPS) turn = bot.wanderTurn;
+  if (seek !== null && clear[seek + 1] === LOOK_STEPS) turn = seek;
+  else if (bot.wanderTicks > 0 && clear[bot.wanderTurn + 1] === LOOK_STEPS) turn = bot.wanderTurn;
   else if (clear[1] === best) turn = 0;
   else {
     const options = TURNS.filter((_, k) => clear[k] === best);
@@ -45,7 +49,37 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
   if (bot.boostTicks > 0) bot.boostTicks--;
   else if (best === LOOK_STEPS && rngNext(bot.rng) < 0.004) bot.boostTicks = 20 + rngInt(bot.rng, 40);
 
-  return { turn, boost: bot.boostTicks > 0, use: false };
+  let use = false;
+  if (me.item) {
+    const near = state.snakes.some((o, j) => j !== idx && o.alive && dist2(o, me.x, me.y) < BOMB_RANGE * BOMB_RANGE);
+    use = rngNext(bot.rng) < (near ? 0.08 : 0.005);
+  }
+  return { turn, boost: bot.boostTicks > 0, use };
+}
+
+function dist2(p: { x: number; y: number }, x: number, y: number): number {
+  const dx = p.x - x;
+  const dy = p.y - y;
+  return dx * dx + dy * dy;
+}
+
+/** Turn toward the nearest pickup in range while the slot is empty; null when there's nothing to chase. */
+function seekTurn(state: MatchState, me: SnakeState): -1 | 0 | 1 | null {
+  if (me.item) return null;
+  let target: { x: number; y: number } | null = null;
+  let best = SEEK_RANGE * SEEK_RANGE;
+  for (const p of state.pickups) {
+    const d = dist2(p, me.x, me.y);
+    if (d < best) {
+      best = d;
+      target = p;
+    }
+  }
+  if (!target) return null;
+  const diff = wrapAngle(detAtan2(target.y - me.y, target.x - me.x) - me.heading);
+  if (diff > 0.12) return 1;
+  if (diff < -0.12) return -1;
+  return 0;
 }
 
 /** How many look-ahead steps stay clear while holding `turn`. */
@@ -69,12 +103,11 @@ function clearSteps(state: MatchState, idx: number, turn: -1 | 0 | 1, cfg: Confi
       if (snake !== idx || me.trail.cum[i] < ignoreOwnFrom) probe.blocked = true;
     });
     if (probe.blocked) return k - 1;
+    for (const b of state.bombs) if (dist2(b, x, y) < (cfg.blastRadius + r) ** 2 && b.fuse < 45) return k - 1;
     for (let j = 0; j < state.snakes.length; j++) {
       const other = state.snakes[j];
       if (j === idx || !other.alive) continue;
-      const dx = other.x - x;
-      const dy = other.y - y;
-      if (dx * dx + dy * dy < 16 * r * r) return k - 1;
+      if (dist2(other, x, y) < 16 * r * r) return k - 1;
     }
   }
   return LOOK_STEPS;

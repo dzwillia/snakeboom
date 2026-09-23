@@ -1,6 +1,9 @@
-import { detectHit, type Hit } from './collision';
+import { updateBombs } from './bombs';
+import { detectHit } from './collision';
 import { TICK_RATE, type Config } from './config';
+import { tickItemTimers, useItem } from './items';
 import { MAPS } from './maps';
+import { collectPickups, updatePickups } from './pickups';
 import { createRng } from './rng';
 import { advanceSnake, growthRate } from './snake';
 import { pickNextMap, startRound } from './state';
@@ -54,6 +57,11 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
     events.push({ type: 'overtime' });
   }
 
+  tickItemTimers(state);
+  state.snakes.forEach((s, i) => {
+    if (s.alive && (inputs[i] ?? NO_INPUT).use) useItem(state, i, cfg, events);
+  });
+
   const growth = growthRate(cfg, state.overtime);
   state.snakes.forEach((s, i) => {
     if (s.alive && advanceSnake(s, i, inputs[i] ?? NO_INPUT, cfg, growth, state.grid)) {
@@ -61,21 +69,32 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
     }
   });
 
-  // Evaluate every head before applying any death, so simultaneous deaths are fair.
-  const hits: Array<Hit | null> = state.snakes.map((s, i) => (s.alive ? detectHit(state, i, cfg) : null));
-  hits.forEach((hit, i) => {
-    if (!hit) return;
-    const s = state.snakes[i];
-    s.alive = false;
-    const record: DeathRecord = { player: i, cause: hit.cause, killer: hit.killer, x: s.x, y: s.y };
-    state.deaths.push(record);
-    events.push({ type: 'death', ...record });
+  collectPickups(state, cfg, events);
+  const blasted = updateBombs(state, cfg, events);
+
+  // Everyone alive at the start of the tick is judged before anyone is removed, so simultaneous deaths are fair.
+  const deaths: DeathRecord[] = [];
+  state.snakes.forEach((s, i) => {
+    if (!s.alive) return;
+    const bomber = blasted.get(i);
+    if (bomber !== undefined) {
+      deaths.push({ player: i, cause: 'blast', killer: bomber, x: s.x, y: s.y });
+      return;
+    }
+    const hit = detectHit(state, i, cfg);
+    if (hit) deaths.push({ player: i, cause: hit.cause, killer: hit.killer, x: s.x, y: s.y });
   });
+  for (const d of deaths) {
+    state.snakes[d.player].alive = false;
+    state.deaths.push(d);
+    events.push({ type: 'death', ...d });
+  }
 
   const alive = state.snakes.filter((s) => s.alive);
   const timeUp = state.roundTicks >= Math.round(cfg.roundMaxSeconds * TICK_RATE);
-  if (alive.length === 1) endRound(state, cfg, events, alive[0].id);
-  else if (alive.length === 0 || timeUp) endRound(state, cfg, events, null);
+  if (alive.length === 1) return endRound(state, cfg, events, alive[0].id);
+  if (alive.length === 0 || timeUp) return endRound(state, cfg, events, null);
+  updatePickups(state, cfg, events);
 }
 
 function endRound(state: MatchState, cfg: Config, events: SimEvent[], winner: number | null): void {

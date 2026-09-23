@@ -35,6 +35,11 @@ export class KeyboardInput {
     return out;
   }
 
+  /** Forgets pending Use presses (pausing and resuming must not fire items). */
+  clearLatches(): void {
+    this.useLatched.fill(false);
+  }
+
   private onKeyDown(e: KeyboardEvent): void {
     const tag = (e.target as { tagName?: string } | null)?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;

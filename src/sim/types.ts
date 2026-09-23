@@ -1,3 +1,4 @@
+import type { PickupKind } from './config';
 import type { RngState } from './rng';
 
 export type Phase = 'countdown' | 'playing' | 'roundOver' | 'matchOver';
@@ -36,6 +37,35 @@ export interface Grid {
   cells: number[][];
 }
 
+/** What a snake holds in its single item slot. */
+export interface ItemState {
+  kind: PickupKind;
+  /** Uses left; the slot empties at 0. */
+  charges: number;
+}
+
+export interface PickupState {
+  id: number;
+  kind: PickupKind;
+  x: number;
+  y: number;
+  /** Ticks until it disappears. */
+  ttl: number;
+}
+
+export interface BombState {
+  id: number;
+  owner: number;
+  x: number;
+  y: number;
+  /** Ticks until it explodes. */
+  fuse: number;
+  /** The fuse it started from, for drawing the countdown ring. */
+  maxFuse: number;
+  /** 0 for a dropped bomb; n for the nth link of a chain reaction. */
+  chainDepth: number;
+}
+
 export interface SnakeState {
   id: number;
   alive: boolean;
@@ -51,6 +81,11 @@ export interface SnakeState {
   boostMeter: number;
   boosting: boolean;
   trail: Trail;
+  item: ItemState | null;
+  /** Ticks until Use works again. */
+  useCooldown: number;
+  /** Bumped whenever a blast punches holes in this trail, so the renderer redraws it. */
+  holeVersion: number;
 }
 
 export interface DeathRecord {
@@ -81,10 +116,18 @@ export interface MatchState {
   rng: RngState;
   /** TILE_COLS * TILE_ROWS entries, 1 = solid. Replaced (new array) at each round start. */
   tiles: number[];
+  /** Bumped whenever tiles change (round start or blasts). */
+  tilesVersion: number;
   snakes: SnakeState[];
   grid: Grid;
   /** Deaths so far this round. */
   deaths: DeathRecord[];
+  pickups: PickupState[];
+  bombs: BombState[];
+  /** Ticks until the next pickup spawn attempt. */
+  pickupTimer: number;
+  /** Next id for pickups and bombs. */
+  nextId: number;
 }
 
 export type SimEvent =
@@ -94,4 +137,18 @@ export type SimEvent =
   | { type: 'boostStarted'; player: number }
   | ({ type: 'death' } & DeathRecord)
   | { type: 'roundOver'; winner: number | null; deaths: DeathRecord[] }
-  | { type: 'matchOver'; winner: number };
+  | { type: 'matchOver'; winner: number }
+  | { type: 'pickupSpawned'; id: number; kind: PickupKind; x: number; y: number }
+  | { type: 'pickupCollected'; id: number; kind: PickupKind; player: number }
+  | { type: 'pickupExpired'; id: number }
+  | { type: 'bombDropped'; id: number; player: number; x: number; y: number }
+  | {
+      type: 'explosion';
+      id: number;
+      owner: number;
+      x: number;
+      y: number;
+      radius: number;
+      chainDepth: number;
+      tilesDestroyed: number[];
+    };

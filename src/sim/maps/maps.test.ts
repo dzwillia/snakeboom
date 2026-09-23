@@ -36,7 +36,7 @@ function find(rows: string[], ch: string): [number, number] {
 describe('maps', () => {
   it('parses every map, Open first', () => {
     expect(MAPS).toHaveLength(MAP_DEFS.length);
-    expect(MAPS[0].name).toBe('Open');
+    expect(MAPS.map((m) => m.name)).toEqual(['Open', 'Pillars', 'Cross', 'Bunkers', 'Lanes']);
   });
 
   for (const def of MAP_DEFS) {

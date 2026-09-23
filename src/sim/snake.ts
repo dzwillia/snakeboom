@@ -19,6 +19,9 @@ export function createSnake(id: number, x: number, y: number, heading: number, c
     boostMeter: 1,
     boosting: false,
     trail,
+    item: null,
+    useCooldown: 0,
+    holeVersion: 0,
   };
 }
 

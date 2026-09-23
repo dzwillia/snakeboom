@@ -1,12 +1,14 @@
 import { TICK_RATE, type Config, type MatchState } from '../sim';
-import { PLAYER_NAMES, formatClock } from './text';
+import { PLAYER_NAMES, describeItem, formatClock } from './text';
 
 interface Side {
   pips: HTMLElement;
   fill: HTMLElement;
+  slot: HTMLElement;
+  lastSlot: string;
 }
 
-/** Top bar: names, score pips, boost meters and the round clock. */
+/** Top bar: names, score pips, boost meters, item slots and the round clock. */
 export class Hud {
   private readonly sides: Side[];
   private readonly clock: HTMLElement;
@@ -14,13 +16,15 @@ export class Hud {
   private lastClock = '';
 
   constructor(private readonly root: HTMLElement) {
-    root.innerHTML = `
-      <div class="side p1"><span class="name">${PLAYER_NAMES[0]}</span><span class="pips"></span><span class="boost"><span class="fill" style="display:block"></span></span></div>
-      <div class="clock">0:00</div>
-      <div class="side p2"><span class="name">${PLAYER_NAMES[1]}</span><span class="pips"></span><span class="boost"><span class="fill" style="display:block"></span></span></div>`;
-    this.sides = [...root.querySelectorAll<HTMLElement>('.side')].map((side) => ({
-      pips: side.querySelector<HTMLElement>('.pips')!,
-      fill: side.querySelector<HTMLElement>('.fill')!,
+    const side = (i: number) =>
+      `<div class="side p${i + 1}"><span class="name">${PLAYER_NAMES[i]}</span><span class="pips"></span>` +
+      `<span class="boost"><span class="fill" style="display:block"></span></span><span class="slot"></span></div>`;
+    root.innerHTML = `${side(0)}<div class="clock">0:00</div>${side(1)}`;
+    this.sides = [...root.querySelectorAll<HTMLElement>('.side')].map((el) => ({
+      pips: el.querySelector<HTMLElement>('.pips')!,
+      fill: el.querySelector<HTMLElement>('.fill')!,
+      slot: el.querySelector<HTMLElement>('.slot')!,
+      lastSlot: '-',
     }));
     this.clock = root.querySelector<HTMLElement>('.clock')!;
   }
@@ -43,10 +47,20 @@ export class Hud {
 
     state.snakes.forEach((s, i) => {
       const side = this.sides[i];
-      if (side) side.fill.style.width = `${Math.round(s.boostMeter * 100)}%`;
+      if (!side) return;
+      side.fill.style.width = `${Math.round(s.boostMeter * 100)}%`;
+      const label = describeItem(s.item);
+      if (label !== side.lastSlot) {
+        side.lastSlot = label;
+        side.slot.textContent = label || 'NO ITEM';
+        side.slot.dataset.kind = s.item?.kind ?? '';
+        side.slot.classList.toggle('full', s.item !== null);
+      }
     });
 
-    const clock = state.overtime ? `OVERTIME ${formatClock(state.roundTicks, TICK_RATE)}` : formatClock(state.roundTicks, TICK_RATE);
+    const clock = state.overtime
+      ? `OVERTIME ${formatClock(state.roundTicks, TICK_RATE)}`
+      : formatClock(state.roundTicks, TICK_RATE);
     if (clock !== this.lastClock) {
       this.lastClock = clock;
       this.clock.textContent = clock;

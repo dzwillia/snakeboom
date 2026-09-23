@@ -24,8 +24,21 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
     if (t.start < 0 || t.start >= t.xs.length) problems.push(`snake ${i}: trail start ${t.start} out of range`);
     const len = trailLength(t);
     if (len > Math.max(0, s.targetLength) + 1e-6) problems.push(`snake ${i}: trail ${len} longer than ${s.targetLength}`);
+    if (s.item && s.item.charges < 1) problems.push(`snake ${i}: holds an empty item`);
   });
   const points = state.scores.reduce((a, b) => a + b, 0);
   if (points > state.round) problems.push(`${points} points after ${state.round} rounds`);
+  if (state.pickups.length > Math.max(0, cfg.maxPickups)) {
+    problems.push(`${state.pickups.length} pickups on the field (max ${cfg.maxPickups})`);
+  }
+  for (const p of state.pickups) {
+    if (circleHitsWall(p.x, p.y, 0)) problems.push(`pickup ${p.id} outside the arena`);
+    if (p.ttl <= 0) problems.push(`pickup ${p.id} outlived its lifetime`);
+  }
+  for (const b of state.bombs) {
+    if (!Number.isFinite(b.x) || !Number.isFinite(b.y)) problems.push(`bomb ${b.id} has a non-finite position`);
+    if (b.fuse <= 0) problems.push(`bomb ${b.id} should have exploded`);
+  }
+  if (state.tiles.some((v) => v !== 0 && v !== 1)) problems.push('tiles hold values other than 0 and 1');
   return problems;
 }
