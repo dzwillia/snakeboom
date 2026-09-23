@@ -1,5 +1,6 @@
 import { Graphics } from 'pixi.js';
-import type { SnakeState } from '../../sim';
+import { TILE_COLS, TILE_SIZE, type SnakeState } from '../../sim';
+import { PALETTE } from '../colors';
 import type { ClientSettings } from '../settings';
 import type { World } from './world';
 
@@ -23,15 +24,24 @@ interface Ring {
   color: number;
 }
 
-const MAX_PARTICLES = 1500;
+interface Flash {
+  x: number;
+  y: number;
+  r: number;
+  life: number;
+  maxLife: number;
+}
 
-/** Client-only juice: sparks, shockwave rings and screen shake, driven by sim events. */
+const MAX_PARTICLES = 2000;
+
+/** Client-only juice: sparks, shockwave rings, flashes and screen shake, driven by sim events. */
 export class Fx {
   /** Scales particle and ring time (slow motion); shake always decays in real time. */
   timeScale = 1;
   private readonly g = new Graphics();
   private particles: Particle[] = [];
   private rings: Ring[] = [];
+  private flashes: Flash[] = [];
   private shake = 0;
 
   constructor(
@@ -59,6 +69,30 @@ export class Fx {
     this.addShake(14);
   }
 
+  /** A bomb going off: flash, shockwave, sparks, and amber debris from destroyed blocks. */
+  explosion(x: number, y: number, radius: number, chainDepth: number, tiles: readonly number[]): void {
+    this.flashes.push({ x, y, r: radius, life: 0.18, maxLife: 0.18 });
+    this.ring(x, y, radius * 1.15, 0.45, 0xffffff);
+    this.ring(x, y, radius * 0.8, 0.32, PALETTE.fuse);
+    for (let k = 0; k < 70; k++) {
+      const c = k % 4 === 0 ? 0xffffff : k % 2 === 0 ? PALETTE.bomb : PALETTE.fuse;
+      this.spark(x, y, c, 150 + Math.random() * 380, 0.3 + Math.random() * 0.6, 2 + Math.random() * 3);
+    }
+    for (const index of tiles) {
+      const tx = (index % TILE_COLS) * TILE_SIZE + TILE_SIZE / 2;
+      const ty = Math.floor(index / TILE_COLS) * TILE_SIZE + TILE_SIZE / 2;
+      for (let k = 0; k < 3; k++) {
+        this.spark(tx, ty, PALETTE.obstacle, 60 + Math.random() * 180, 0.5 + Math.random() * 0.7, 3 + Math.random() * 2);
+      }
+    }
+    this.addShake(8 + 4 * Math.min(chainDepth, 4));
+  }
+
+  pickupBurst(x: number, y: number, color: number): void {
+    this.ring(x, y, 34, 0.3, color);
+    for (let k = 0; k < 18; k++) this.spark(x, y, color, 80 + Math.random() * 140, 0.25 + Math.random() * 0.3, 2);
+  }
+
   ring(x: number, y: number, maxR: number, life: number, color: number): void {
     this.rings.push({ x, y, maxR, life, maxLife: life, color });
   }
@@ -76,6 +110,7 @@ export class Fx {
   clear(): void {
     this.particles = [];
     this.rings = [];
+    this.flashes = [];
     this.shake = 0;
     this.g.clear();
   }
@@ -85,6 +120,12 @@ export class Fx {
     const drag = Math.pow(0.04, dt);
     const g = this.g;
     g.clear();
+
+    this.flashes = this.flashes.filter((f) => (f.life -= dt) > 0);
+    for (const f of this.flashes) {
+      const k = 1 - f.life / f.maxLife;
+      g.circle(f.x, f.y, f.r * (0.55 + 0.45 * k)).fill({ color: 0xffffff, alpha: 0.75 * (1 - k) });
+    }
 
     this.particles = this.particles.filter((p) => (p.life -= dt) > 0);
     for (const p of this.particles) {

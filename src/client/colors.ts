@@ -1,3 +1,5 @@
+import type { PickupKind } from '../sim';
+
 export const PLAYER_COLORS: number[] = [0x22f3ff, 0xff2e97];
 
 export const PALETTE = {
@@ -7,6 +9,13 @@ export const PALETTE = {
   obstacle: 0xffb020,
   obstacleFill: 0x2a1a00,
   core: 0xffffff,
+  bomb: 0xff3030,
+  bombDim: 0x8a1010,
+  fuse: 0xffb020,
+};
+
+export const PICKUP_COLORS: Record<PickupKind, number> = {
+  bomb: 0xff4d2e,
 };
 
 export const PLAYER_CSS = ['var(--cyan)', 'var(--pink)'];

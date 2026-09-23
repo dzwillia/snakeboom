@@ -10,6 +10,7 @@ export class SnakeView {
   private readonly body = new Container();
   private readonly head = new Graphics();
   private readonly chunks = new Map<number, Graphics>();
+  private lastHoleVersion = -1;
 
   constructor(
     parent: Container,
@@ -23,6 +24,7 @@ export class SnakeView {
   reset(): void {
     for (const g of this.chunks.values()) g.destroy();
     this.chunks.clear();
+    this.lastHoleVersion = -1;
     this.head.clear();
     this.body.visible = true;
     this.head.visible = true;
@@ -49,6 +51,9 @@ export class SnakeView {
       }
     }
 
+    // Blasts punch holes anywhere along the body, so a new hole redraws every chunk once.
+    const holesChanged = s.holeVersion !== this.lastHoleVersion;
+    this.lastHoleVersion = s.holeVersion;
     const hx = s.prevX + (s.x - s.prevX) * alpha;
     const hy = s.prevY + (s.y - s.prevY) * alpha;
     for (let k = firstChunk; k <= lastChunk; k++) {
@@ -59,7 +64,7 @@ export class SnakeView {
         this.chunks.set(k, g);
         this.body.addChild(g);
       }
-      if (fresh || k === firstChunk || k >= lastChunk - 1) {
+      if (fresh || holesChanged || k === firstChunk || k >= lastChunk - 1) {
         this.drawChunk(g, t, k, startSeq, headSeq, hx, hy, radius);
       }
     }

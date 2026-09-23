@@ -5,6 +5,7 @@
   --text: #e8f4ff;
   --dim: #7d8db0;
   --red: #ff3b3b;
+  --bomb: #ff4d2e;
   --hud-h: 64px;
 }
 
@@ -212,6 +213,28 @@ kbd {
   font-size: clamp(14px, 2vw, 22px);
   color: var(--text);
   letter-spacing: 0.08em;
+}
+
+.slot {
+  min-width: 96px;
+  padding: 3px 8px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-align: center;
+  opacity: 0.35;
+}
+
+.slot.full {
+  opacity: 1;
+  box-shadow: 0 0 10px currentColor;
+  text-shadow: 0 0 8px currentColor;
+}
+
+.slot[data-kind='bomb'] {
+  color: var(--bomb);
 }
 
 .fatal {

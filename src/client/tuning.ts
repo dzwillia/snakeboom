@@ -36,6 +36,22 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   match.add(cfg, 'countdownSeconds', 1, 5, 1).name('countdown (s)');
   match.add(cfg, 'roundOverSeconds', 1, 6, 0.5).name('round banner (s)');
 
+  const pickups = gui.addFolder('Pickups');
+  pickups.add(cfg, 'maxPickups', 0, 6, 1).name('max on field');
+  pickups.add(cfg, 'firstPickupDelay', 0, 20, 0.5).name('first spawn (s)');
+  pickups.add(cfg, 'pickupInterval', 1, 30, 0.5).name('spawn every (s)');
+  pickups.add(cfg, 'pickupLifetime', 3, 60, 1).name('lifetime (s)');
+  pickups.add(cfg, 'pickupRadius', 6, 30, 1).name('size');
+  pickups.add(cfg, 'pickupMinHeadDistance', 0, 400, 10).name('min distance from heads');
+  pickups.add(cfg, 'pickupClearance', 10, 120, 5).name('clearance');
+
+  const bombs = gui.addFolder('Bombs');
+  bombs.add(cfg, 'bombCharges', 1, 10, 1).name('bombs per pickup');
+  bombs.add(cfg, 'bombDropCooldown', 0, 2, 0.05).name('drop cooldown (s)');
+  bombs.add(cfg, 'bombFuse', 0.3, 5, 0.1).name('fuse (s)');
+  bombs.add(cfg, 'blastRadius', 20, 200, 5).name('blast radius');
+  bombs.add(cfg, 'chainDelay', 0.02, 1, 0.02).name('chain delay (s)');
+
   const fx = gui.addFolder('Effects');
   fx.add(settings, 'bloom');
   fx.add(settings, 'bloomStrength', 0, 4, 0.1).name('bloom strength');
@@ -46,6 +62,7 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   audio.add(settings, 'masterVolume', 0, 1, 0.05).name('volume');
   audio.add(settings, 'muted');
 
+  for (const folder of gui.folders.slice(1)) folder.close();
   const refresh = () => gui.controllersRecursive().forEach((c) => c.updateDisplay());
   const actions = {
     reset: () => {
