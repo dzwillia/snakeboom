@@ -24,7 +24,8 @@ export type SoundName =
   | 'slow'
   | 'reverse'
   | 'dozer'
-  | 'scrape';
+  | 'scrape'
+  | 'nearMiss';
 
 // ZzFX parameters: volume, randomness, frequency, attack, sustain, release, shape, shapeCurve,
 // slide, deltaSlide, pitchJump, pitchJumpTime, repeatTime, noise, modulation, bitCrush, delay,
@@ -52,11 +53,12 @@ const BANK: Record<SoundName, number[]> = {
   reverse: [0.6, 0, 440, 0.01, 0.3, 0.2, 1, 1, 0, 0, 0, 0, 0, 0, 12],
   dozer: [0.6, 0.05, 90, 0.05, 0.3, 0.2, 2, 1, 0, 0, 0, 0, 0, 0.2, 0, 0, 0, 1, 0, 0.3],
   scrape: [0.25, 0.2, 120, 0, 0.03, 0.06, 4, 1, 0, 0, 0, 0, 0, 2],
+  nearMiss: [0.3, 0.05, 1100, 0, 0.02, 0.09, 0, 1, -24],
 };
 
 /** Synthesized sound effects (no audio files). */
 export class Sound {
-  private readonly gate = new SoundGate({ scrape: 150, tick: 60, explosion: 45 });
+  private readonly gate = new SoundGate({ scrape: 150, tick: 60, explosion: 45, nearMiss: 120 });
 
   constructor(private readonly settings: ClientSettings) {}
 

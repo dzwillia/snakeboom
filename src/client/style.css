@@ -193,6 +193,20 @@ kbd {
   font-size: 12px;
 }
 
+.selector {
+  margin-top: 22px;
+  font-size: 18px;
+  letter-spacing: 0.14em;
+}
+
+.selector .wins {
+  display: inline-block;
+  min-width: 1.6em;
+  font-size: 26px;
+  font-weight: 900;
+  text-shadow: 0 0 10px currentColor;
+}
+
 .hint {
   margin-top: 28px;
   letter-spacing: 0.2em;

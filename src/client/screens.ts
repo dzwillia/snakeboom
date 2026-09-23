@@ -28,7 +28,8 @@ export class Screens {
         </div>
         <div class="small">PICKUPS: BOMB · GHOST · SHIELD · TURBO · SLOW · REVERSE · DOZER</div>
         <div class="hint">PRESS SPACE TO START</div>
-        <div class="small">FIRST TO ${winsToWin} · <kbd>ESC</kbd> PAUSE · <kbd>M</kbd> MUTE · <kbd>\`</kbd> TUNING</div>
+        <div class="selector">FIRST TO <kbd>◀</kbd> <span class="wins">${winsToWin}</span> <kbd>▶</kbd></div>
+        <div class="small"><kbd>ESC</kbd> PAUSE · <kbd>M</kbd> MUTE · <kbd>\`</kbd> TUNING</div>
       </div>`,
       'title',
     );
@@ -37,6 +38,12 @@ export class Screens {
   countdown(n: number | 'GO'): void {
     const token = this.show(`<div class="big" style="color:var(--text)">${n}</div>`, 'countdown');
     if (n === 'GO') this.clearLater(token, 700);
+  }
+
+  /** A transient callout (like OVERTIME) that clears itself unless something replaces it first. */
+  flash(text: string, colorCss: string, ms: number): void {
+    const token = this.show(`<div class="banner-title" style="color:${colorCss}">${text}</div>`, 'countdown');
+    this.clearLater(token, ms);
   }
 
   roundOver(title: string, detail: string, winner: number | null): void {
