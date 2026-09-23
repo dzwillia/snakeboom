@@ -6,6 +6,7 @@ import { MAPS } from './maps';
 import { collectPickups, updatePickups } from './pickups';
 import { createRng } from './rng';
 import { advanceSnake, growthRate } from './snake';
+import { tryShield } from './shield';
 import { pickNextMap, startRound } from './state';
 import { NO_INPUT, type DeathRecord, type MatchState, type PlayerInput, type SimEvent } from './types';
 
@@ -72,19 +73,21 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   collectPickups(state, cfg, events);
   const blasted = updateBombs(state, cfg, events);
 
-  // Everyone alive at the start of the tick is judged before anyone is removed, so simultaneous deaths are fair.
-  const deaths: DeathRecord[] = [];
+  // Everyone alive at the start of the tick is judged before anyone moves or dies, so
+  // simultaneous deaths are fair. Grace ignores blasts; a held Shield turns a death into a save.
+  const hits: DeathRecord[] = [];
   state.snakes.forEach((s, i) => {
     if (!s.alive) return;
     const bomber = blasted.get(i);
-    if (bomber !== undefined) {
-      deaths.push({ player: i, cause: 'blast', killer: bomber, x: s.x, y: s.y });
+    if (bomber !== undefined && s.effects.grace <= 0) {
+      hits.push({ player: i, cause: 'blast', killer: bomber, x: s.x, y: s.y });
       return;
     }
     const hit = detectHit(state, i, cfg);
-    if (hit) deaths.push({ player: i, cause: hit.cause, killer: hit.killer, x: s.x, y: s.y });
+    if (hit) hits.push({ player: i, cause: hit.cause, killer: hit.killer, x: s.x, y: s.y });
   });
-  for (const d of deaths) {
+  for (const d of hits) {
+    if (tryShield(state, d.player, d.cause, cfg, events)) continue;
     state.snakes[d.player].alive = false;
     state.deaths.push(d);
     events.push({ type: 'death', ...d });
