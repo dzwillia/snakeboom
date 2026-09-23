@@ -3,7 +3,7 @@ import '@fontsource/orbitron/900.css';
 import './style.css';
 import { createMatch, DEFAULT_CONFIG, rematch, step, type MatchState, type SimEvent } from '../sim';
 import { Sound } from './audio';
-import { PLAYER_COLORS } from './colors';
+import { PICKUP_COLORS, PLAYER_COLORS } from './colors';
 import { Hud } from './hud';
 import { KeyboardInput } from './input';
 import { FixedLoop } from './loop';
@@ -14,6 +14,17 @@ import { Screens } from './screens';
 import { browserStorage, CONFIG_KEY, DEFAULT_SETTINGS, loadStored, saveStored, SETTINGS_KEY } from './settings';
 import { describeRound } from './text';
 import { createTuningPanel } from './tuning';
+
+declare global {
+  interface Window {
+    /** Dev-only handle for browser tests. */
+    __snakeboom?: { readonly state: MatchState | null };
+  }
+}
+
+/** Bombs tick audibly during their last half second. */
+const FUSE_TICK_FROM = 30;
+const FUSE_TICK_EVERY = 8;
 
 function element(id: string): HTMLElement {
   const el = document.getElementById(id);
@@ -37,6 +48,7 @@ async function boot(): Promise<void> {
   let state: MatchState | null = null;
   let paused = false;
   let tuningOpen = false;
+  const fuseStage = new Map<number, number>();
   const newSeed = () => Math.floor(Math.random() * 2 ** 31);
   const persist = () => {
     saveStored(storage, CONFIG_KEY, cfg);
@@ -54,8 +66,9 @@ async function boot(): Promise<void> {
   const setPaused = (value: boolean) => {
     if (!state || state.phase === 'matchOver' || paused === value) return;
     paused = value;
+    input.clearLatches();
     if (paused) screens.paused();
-    else screens.clear();
+    else screens.resume();
   };
 
   const handle = (events: SimEvent[]) => {
@@ -90,6 +103,38 @@ async function boot(): Promise<void> {
           screens.matchOver(e.winner, state.scores);
           sound.play('matchWin');
           break;
+        case 'pickupSpawned':
+          sound.play('pickupSpawn', 0.5);
+          break;
+        case 'pickupCollected': {
+          const s = state.snakes[e.player];
+          fx.pickupBurst(s.x, s.y, PICKUP_COLORS[e.kind]);
+          sound.play('pickup');
+          break;
+        }
+        case 'bombDropped':
+          sound.play('bombDrop');
+          break;
+        case 'explosion':
+          fx.explosion(e.x, e.y, e.radius, e.chainDepth, e.tilesDestroyed);
+          sound.play('explosion', 1, 1 + 0.12 * Math.min(e.chainDepth, 5));
+          break;
+      }
+    }
+  };
+
+  const tickFuses = () => {
+    if (!state || paused) return;
+    if (state.bombs.length === 0) {
+      fuseStage.clear();
+      return;
+    }
+    for (const b of state.bombs) {
+      if (b.fuse > FUSE_TICK_FROM) continue;
+      const stage = Math.floor(b.fuse / FUSE_TICK_EVERY);
+      if (fuseStage.get(b.id) !== stage) {
+        fuseStage.set(b.id, stage);
+        sound.play('tick', 0.5);
       }
     }
   };
@@ -133,15 +178,24 @@ async function boot(): Promise<void> {
     if (document.hidden) setPaused(true);
   });
 
+  if (import.meta.env.DEV) {
+    window.__snakeboom = {
+      get state() {
+        return state;
+      },
+    };
+  }
+
   screens.title(cfg.winsToWin);
   new FixedLoop(
     () => {
       if (state && !paused) handle(step(state, input.sample(), cfg));
     },
     (alpha, frameSeconds) => {
-      renderer.draw(state, alpha, cfg);
+      renderer.draw(state, alpha, cfg, performance.now() / 1000);
       fx.update(frameSeconds);
       hud.update(state, cfg);
+      tickFuses();
     },
   ).start();
 }
