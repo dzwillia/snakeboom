@@ -23,10 +23,10 @@ Pick an AI level on the title screen (or in the tuning panel under **Opponent**)
 | Level | How it plays |
 |---|---|
 | **Easy** | Looks under a second ahead, reacts slowly, wanders toward pickups, uses items at random and stays confused by Reverse for a full second. Good for testing a mechanic in peace. |
-| **Normal** | Looks further, replans quickly when something lands in its path, cuts across your line when it can and times Slow and Reverse for when you're boxed in. |
-| **Hard** | Plans two seconds ahead every few ticks, hunts the space in front of your head, boosts to get there, bombs you when you're cornered and reads Reverse instantly. |
+| **Normal** | Looks further, replans quickly when something lands in its path, fights for territory and times Slow and Reverse for when you're boxed in. |
+| **Hard** | Plans two and a half seconds ahead every other tick, fights for territory (the floor it can reach before you can), cuts across your line just ahead of your head, boosts to get there, bombs you when you're cornered and reads Reverse instantly. |
 
-The AI lives in the rules engine (`src/sim/bots/opponent.ts`), so it is deterministic and works headlessly: `pnpm soak --bots hard,easy` pits two levels against each other and prints win counts, and the same code could drive a server-side bot online later. Difficulty levels are a table of knobs (look-ahead, reaction time, aggression, greed, boost use, item skill, mistake rate) at the top of that file.
+The AI lives in the rules engine (`src/sim/bots/opponent.ts`), so it is deterministic and works headlessly: `pnpm soak --bots hard,easy` pits two levels against each other and prints win counts and who hurt whom, `--profile '{"aggression":0.5}'` overrides knobs on the first AI seat, and `--debug 1` prints what the first AI was seeing when it hurt itself. The same code could drive a server-side bot online later. Difficulty levels are a table of knobs (look-ahead, reaction time, aggression, greed, boost use, item skill, mistake rate) at the top of that file.
 
 ## How it plays
 
