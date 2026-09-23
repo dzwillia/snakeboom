@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { deathBeatAt, PUNCH } from './deathBeat';
+import { deathBeatAt, FLASH_PEAK, PUNCH } from './deathBeat';
 
 const beat = { hitStopSeconds: 0.12, slowMoScale: 0.3, slowMoSeconds: 0.8 };
 
 describe('deathBeatAt', () => {
   it('starts frozen, flashing and punched in', () => {
-    expect(deathBeatAt(0, beat)).toEqual({ fxTimeScale: 0, flash: 0.6, zoom: 1 + PUNCH });
+    expect(deathBeatAt(0, beat)).toEqual({ fxTimeScale: 0, flash: FLASH_PEAK, zoom: 1 + PUNCH });
+    expect(FLASH_PEAK).toBeLessThanOrEqual(0.3); // a flash, not a white-out
   });
 
   it('fades the flash across the hit-stop', () => {
     const mid = deathBeatAt(0.06, beat);
     expect(mid.fxTimeScale).toBe(0);
-    expect(mid.flash).toBeCloseTo(0.3, 9);
+    expect(mid.flash).toBeCloseTo(FLASH_PEAK / 2, 9);
     expect(mid.zoom).toBeLessThan(1 + PUNCH);
   });
 

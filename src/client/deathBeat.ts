@@ -15,6 +15,8 @@ export interface DeathBeatFrame {
 
 /** How far the camera punches in at the moment of death. */
 export const PUNCH = 0.06;
+/** Peak alpha of the death flash (drawn outside the bloom, so this reads as a flash, not a white-out). */
+export const FLASH_PEAK = 0.25;
 
 /**
  * The death beat `elapsed` seconds after a death: a frozen, flashing hit-stop, then slow motion,
@@ -27,7 +29,7 @@ export function deathBeatAt(elapsed: number, s: DeathBeatSettings): DeathBeatFra
   const k = elapsed / total;
   return {
     fxTimeScale: inHitStop ? 0 : s.slowMoScale,
-    flash: inHitStop ? 0.6 * (1 - elapsed / s.hitStopSeconds) : 0,
+    flash: inHitStop ? FLASH_PEAK * (1 - elapsed / s.hitStopSeconds) : 0,
     zoom: 1 + PUNCH * (1 - k) * (1 - k),
   };
 }

@@ -42,6 +42,8 @@ export class Fx {
   /** Scales particle and ring time (hit-stop and slow motion); shake always decays in real time. */
   timeScale = 1;
   private readonly g = new Graphics();
+  /** Full-screen flashes, drawn above the bloom layer with normal blending. */
+  private readonly overlay = new Graphics();
   private particles: Particle[] = [];
   private rings: Ring[] = [];
   private flashes: Flash[] = [];
@@ -56,6 +58,7 @@ export class Fx {
   ) {
     this.g.blendMode = 'add';
     world.glow.addChild(this.g);
+    world.root.addChild(this.overlay);
   }
 
   /** Shatters a dead snake into sparks along its whole body, with a flash at the head. */
@@ -88,7 +91,7 @@ export class Fx {
     }
     this.debris(tiles);
     this.addShake(8 + 4 * Math.min(chainDepth, 4));
-    if (depth >= 2) this.chainFlash = Math.max(this.chainFlash, 0.08 + 0.04 * depth);
+    if (depth >= 2) this.chainFlash = Math.max(this.chainFlash, Math.min(0.18, 0.04 + 0.025 * depth));
   }
 
   /** Amber rubble from blocks that were blown up or crushed. */
@@ -155,6 +158,7 @@ export class Fx {
     this.chainFlash = 0;
     this.camera = { zoom: 1, x: 0, y: 0 };
     this.g.clear();
+    this.overlay.clear();
   }
 
   update(frameSeconds: number): void {
@@ -165,7 +169,8 @@ export class Fx {
     g.clear();
 
     const flashAlpha = calm ? 0 : Math.max(this.screenFlash, this.chainFlash);
-    if (flashAlpha > 0.005) g.rect(0, 0, ARENA_WIDTH, ARENA_HEIGHT).fill({ color: 0xffffff, alpha: flashAlpha });
+    this.overlay.clear();
+    if (flashAlpha > 0.005) this.overlay.rect(0, 0, ARENA_WIDTH, ARENA_HEIGHT).fill({ color: 0xffffff, alpha: flashAlpha });
     this.chainFlash *= Math.pow(0.0005, frameSeconds);
 
     this.flashes = this.flashes.filter((f) => (f.life -= dt) > 0);
