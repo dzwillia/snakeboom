@@ -103,7 +103,7 @@ Pickups are the only source of bombs and power-ups.
 
 - **Spawning:** the first pickup appears `firstPickupDelay` after GO. After that, every `pickupInterval` seconds a new pickup spawns if fewer than `maxPickups` are on the field.
 - **Placement:** the spawn point comes from the seeded random generator. It must be at least `pickupClearance` from walls, solid tiles, solid trail points and bombs, and at least `pickupMinHeadDistance` from every head. The game tries up to 50 random points. If none fit, it skips that spawn.
-- **Kind:** chosen by weight. The defaults are Bomb 35 and 13 each for the other five kinds.
+- **Kind:** chosen by weight. The defaults are Bomb 25 and 15 each for the other five kinds.
 - **Lifetime:** `pickupLifetime`. The pickup blinks for its last 3 seconds (a client-side effect) and then disappears. This stops pickups that get walled in from blocking new spawns.
 - **Collecting:** a head collects a pickup on contact (`distance < r + pickupRadius`), but only if its item slot is empty. Bodies never collect pickups.
 
@@ -113,7 +113,7 @@ Each player has one item slot, and both slots are shown on the HUD. The Use key 
 
 | Item | What Use does | Details |
 |---|---|---|
-| **Bomb ×3** | Drops a timed bomb at your head | The slot empties after the third bomb. Drops must be at least `bombDropCooldown` apart. |
+| **Bomb ×3** | Throws a bomb ahead of your opponent | It arcs through the air for `bombFlightTime` and lands where they'll be if they hold course, then blasts `bombFuse` later. A reticle marks the blast zone from the moment it's thrown. The slot empties after the third bomb, and throws must be at least `bombThrowCooldown` apart. |
 | **Ghost** | For `ghostDuration`, your **head** passes through bodies, other heads and obstacles | Walls and blasts still kill. Your body stays solid to your opponent. The head flickers for the final `ghostWarning`. If the head is inside something when Ghost ends, it dies. |
 | **Shield** | Nothing: it is passive while held | It absorbs your next death of any kind, and then the slot empties. |
 | **Turbo** | For `turboDuration`, boosting doesn't drain the meter | You still hold the boost key to go fast. |
@@ -130,14 +130,14 @@ Each player has one item slot, and both slots are shown on the HUD. The Use key 
 
 ### 3.6 Bombs and blasts
 
-- A bomb has a position, an owner and a fuse (`bombFuse`). Bombs are not solid, so snakes pass over them.
+- A bomb is **thrown**. It lands ahead of the nearest living opponent, at the spot they'd reach in `(bombFlightTime + bombFuse) × bombLeadFactor` seconds at their current speed and heading (kept inside the arena). It flies for `bombFlightTime`, lands, and then burns a fuse of `bombFuse`. Bombs are not solid, so snakes pass over them. Bombs still in the air can't be set off by other blasts.
 - When a fuse reaches 0, the bomb explodes with radius `R` (`blastRadius`). Four things happen:
   1. **Heads:** any head within `R + r` of the center dies, including the owner's. A Shield or shield grace absorbs the hit.
   2. **Bodies:** every trail point within `R + r` becomes a **hole**. Holes aren't solid and aren't drawn, so the blast circle cuts the tube cleanly. A hole stays where it is until that snake's tail passes over it.
   3. **Obstacles:** every solid tile that intersects the blast circle is destroyed.
   4. **Other bombs:** any other bomb within `R` whose remaining fuse is longer than `chainDelay` has its fuse cut to `chainDelay`. Chains ripple outward, and each explosion records its chain depth for the visual effects.
 - Explosions that happen in the same tick resolve in bomb-id order.
-- This follows from the rules and is intended: a bomb dropped at your head lands on your own trail, so 1.5 s later it blows a hole in your own body. That's useful for escaping a trap, but it costs you part of your wall.
+- A thrown bomb still catches the thrower (and holes their body) if they're near the landing spot when it blasts.
 
 ### 3.7 Rounds and matches
 
@@ -368,12 +368,12 @@ Because the engine is deterministic and each player's input per tick is tiny (ab
 | Boost | `boostMultiplier` | 1.6 |
 | | `boostMeterSeconds` (full → empty) | 2.0 s |
 | | `boostRefillSeconds` (empty → full, key released) | 6.0 s |
-| Pickups | `maxPickups` · `firstPickupDelay` · `pickupInterval` | 2 · 3 s · 6 s |
-| | `pickupLifetime` · `pickupRadius` | 15 s · 14 |
+| Pickups | `maxPickups` · `firstPickupDelay` · `pickupInterval` | 4 · 1 s · 2.5 s |
+| | `pickupLifetime` · `pickupRadius` | 12 s · 14 |
 | | `pickupMinHeadDistance` · `pickupClearance` | 150 · 40 |
-| | Weights | bomb 35 · ghost 13 · shield 13 · turbo 13 · slow 13 · reverse 13 |
-| Bombs | `bombCharges` · `bombDropCooldown` | 3 · 0.3 s |
-| | `bombFuse` · `blastRadius` · `chainDelay` | 1.5 s · 70 · 0.12 s |
+| | Weights | bomb 25 · ghost 15 · shield 15 · turbo 15 · slow 15 · reverse 15 |
+| Bombs | `bombCharges` · `bombThrowCooldown` · `bombFlightTime` | 3 · 0.5 s · 0.45 s |
+| | `bombFuse` (after landing) · `blastRadius` · `chainDelay` · `bombLeadFactor` | 1 s · 70 · 0.12 s · 1 |
 | Items | `ghostDuration` · `ghostWarning` | 3 s · 0.75 s |
 | | `shieldGrace` | 0.5 s |
 | | `turboDuration` | 4 s |
@@ -493,3 +493,7 @@ Playtest focus: the "one more match" test.
 - Work happens on the `v1-prototype` branch, with a commit after each task.
 - Work stops at each milestone for a playtest, and the branch merges to `main` once the developer approves.
 - Autonomous work between checkpoints follows the implementation plan that comes from this spec.
+
+## 11. Changes from playtesting
+
+- **v0.4.0.** Bombs are thrown, not dropped. The old drop-at-your-head bomb felt random. A thrown bomb lands where the opponent is heading, shows a reticle over its blast zone, and gives them about 1.45 s to react. More pickups spawn: up to 4 on the field, the first after 1 s, then one every 2.5 s, each lasting 12 s. Power-ups have more weight relative to bombs.

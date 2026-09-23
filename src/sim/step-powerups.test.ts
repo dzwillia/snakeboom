@@ -45,7 +45,7 @@ describe('step with power-ups', () => {
     cyan.item = createItem('shield', cfg);
     Object.assign(cyan, { x: 12, y: 500, heading: PI });
     run(s, 3);
-    s.bombs.push({ id: 99, owner: 1, x: cyan.x, y: cyan.y, fuse: 1, maxFuse: 1, chainDepth: 0 });
+    s.bombs.push({ id: 99, owner: 1, x: cyan.x, y: cyan.y, fuse: 1, maxFuse: 1, chainDepth: 0, flight: 0, flightTotal: 0, fromX: cyan.x, fromY: cyan.y });
     expect(deaths(run(s, 1))).toEqual([]);
     expect(cyan.alive).toBe(true);
   });

@@ -119,8 +119,11 @@ async function boot(): Promise<void> {
           sound.play('pickup');
           break;
         }
-        case 'bombDropped':
-          sound.play('bombDrop');
+        case 'bombThrown':
+          sound.play('bombThrow');
+          break;
+        case 'bombLanded':
+          sound.play('bombDrop', 0.8);
           break;
         case 'explosion':
           fx.explosion(e.x, e.y, e.radius, e.chainDepth, e.tilesDestroyed);
@@ -154,7 +157,7 @@ async function boot(): Promise<void> {
       return;
     }
     for (const b of state.bombs) {
-      if (b.fuse > FUSE_TICK_FROM) continue;
+      if (b.flight > 0 || b.fuse > FUSE_TICK_FROM) continue;
       const stage = Math.floor(b.fuse / FUSE_TICK_EVERY);
       if (fuseStage.get(b.id) !== stage) {
         fuseStage.set(b.id, stage);

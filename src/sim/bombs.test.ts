@@ -17,7 +17,7 @@ function playing(): MatchState {
 }
 
 function bomb(id: number, x: number, y: number, owner = 0, fuse = FUSE): BombState {
-  return { id, owner, x, y, fuse, maxFuse: fuse, chainDepth: 0 };
+  return { id, owner, x, y, fuse, maxFuse: fuse, chainDepth: 0, flight: 0, flightTotal: 0, fromX: x, fromY: y };
 }
 
 function run(s: MatchState, ticks: number) {
@@ -96,6 +96,22 @@ describe('bombs', () => {
     expect(s.bombs.find((b) => b.id === 3)?.fuse).toBe(FUSE - 1);
     const chain = run(s, CHAIN);
     expect(chain.events).toEqual([expect.objectContaining({ type: 'explosion', id: 2, chainDepth: 1 })]);
+  });
+
+  it('flies for bombFlightTime, lands with an event, then burns its fuse', () => {
+    const s = playing();
+    s.bombs = [{ ...bomb(4, 800, 500), flight: 10, flightTotal: 10, fromX: 600, fromY: 500 }];
+    expect(run(s, 10).events).toEqual([{ type: 'bombLanded', id: 4, x: 800, y: 500 }]);
+    expect(s.bombs[0].fuse).toBe(FUSE);
+    expect(run(s, FUSE - 1).events).toEqual([]);
+    expect(run(s, 1).events).toEqual([expect.objectContaining({ type: 'explosion', id: 4 })]);
+  });
+
+  it('a bomb still in the air ignores other blasts', () => {
+    const s = playing();
+    s.bombs = [bomb(1, 800, 500, 0, 1), { ...bomb(2, 830, 500), flight: 20, flightTotal: 20 }];
+    run(s, 1);
+    expect(s.bombs.find((b) => b.id === 2)).toMatchObject({ flight: 19, fuse: FUSE, chainDepth: 0 });
   });
 
   // Review Focus 2: a pile of bombs must not re-trigger forever.

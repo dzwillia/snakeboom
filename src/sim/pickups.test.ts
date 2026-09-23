@@ -29,7 +29,7 @@ describe('pickups', () => {
     expect(pickKind(none, rng)).toBeNull();
   });
 
-  it('follows the default mix: bombs about 35%, each power-up about 13%', () => {
+  it('follows the default pickup mix', () => {
     const rng = createRng(4);
     const counts: Record<string, number> = {};
     const draws = 20_000;
@@ -37,8 +37,9 @@ describe('pickups', () => {
       const kind = pickKind(DEFAULT_CONFIG.pickupWeights, rng)!;
       counts[kind] = (counts[kind] ?? 0) + 1;
     }
-    expect(counts.bomb / draws).toBeCloseTo(0.35, 1);
-    for (const kind of ['ghost', 'shield', 'turbo', 'slow', 'reverse']) expect(counts[kind] / draws).toBeCloseTo(0.13, 1);
+    const weights = DEFAULT_CONFIG.pickupWeights;
+    const total = Object.values(weights).reduce((a, b) => a + b, 0);
+    for (const [kind, w] of Object.entries(weights)) expect(counts[kind] / draws).toBeCloseTo(w / total, 1);
   });
 
   it('spawns the first pickup after firstPickupDelay, then one per interval up to maxPickups', () => {
@@ -48,10 +49,10 @@ describe('pickups', () => {
     expect(tick(s, first - 1)).toEqual([]);
     const spawned = tick(s, 1);
     expect(spawned).toEqual([expect.objectContaining({ type: 'pickupSpawned' })]);
+    tick(s, interval * (cfg.maxPickups - 1));
+    expect(s.pickups).toHaveLength(cfg.maxPickups);
     tick(s, interval);
-    expect(s.pickups).toHaveLength(2);
-    tick(s, interval);
-    expect(s.pickups).toHaveLength(2);
+    expect(s.pickups).toHaveLength(cfg.maxPickups);
   });
 
   it('expires pickups after pickupLifetime', () => {
