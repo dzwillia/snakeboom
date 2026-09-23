@@ -16,6 +16,7 @@ const FORBIDDEN: Array<[RegExp, string]> = [
   [/\bwindow\b/, 'window'],
   [/\bdocument\b/, 'document'],
   [/from\s+['"]node:/, 'node: import'],
+  [/\*\*/, 'exponent operator (use multiplication)'],
 ];
 
 function simSources(dir: string): string[] {

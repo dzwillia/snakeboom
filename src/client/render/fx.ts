@@ -1,6 +1,6 @@
 import { Graphics } from 'pixi.js';
 import { TILE_COLS, TILE_SIZE, type SnakeState } from '../../sim';
-import { PALETTE } from '../colors';
+import { PALETTE, PICKUP_COLORS } from '../colors';
 import type { ClientSettings } from '../settings';
 import type { World } from './world';
 
@@ -86,6 +86,14 @@ export class Fx {
       }
     }
     this.addShake(8 + 4 * Math.min(chainDepth, 4));
+  }
+
+  /** A Shield soaking up a hit: a bright green ring, sparks and a little shake. */
+  shieldBurst(x: number, y: number): void {
+    this.ring(x, y, 46, 0.4, PICKUP_COLORS.shield);
+    this.ring(x, y, 26, 0.25, 0xffffff);
+    for (let k = 0; k < 30; k++) this.spark(x, y, PICKUP_COLORS.shield, 120 + Math.random() * 200, 0.3 + Math.random() * 0.4, 2);
+    this.addShake(6);
   }
 
   pickupBurst(x: number, y: number, color: number): void {

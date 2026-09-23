@@ -41,6 +41,16 @@ export function describeItem(item: ItemState | null): string {
   switch (item.kind) {
     case 'bomb':
       return `BOMB ×${item.charges}`;
+    case 'ghost':
+      return 'GHOST';
+    case 'shield':
+      return 'SHIELD';
+    case 'turbo':
+      return 'TURBO';
+    case 'slow':
+      return 'SLOW';
+    case 'reverse':
+      return 'REVERSE';
   }
 }
 

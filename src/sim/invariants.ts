@@ -25,6 +25,9 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
     const len = trailLength(t);
     if (len > Math.max(0, s.targetLength) + 1e-6) problems.push(`snake ${i}: trail ${len} longer than ${s.targetLength}`);
     if (s.item && s.item.charges < 1) problems.push(`snake ${i}: holds an empty item`);
+    for (const [name, v] of Object.entries(s.effects)) {
+      if (!Number.isInteger(v) || v < 0) problems.push(`snake ${i}: effect ${name} is ${v}`);
+    }
   });
   const points = state.scores.reduce((a, b) => a + b, 0);
   if (points > state.round) problems.push(`${points} points after ${state.round} rounds`);

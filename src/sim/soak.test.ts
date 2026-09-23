@@ -54,6 +54,29 @@ describe('soak', () => {
       { maxPickups: 6, pickupInterval: 1, firstPickupDelay: 0, bombCharges: 10, bombDropCooldown: 0, blastRadius: 200, chainDelay: 0.02 },
     ],
     ['no pickups at all', { maxPickups: 0 }],
+    [
+      'shields only',
+      {
+        pickupWeights: { bomb: 0, ghost: 0, shield: 1, turbo: 0, slow: 0, reverse: 0 },
+        firstPickupDelay: 0,
+        pickupInterval: 1,
+        maxPickups: 4,
+      },
+    ],
+    [
+      'ghosts only',
+      {
+        pickupWeights: { bomb: 0, ghost: 1, shield: 0, turbo: 0, slow: 0, reverse: 0 },
+        firstPickupDelay: 0,
+        pickupInterval: 1,
+        maxPickups: 4,
+        ghostDuration: 10,
+      },
+    ],
+    [
+      'every power-up at once',
+      { firstPickupDelay: 0, pickupInterval: 0.5, maxPickups: 6, slowFactor: 0.2, turboDuration: 20, reverseDuration: 20 },
+    ],
   ];
   for (const [name, overrides] of extremes) {
     it(`stays healthy with ${name}`, () => {

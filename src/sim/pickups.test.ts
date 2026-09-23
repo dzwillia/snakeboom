@@ -24,8 +24,21 @@ function tick(s: MatchState, n: number, c: Config = cfg): SimEvent[] {
 describe('pickups', () => {
   it('picks kinds by weight and returns null when no weight is positive', () => {
     const rng = createRng(1);
-    expect(pickKind({ bomb: 5 }, rng)).toBe('bomb');
-    expect(pickKind({ bomb: 0 }, rng)).toBeNull();
+    const none = { bomb: 0, ghost: 0, shield: 0, turbo: 0, slow: 0, reverse: 0 };
+    expect(pickKind({ ...none, shield: 5 }, rng)).toBe('shield');
+    expect(pickKind(none, rng)).toBeNull();
+  });
+
+  it('follows the default mix: bombs about 35%, each power-up about 13%', () => {
+    const rng = createRng(4);
+    const counts: Record<string, number> = {};
+    const draws = 20_000;
+    for (let i = 0; i < draws; i++) {
+      const kind = pickKind(DEFAULT_CONFIG.pickupWeights, rng)!;
+      counts[kind] = (counts[kind] ?? 0) + 1;
+    }
+    expect(counts.bomb / draws).toBeCloseTo(0.35, 1);
+    for (const kind of ['ghost', 'shield', 'turbo', 'slow', 'reverse']) expect(counts[kind] / draws).toBeCloseTo(0.13, 1);
   });
 
   it('spawns the first pickup after firstPickupDelay, then one per interval up to maxPickups', () => {
@@ -34,7 +47,7 @@ describe('pickups', () => {
     const interval = Math.round(cfg.pickupInterval * TICK_RATE);
     expect(tick(s, first - 1)).toEqual([]);
     const spawned = tick(s, 1);
-    expect(spawned).toEqual([expect.objectContaining({ type: 'pickupSpawned', kind: 'bomb' })]);
+    expect(spawned).toEqual([expect.objectContaining({ type: 'pickupSpawned' })]);
     tick(s, interval);
     expect(s.pickups).toHaveLength(2);
     tick(s, interval);

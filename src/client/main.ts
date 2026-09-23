@@ -1,8 +1,8 @@
 import '@fontsource/orbitron/700.css';
 import '@fontsource/orbitron/900.css';
 import './style.css';
-import { createMatch, DEFAULT_CONFIG, rematch, step, type MatchState, type SimEvent } from '../sim';
-import { Sound } from './audio';
+import { createMatch, DEFAULT_CONFIG, rematch, step, type MatchState, type PickupKind, type SimEvent } from '../sim';
+import { Sound, type SoundName } from './audio';
 import { PICKUP_COLORS, PLAYER_COLORS } from './colors';
 import { Hud } from './hud';
 import { KeyboardInput } from './input';
@@ -25,6 +25,13 @@ declare global {
 /** Bombs tick audibly during their last half second. */
 const FUSE_TICK_FROM = 30;
 const FUSE_TICK_EVERY = 8;
+
+const ITEM_SOUNDS: Partial<Record<PickupKind, SoundName>> = {
+  ghost: 'ghost',
+  turbo: 'turbo',
+  slow: 'slow',
+  reverse: 'reverse',
+};
 
 function element(id: string): HTMLElement {
   const el = document.getElementById(id);
@@ -118,6 +125,23 @@ async function boot(): Promise<void> {
         case 'explosion':
           fx.explosion(e.x, e.y, e.radius, e.chainDepth, e.tilesDestroyed);
           sound.play('explosion', 1, 1 + 0.12 * Math.min(e.chainDepth, 5));
+          break;
+        case 'itemUsed': {
+          const name = ITEM_SOUNDS[e.kind];
+          if (name) sound.play(name);
+          break;
+        }
+        case 'effectStarted': {
+          const s = state.snakes[e.player];
+          fx.pickupBurst(s.x, s.y, PICKUP_COLORS[e.effect]);
+          break;
+        }
+        case 'effectEnded':
+          if (e.effect === 'ghost') sound.play('ghostEnd', 0.7);
+          break;
+        case 'shieldBlocked':
+          fx.shieldBurst(e.x, e.y);
+          sound.play('shield');
           break;
       }
     }

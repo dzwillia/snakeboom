@@ -49,10 +49,20 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
   if (bot.boostTicks > 0) bot.boostTicks--;
   else if (best === LOOK_STEPS && rngNext(bot.rng) < 0.004) bot.boostTicks = 20 + rngInt(bot.rng, 40);
 
+  const near = state.snakes.some((o, j) => j !== idx && o.alive && dist2(o, me.x, me.y) < BOMB_RANGE * BOMB_RANGE);
   let use = false;
-  if (me.item) {
-    const near = state.snakes.some((o, j) => j !== idx && o.alive && dist2(o, me.x, me.y) < BOMB_RANGE * BOMB_RANGE);
-    use = rngNext(bot.rng) < (near ? 0.08 : 0.005);
+  switch (me.item?.kind) {
+    case 'bomb':
+    case 'slow':
+    case 'reverse':
+      use = rngNext(bot.rng) < (near ? 0.08 : 0.005);
+      break;
+    case 'ghost':
+      use = best < LOOK_STEPS / 3; // escape when boxed in
+      break;
+    case 'turbo':
+      use = best === LOOK_STEPS && rngNext(bot.rng) < 0.01;
+      break;
   }
   return { turn, boost: bot.boostTicks > 0, use };
 }
@@ -103,7 +113,8 @@ function clearSteps(state: MatchState, idx: number, turn: -1 | 0 | 1, cfg: Confi
       if (snake !== idx || me.trail.cum[i] < ignoreOwnFrom) probe.blocked = true;
     });
     if (probe.blocked) return k - 1;
-    for (const b of state.bombs) if (dist2(b, x, y) < (cfg.blastRadius + r) ** 2 && b.fuse < 45) return k - 1;
+    const danger = cfg.blastRadius + r;
+    for (const b of state.bombs) if (dist2(b, x, y) < danger * danger && b.fuse < 45) return k - 1;
     for (let j = 0; j < state.snakes.length; j++) {
       const other = state.snakes[j];
       if (j === idx || !other.alive) continue;

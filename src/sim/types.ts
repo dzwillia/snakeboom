@@ -44,6 +44,19 @@ export interface ItemState {
   charges: number;
 }
 
+/** Timed effects on a snake, in ticks remaining (0 = off). */
+export interface EffectTimers {
+  ghost: number;
+  turbo: number;
+  slow: number;
+  reverse: number;
+  /** Shield grace: immune to everything except walls. */
+  grace: number;
+}
+
+/** Effects announced by effectStarted/effectEnded events (grace is internal). */
+export type EffectName = 'ghost' | 'turbo' | 'slow' | 'reverse';
+
 export interface PickupState {
   id: number;
   kind: PickupKind;
@@ -86,6 +99,7 @@ export interface SnakeState {
   useCooldown: number;
   /** Bumped whenever a blast punches holes in this trail, so the renderer redraws it. */
   holeVersion: number;
+  effects: EffectTimers;
 }
 
 export interface DeathRecord {
@@ -142,6 +156,10 @@ export type SimEvent =
   | { type: 'pickupCollected'; id: number; kind: PickupKind; player: number }
   | { type: 'pickupExpired'; id: number }
   | { type: 'bombDropped'; id: number; player: number; x: number; y: number }
+  | { type: 'itemUsed'; player: number; kind: PickupKind }
+  | { type: 'effectStarted'; player: number; effect: EffectName }
+  | { type: 'effectEnded'; player: number; effect: EffectName }
+  | { type: 'shieldBlocked'; player: number; x: number; y: number; cause: DeathCause }
   | {
       type: 'explosion';
       id: number;

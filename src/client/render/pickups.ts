@@ -38,5 +38,36 @@ function drawGlyph(g: Graphics, kind: PickupKind, x: number, y: number, s: numbe
         .lineTo(x + s * 0.75, y - s * 0.9)
         .stroke({ width: 2, color: PALETTE.fuse, cap: 'round' });
       break;
+    case 'ghost':
+      g.circle(x, y - s * 0.15, s * 0.6).fill({ color });
+      g.rect(x - s * 0.6, y - s * 0.15, s * 1.2, s * 0.75).fill({ color });
+      g.circle(x - s * 0.22, y - s * 0.2, s * 0.14).fill({ color: PALETTE.background });
+      g.circle(x + s * 0.22, y - s * 0.2, s * 0.14).fill({ color: PALETTE.background });
+      break;
+    case 'shield':
+      g.poly([x, y - s * 0.9, x + s * 0.75, y - s * 0.55, x + s * 0.6, y + s * 0.35, x, y + s * 0.9, x - s * 0.6, y + s * 0.35, x - s * 0.75, y - s * 0.55]).stroke({
+        width: 2.5,
+        color,
+        join: 'round',
+      });
+      break;
+    case 'turbo':
+      g.poly([x + s * 0.15, y - s * 0.95, x - s * 0.55, y + s * 0.1, x - s * 0.05, y + s * 0.1, x - s * 0.2, y + s * 0.95, x + s * 0.55, y - s * 0.15, x + s * 0.05, y - s * 0.15]).fill({
+        color,
+      });
+      break;
+    case 'slow':
+      g.poly([x - s * 0.55, y - s * 0.8, x + s * 0.55, y - s * 0.8, x, y]).fill({ color });
+      g.poly([x - s * 0.55, y + s * 0.8, x + s * 0.55, y + s * 0.8, x, y]).fill({ color });
+      break;
+    case 'reverse':
+      g.moveTo(x - s * 0.7, y - s * 0.3)
+        .lineTo(x + s * 0.45, y - s * 0.3)
+        .moveTo(x + s * 0.7, y + s * 0.3)
+        .lineTo(x - s * 0.45, y + s * 0.3)
+        .stroke({ width: 2.5, color, cap: 'round' });
+      g.poly([x + s * 0.8, y - s * 0.3, x + s * 0.35, y - s * 0.62, x + s * 0.35, y + s * 0.02]).fill({ color });
+      g.poly([x - s * 0.8, y + s * 0.3, x - s * 0.35, y - s * 0.02, x - s * 0.35, y + s * 0.62]).fill({ color });
+      break;
   }
 }

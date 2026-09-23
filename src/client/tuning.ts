@@ -1,6 +1,6 @@
 import GUI from 'lil-gui';
-import { DEFAULT_CONFIG, type Config } from '../sim';
-import { DEFAULT_SETTINGS, type ClientSettings } from './settings';
+import { DEFAULT_CONFIG, type Config, type PickupKind } from '../sim';
+import { DEFAULT_SETTINGS, resetInPlace, type ClientSettings } from './settings';
 
 export interface TuningPanel {
   show(): void;
@@ -52,6 +52,18 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   bombs.add(cfg, 'blastRadius', 20, 200, 5).name('blast radius');
   bombs.add(cfg, 'chainDelay', 0.02, 1, 0.02).name('chain delay (s)');
 
+  const power = gui.addFolder('Power-ups');
+  power.add(cfg, 'ghostDuration', 0.5, 10, 0.25).name('ghost (s)');
+  power.add(cfg, 'ghostWarning', 0, 3, 0.25).name('ghost warning (s)');
+  power.add(cfg, 'shieldGrace', 0, 3, 0.1).name('shield grace (s)');
+  power.add(cfg, 'turboDuration', 0.5, 15, 0.5).name('turbo (s)');
+  power.add(cfg, 'slowDuration', 0.5, 15, 0.5).name('slow (s)');
+  power.add(cfg, 'slowFactor', 0.1, 1, 0.05).name('slow speed ×');
+  power.add(cfg, 'reverseDuration', 0.5, 15, 0.5).name('reverse (s)');
+
+  const mix = gui.addFolder('Pickup mix');
+  for (const kind of Object.keys(cfg.pickupWeights) as PickupKind[]) mix.add(cfg.pickupWeights, kind, 0, 100, 1);
+
   const fx = gui.addFolder('Effects');
   fx.add(settings, 'bloom');
   fx.add(settings, 'bloomStrength', 0, 4, 0.1).name('bloom strength');
@@ -66,8 +78,8 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   const refresh = () => gui.controllersRecursive().forEach((c) => c.updateDisplay());
   const actions = {
     reset: () => {
-      Object.assign(cfg, structuredClone(DEFAULT_CONFIG));
-      Object.assign(settings, structuredClone(DEFAULT_SETTINGS));
+      resetInPlace(cfg, DEFAULT_CONFIG);
+      resetInPlace(settings, DEFAULT_SETTINGS);
       refresh();
       hooks.onChange();
     },

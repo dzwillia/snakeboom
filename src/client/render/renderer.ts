@@ -51,7 +51,7 @@ export class Renderer {
     state.snakes.forEach((s, i) => {
       const view = this.snakes[i];
       if (!view) return;
-      if (s.alive) view.update(s, state.phase === 'playing' ? alpha : 1, cfg.snakeRadius);
+      if (s.alive) view.update(s, state.phase === 'playing' ? alpha : 1, cfg, timeSeconds);
       else view.hide();
     });
     this.bombs.draw(state.bombs, timeSeconds);
