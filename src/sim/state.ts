@@ -20,9 +20,14 @@ export function createMatch(cfg: Config, seed: number): MatchState {
     mapBag: [],
     rng: createRng(seed),
     tiles: [],
+    tilesVersion: 0,
     snakes: [],
     grid: createGrid(ARENA_WIDTH, ARENA_HEIGHT),
     deaths: [],
+    pickups: [],
+    bombs: [],
+    pickupTimer: 0,
+    nextId: 1,
   };
   startRound(state, cfg);
   return state;
@@ -32,7 +37,11 @@ export function createMatch(cfg: Config, seed: number): MatchState {
 export function startRound(state: MatchState, cfg: Config): void {
   const map = MAPS[state.mapIndex];
   state.tiles = map.tiles.slice();
+  state.tilesVersion++;
   state.snakes = map.spawns.map((sp, i) => createSnake(i, sp.x, sp.y, sp.heading, cfg));
+  state.pickups = [];
+  state.bombs = [];
+  state.pickupTimer = Math.max(1, Math.round(cfg.firstPickupDelay * TICK_RATE));
   rebuildGrid(state);
   state.phase = 'countdown';
   state.phaseTicks = Math.max(1, Math.round(cfg.countdownSeconds * TICK_RATE));
