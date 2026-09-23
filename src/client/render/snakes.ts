@@ -127,17 +127,17 @@ export class SnakeView {
       for (const side of [-0.8, 0, 0.8]) {
         const ox = -by * side * r;
         const oy = bx * side * r;
-        g.moveTo(x + ox + bx * r * 1.5, y + oy + by * r * 1.5).lineTo(x + ox + bx * r * 3.4, y + oy + by * r * 3.4);
+        g.moveTo(x + ox + bx * r * 1.5, y + oy + by * r * 1.5).lineTo(x + ox + bx * r * 4.5, y + oy + by * r * 4.5);
       }
-      g.stroke({ width: 2, color: PICKUP_COLORS.turbo, cap: 'round' });
+      g.stroke({ width: 2.5, color: PICKUP_COLORS.turbo, cap: 'round' });
     }
     if (e.slow > 0) {
-      g.circle(x, y, r * 2.1).stroke({ width: 2, color: PICKUP_COLORS.slow, alpha: 0.55 + 0.3 * Math.sin(t * 10) });
+      g.circle(x, y, r * 2.7).stroke({ width: 3, color: PICKUP_COLORS.slow, alpha: 0.55 + 0.3 * Math.sin(t * 10) });
     }
 
     const flicker = e.ghost > 0 && e.ghost < cfg.ghostWarning * TICK_RATE && Math.floor(t * 12) % 2 === 0;
     if (e.ghost > 0 && !flicker) {
-      g.circle(x, y, r * 1.6).fill({ color: PICKUP_COLORS.ghost, alpha: 0.25 });
+      g.circle(x, y, r * 2).fill({ color: PICKUP_COLORS.ghost, alpha: 0.25 });
       g.circle(x, y, r * 0.9).fill({ color: PICKUP_COLORS.ghost, alpha: 0.75 });
     } else {
       g.circle(x, y, r * 1.25).fill({ color: this.color });
@@ -148,17 +148,18 @@ export class SnakeView {
     g.circle(ex, ey, Math.max(1.2, r * 0.28)).fill({ color: PALETTE.background });
 
     if (s.item?.kind === 'shield') {
-      g.circle(x, y, r * 2.4).stroke({ width: 2.5, color: PICKUP_COLORS.shield, alpha: 0.85 });
+      g.circle(x, y, r * 3).stroke({ width: 3, color: PICKUP_COLORS.shield, alpha: 0.85 });
     }
     if (e.grace > 0 && Math.floor(t * 16) % 2 === 0) {
-      g.circle(x, y, r * 2.8).stroke({ width: 3, color: PICKUP_COLORS.shield });
+      g.circle(x, y, r * 3.5).stroke({ width: 3, color: PICKUP_COLORS.shield });
     }
     if (e.reverse > 0) {
       const a = t * 8;
-      const cy = y - r * 2.8;
-      g.moveTo(x + Math.cos(a) * r, cy + Math.sin(a) * r)
-        .arc(x, cy, r, a, a + Math.PI * 1.4)
-        .stroke({ width: 2, color: PICKUP_COLORS.reverse, cap: 'round' });
+      const cy = y - r * 3.8;
+      const sr = r * 1.4;
+      g.moveTo(x + Math.cos(a) * sr, cy + Math.sin(a) * sr)
+        .arc(x, cy, sr, a, a + Math.PI * 1.4)
+        .stroke({ width: 2.5, color: PICKUP_COLORS.reverse, cap: 'round' });
     }
   }
 }
