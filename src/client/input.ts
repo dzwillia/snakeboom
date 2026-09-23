@@ -36,6 +36,8 @@ export class KeyboardInput {
   }
 
   private onKeyDown(e: KeyboardEvent): void {
+    const tag = (e.target as { tagName?: string } | null)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (GAME_KEYS.has(e.code)) e.preventDefault();
     if (e.repeat) return;
     this.down.add(e.code);

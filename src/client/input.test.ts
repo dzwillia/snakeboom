@@ -48,6 +48,14 @@ describe('KeyboardInput', () => {
     expect(codes).toEqual(['ArrowDown']);
   });
 
+  it('ignores keys typed into form fields such as the tuning panel', () => {
+    const field = Object.assign(new EventTarget(), { tagName: 'INPUT' });
+    const input = new KeyboardInput(field);
+    field.dispatchEvent(key('keydown', 'KeyA'));
+    field.dispatchEvent(key('keydown', 'KeyS'));
+    expect(input.sample()[0]).toEqual(idle);
+  });
+
   // Review Focus 2: losing focus mid-round must not leave a snake turning forever.
   it('releases every key and notifies listeners when the window loses focus', () => {
     const target = new EventTarget();
