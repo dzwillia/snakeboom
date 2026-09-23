@@ -1,6 +1,6 @@
 import { Container, Graphics } from 'pixi.js';
-import type { SnakeState, Trail } from '../../sim';
-import { PALETTE } from '../colors';
+import { TICK_RATE, type Config, type SnakeState, type Trail } from '../../sim';
+import { PALETTE, PICKUP_COLORS } from '../colors';
 
 /** Points per body chunk. Only the tail and head chunks are redrawn each frame. */
 const CHUNK = 128;
@@ -11,7 +11,7 @@ interface Chunk {
   core: Graphics;
 }
 
-/** Draws one snake as a neon tube (colored stroke + bright core) with a glowing head. */
+/** Draws one snake as a neon tube (colored stroke + bright core) with a glowing, status-aware head. */
 export class SnakeView {
   private readonly tubes = new Container();
   private readonly cores = new Container();
@@ -40,11 +40,12 @@ export class SnakeView {
     this.setVisible(false);
   }
 
-  update(s: SnakeState, alpha: number, radius: number): void {
+  update(s: SnakeState, alpha: number, cfg: Config, t: number): void {
     this.setVisible(true);
-    const t = s.trail;
-    const startSeq = t.baseSeq + t.start;
-    const headSeq = t.baseSeq + t.xs.length - 1;
+    const radius = cfg.snakeRadius;
+    const trail = s.trail;
+    const startSeq = trail.baseSeq + trail.start;
+    const headSeq = trail.baseSeq + trail.xs.length - 1;
     const firstChunk = Math.floor(startSeq / CHUNK);
     const lastChunk = Math.floor(headSeq / CHUNK);
 
@@ -70,10 +71,10 @@ export class SnakeView {
         this.cores.addChild(chunk.core);
       }
       if (fresh || holesChanged || k === firstChunk || k >= lastChunk - 1) {
-        this.drawChunk(chunk, t, k, startSeq, headSeq, hx, hy, radius);
+        this.drawChunk(chunk, trail, k, startSeq, headSeq, hx, hy, radius);
       }
     }
-    this.drawHead(hx, hy, s.heading, radius);
+    this.drawHead(s, hx, hy, cfg, t);
   }
 
   private setVisible(visible: boolean): void {
@@ -84,7 +85,7 @@ export class SnakeView {
 
   private drawChunk(
     chunk: Chunk,
-    t: Trail,
+    trail: Trail,
     k: number,
     startSeq: number,
     headSeq: number,
@@ -98,14 +99,14 @@ export class SnakeView {
     const runs: number[][] = [];
     let run: number[] = [];
     for (let seq = from; seq <= to; seq++) {
-      const i = seq - t.baseSeq;
-      if (!t.solid[i]) {
+      const i = seq - trail.baseSeq;
+      if (!trail.solid[i]) {
         if (run.length > 0) runs.push(run);
         run = [];
         continue;
       }
       if (seq === headSeq) run.push(hx, hy);
-      else run.push(t.xs[i], t.ys[i]);
+      else run.push(trail.xs[i], trail.ys[i]);
     }
     if (run.length > 0) runs.push(run);
 
@@ -113,14 +114,52 @@ export class SnakeView {
     strokeRuns(chunk.core, runs, Math.max(1.5, radius * 0.7), PALETTE.core);
   }
 
-  private drawHead(x: number, y: number, heading: number, radius: number): void {
+  /** The head plus status: turbo streaks, slow halo, ghost glow, shield ring, grace flash, reverse swirl. */
+  private drawHead(s: SnakeState, x: number, y: number, cfg: Config, t: number): void {
     const g = this.head;
+    const r = cfg.snakeRadius;
+    const e = s.effects;
     g.clear();
-    g.circle(x, y, radius * 1.25).fill({ color: this.color });
-    g.circle(x, y, radius * 0.7).fill({ color: PALETTE.core });
-    const ex = x + Math.cos(heading) * radius * 0.55;
-    const ey = y + Math.sin(heading) * radius * 0.55;
-    g.circle(ex, ey, Math.max(1.2, radius * 0.28)).fill({ color: PALETTE.background });
+
+    if (e.turbo > 0) {
+      const bx = -Math.cos(s.heading);
+      const by = -Math.sin(s.heading);
+      for (const side of [-0.8, 0, 0.8]) {
+        const ox = -by * side * r;
+        const oy = bx * side * r;
+        g.moveTo(x + ox + bx * r * 1.5, y + oy + by * r * 1.5).lineTo(x + ox + bx * r * 3.4, y + oy + by * r * 3.4);
+      }
+      g.stroke({ width: 2, color: PICKUP_COLORS.turbo, cap: 'round' });
+    }
+    if (e.slow > 0) {
+      g.circle(x, y, r * 2.1).stroke({ width: 2, color: PICKUP_COLORS.slow, alpha: 0.55 + 0.3 * Math.sin(t * 10) });
+    }
+
+    const flicker = e.ghost > 0 && e.ghost < cfg.ghostWarning * TICK_RATE && Math.floor(t * 12) % 2 === 0;
+    if (e.ghost > 0 && !flicker) {
+      g.circle(x, y, r * 1.6).fill({ color: PICKUP_COLORS.ghost, alpha: 0.25 });
+      g.circle(x, y, r * 0.9).fill({ color: PICKUP_COLORS.ghost, alpha: 0.75 });
+    } else {
+      g.circle(x, y, r * 1.25).fill({ color: this.color });
+      g.circle(x, y, r * 0.7).fill({ color: PALETTE.core });
+    }
+    const ex = x + Math.cos(s.heading) * r * 0.55;
+    const ey = y + Math.sin(s.heading) * r * 0.55;
+    g.circle(ex, ey, Math.max(1.2, r * 0.28)).fill({ color: PALETTE.background });
+
+    if (s.item?.kind === 'shield') {
+      g.circle(x, y, r * 2.4).stroke({ width: 2.5, color: PICKUP_COLORS.shield, alpha: 0.85 });
+    }
+    if (e.grace > 0 && Math.floor(t * 16) % 2 === 0) {
+      g.circle(x, y, r * 2.8).stroke({ width: 3, color: PICKUP_COLORS.shield });
+    }
+    if (e.reverse > 0) {
+      const a = t * 8;
+      const cy = y - r * 2.8;
+      g.moveTo(x + Math.cos(a) * r, cy + Math.sin(a) * r)
+        .arc(x, cy, r, a, a + Math.PI * 1.4)
+        .stroke({ width: 2, color: PICKUP_COLORS.reverse, cap: 'round' });
+    }
   }
 }
 

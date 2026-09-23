@@ -42,6 +42,21 @@ export function mergeSaved<T extends object>(defaults: T, saved: unknown): T {
   return out as T;
 }
 
+/** Resets `target` to `defaults` in place, keeping nested objects the same instances (UI bindings stay live). */
+export function resetInPlace<T extends object>(target: T, defaults: T): void {
+  const t = target as Record<string, unknown>;
+  const d = defaults as Record<string, unknown>;
+  for (const key of Object.keys(d)) {
+    const dv = d[key];
+    const tv = t[key];
+    if (dv && typeof dv === 'object' && !Array.isArray(dv) && tv && typeof tv === 'object') {
+      resetInPlace(tv as object, dv as object);
+    } else {
+      t[key] = structuredClone(dv);
+    }
+  }
+}
+
 export function loadStored<T extends object>(
   storage: Pick<Storage, 'getItem'> | undefined,
   key: string,

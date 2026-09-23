@@ -14,7 +14,13 @@ export type SoundName =
   | 'pickup'
   | 'bombDrop'
   | 'explosion'
-  | 'tick';
+  | 'tick'
+  | 'ghost'
+  | 'ghostEnd'
+  | 'shield'
+  | 'turbo'
+  | 'slow'
+  | 'reverse';
 
 // ZzFX parameters: volume, randomness, frequency, attack, sustain, release, shape, shapeCurve,
 // slide, deltaSlide, pitchJump, pitchJumpTime, repeatTime, noise, modulation, bitCrush, delay,
@@ -33,6 +39,12 @@ const BANK: Record<SoundName, number[]> = {
   bombDrop: [0.5, 0.05, 120, 0, 0.03, 0.12, 0, 1, -10, 0, 0, 0, 0, 0.3],
   explosion: [1.3, 0.1, 62, 0.01, 0.22, 0.95, 4, 0.8, -1, 0, 0, 0, 0, 1.8, 0, 0.4, 0, 0.5, 0.25],
   tick: [0.3, 0, 1600, 0, 0.005, 0.03, 0],
+  ghost: [0.5, 0, 300, 0.05, 0.25, 0.3, 0, 1, 2, 0, 0, 0, 0, 0, 5],
+  ghostEnd: [0.4, 0, 500, 0.01, 0.05, 0.15, 0, 1, -3],
+  shield: [0.9, 0.05, 400, 0, 0.05, 0.3, 1, 2, 0, 0, 200, 0.02, 0, 0, 0, 0.1],
+  turbo: [0.6, 0, 200, 0.02, 0.3, 0.2, 2, 1, 6, 0.5],
+  slow: [0.6, 0, 600, 0.02, 0.3, 0.3, 1, 1, -6, -0.2],
+  reverse: [0.6, 0, 440, 0.01, 0.3, 0.2, 1, 1, 0, 0, 0, 0, 0, 0, 12],
 };
 
 /** Synthesized sound effects (no audio files). */

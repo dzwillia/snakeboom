@@ -26,7 +26,7 @@ export class Screens {
           <div class="p2"><h3>${PLAYER_NAMES[1]}</h3>
             <p><kbd>←</kbd> <kbd>→</kbd> steer</p><p><kbd>↑</kbd> boost</p><p><kbd>↓</kbd> use item</p></div>
         </div>
-        <div class="small">GRAB PICKUPS FOR BOMBS · BLASTS BREAK BODIES AND BLOCKS</div>
+        <div class="small">PICKUPS: BOMB · GHOST · SHIELD · TURBO · SLOW · REVERSE</div>
         <div class="hint">PRESS SPACE TO START</div>
         <div class="small">FIRST TO ${winsToWin} · <kbd>ESC</kbd> PAUSE · <kbd>M</kbd> MUTE · <kbd>\`</kbd> TUNING</div>
       </div>`,

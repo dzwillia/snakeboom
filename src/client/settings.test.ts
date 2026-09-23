@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG } from '../sim';
-import { DEFAULT_SETTINGS, loadStored, mergeSaved, saveStored } from './settings';
+import { DEFAULT_SETTINGS, loadStored, mergeSaved, resetInPlace, saveStored } from './settings';
 
 describe('mergeSaved', () => {
   const defaults = { speed: 170, on: true, weights: { a: 1, b: 2 } };
@@ -22,6 +22,20 @@ describe('mergeSaved', () => {
     const out = mergeSaved(defaults, null);
     out.weights.a = 99;
     expect(defaults.weights.a).toBe(1);
+  });
+});
+
+describe('resetInPlace', () => {
+  // M3 Review Focus 5: tuning-panel sliders stay bound to the live weights object.
+  it('restores defaults while keeping nested objects the same instances', () => {
+    const live = structuredClone(DEFAULT_CONFIG);
+    const weights = live.pickupWeights;
+    live.baseSpeed = 999;
+    weights.bomb = 0;
+    resetInPlace(live, DEFAULT_CONFIG);
+    expect(live).toEqual(DEFAULT_CONFIG);
+    expect(live.pickupWeights).toBe(weights);
+    expect(live.pickupWeights).not.toBe(DEFAULT_CONFIG.pickupWeights);
   });
 });
 
