@@ -1,5 +1,6 @@
 import { Container, Graphics } from 'pixi.js';
 import { TICK_RATE, type Config, type SnakeState, type Trail } from '../../sim';
+import { blinkOn } from '../blink';
 import { PALETTE, PICKUP_COLORS } from '../colors';
 
 /** Points per body chunk. Only the tail and head chunks are redrawn each frame. */
@@ -121,7 +122,10 @@ export class SnakeView {
     const e = s.effects;
     g.clear();
 
-    if (e.turbo > 0) {
+    // Every timed special flashes during its last cfg.effectWarning seconds.
+    const shows = (ticks: number) => ticks > 0 && blinkOn(ticks / TICK_RATE, cfg.effectWarning, t);
+
+    if (shows(e.turbo)) {
       const bx = -Math.cos(s.heading);
       const by = -Math.sin(s.heading);
       for (const side of [-0.8, 0, 0.8]) {
@@ -131,11 +135,11 @@ export class SnakeView {
       }
       g.stroke({ width: 2.5, color: PICKUP_COLORS.turbo, cap: 'round' });
     }
-    if (e.slow > 0) {
+    if (shows(e.slow)) {
       g.circle(x, y, r * 2.7).stroke({ width: 3, color: PICKUP_COLORS.slow, alpha: 0.55 + 0.3 * Math.sin(t * 10) });
     }
 
-    if (e.dozer > 0) {
+    if (shows(e.dozer)) {
       // Bulldozer blade across the front of the head.
       const hx = Math.cos(s.heading);
       const hy = Math.sin(s.heading);
@@ -157,8 +161,7 @@ export class SnakeView {
         .stroke({ width: 1.5, color: PALETTE.core, alpha: 0.6 });
     }
 
-    const flicker = e.ghost > 0 && e.ghost < cfg.ghostWarning * TICK_RATE && Math.floor(t * 12) % 2 === 0;
-    if (e.ghost > 0 && !flicker) {
+    if (shows(e.ghost)) {
       g.circle(x, y, r * 2).fill({ color: PICKUP_COLORS.ghost, alpha: 0.25 });
       g.circle(x, y, r * 0.9).fill({ color: PICKUP_COLORS.ghost, alpha: 0.75 });
     } else {
@@ -173,9 +176,9 @@ export class SnakeView {
       g.circle(x, y, r * 3).stroke({ width: 3, color: PICKUP_COLORS.shield, alpha: 0.85 });
     }
     if (e.grace > 0 && Math.floor(t * 16) % 2 === 0) {
-      g.circle(x, y, r * 3.5).stroke({ width: 3, color: PICKUP_COLORS.shield });
+      g.circle(x, y, r * 3.5).stroke({ width: 3, color: PALETTE.core });
     }
-    if (e.reverse > 0) {
+    if (shows(e.reverse)) {
       const a = t * 8;
       const cy = y - r * 3.8;
       const sr = r * 1.4;

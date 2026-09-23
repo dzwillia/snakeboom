@@ -1,14 +1,31 @@
-import { TICK_RATE, type Config, type MatchState, type SnakeState } from '../sim';
+import { TICK_RATE, type Config, type EffectName, type MatchState, type SnakeState } from '../sim';
+import { blinkOn } from './blink';
 import { PLAYER_NAMES, describeItem, formatClock } from './text';
 
+const EFFECT_ORDER: EffectName[] = ['dozer', 'ghost', 'turbo', 'slow', 'reverse'];
+const EFFECT_LABELS: Record<EffectName, string> = {
+  dozer: 'DOZER',
+  ghost: 'GHOST',
+  turbo: 'TURBO',
+  slow: 'SLOWED',
+  reverse: 'REVERSED',
+};
+
 interface Side {
+  hearts: HTMLElement;
   pips: HTMLElement;
   fill: HTMLElement;
+  effects: HTMLElement;
   slots: HTMLElement;
+  lastHearts: string;
+  lastEffects: string;
   lastSlots: string;
 }
 
-/** Top bar: names, score pips, boost meters, item queues (plus Shield bubble) and the round clock. */
+/**
+ * Top bar: names, hearts, score pips, boost meters, active effects (flashing as they run out),
+ * item queues (plus the Shield bubble) and the round clock.
+ */
 export class Hud {
   private readonly sides: Side[];
   private readonly clock: HTMLElement;
@@ -17,19 +34,25 @@ export class Hud {
 
   constructor(private readonly root: HTMLElement) {
     const side = (i: number) =>
-      `<div class="side p${i + 1}"><span class="name">${PLAYER_NAMES[i]}</span><span class="pips"></span>` +
-      `<span class="boost"><span class="fill" style="display:block"></span></span><span class="slots"></span></div>`;
+      `<div class="side p${i + 1}">` +
+      `<div class="row"><span class="name">${PLAYER_NAMES[i]}</span><span class="hearts"></span><span class="pips"></span></div>` +
+      `<div class="row"><span class="boost"><span class="fill" style="display:block"></span></span>` +
+      `<span class="effects"></span><span class="slots"></span></div></div>`;
     root.innerHTML = `${side(0)}<div class="clock">0:00</div>${side(1)}`;
     this.sides = [...root.querySelectorAll<HTMLElement>('.side')].map((el) => ({
+      hearts: el.querySelector<HTMLElement>('.hearts')!,
       pips: el.querySelector<HTMLElement>('.pips')!,
       fill: el.querySelector<HTMLElement>('.fill')!,
+      effects: el.querySelector<HTMLElement>('.effects')!,
       slots: el.querySelector<HTMLElement>('.slots')!,
+      lastHearts: '-',
+      lastEffects: '-',
       lastSlots: '-',
     }));
     this.clock = root.querySelector<HTMLElement>('.clock')!;
   }
 
-  update(state: MatchState | null, cfg: Config): void {
+  update(state: MatchState | null, cfg: Config, t = 0): void {
     this.root.classList.toggle('on', state !== null);
     if (!state) return;
 
@@ -49,9 +72,29 @@ export class Hud {
       const side = this.sides[i];
       if (!side) return;
       side.fill.style.width = `${Math.round(s.boostMeter * 100)}%`;
-      const key = `${cfg.itemSlots}|${s.shield}|${s.items.map((it) => `${it.kind}:${it.charges}`).join(',')}`;
-      if (key !== side.lastSlots) {
-        side.lastSlots = key;
+
+      const heartsKey = `${s.hearts}/${cfg.hearts}`;
+      if (heartsKey !== side.lastHearts) {
+        side.lastHearts = heartsKey;
+        side.hearts.innerHTML = heartsHtml(s.hearts, cfg.hearts);
+      }
+
+      const active = EFFECT_ORDER.filter((e) => s.effects[e] > 0);
+      const effectsKey = active.map((e) => `${e}:${Math.ceil(s.effects[e] / TICK_RATE)}`).join(',');
+      if (effectsKey !== side.lastEffects) {
+        side.lastEffects = effectsKey;
+        side.effects.innerHTML = active
+          .map((e) => `<span class="slot chip" data-kind="${e}" data-effect="${e}">${EFFECT_LABELS[e]} ${Math.ceil(s.effects[e] / TICK_RATE)}</span>`)
+          .join('');
+      }
+      for (const chip of side.effects.querySelectorAll<HTMLElement>('[data-effect]')) {
+        const ticks = s.effects[chip.dataset.effect as EffectName];
+        chip.style.visibility = blinkOn(ticks / TICK_RATE, cfg.effectWarning, t) ? 'visible' : 'hidden';
+      }
+
+      const slotsKey = `${cfg.itemSlots}|${s.shield}|${s.items.map((it) => `${it.kind}:${it.charges}`).join(',')}`;
+      if (slotsKey !== side.lastSlots) {
+        side.lastSlots = slotsKey;
         side.slots.innerHTML = slotsHtml(s, cfg.itemSlots);
       }
     });
@@ -65,6 +108,10 @@ export class Hud {
       this.clock.classList.toggle('overtime', state.overtime);
     }
   }
+}
+
+function heartsHtml(hearts: number, max: number): string {
+  return Array.from({ length: Math.max(1, Math.round(max)) }, (_, k) => `<span class="heart${k < hearts ? '' : ' lost'}">♥</span>`).join('');
 }
 
 /** The Shield bubble chip, then the item queue with the next item (front) highlighted. */

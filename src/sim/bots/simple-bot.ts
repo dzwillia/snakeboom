@@ -38,7 +38,8 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
 
   const seek = seekTurn(state, me, cfg);
   let turn: -1 | 0 | 1;
-  if (seek !== null && clear[seek + 1] === LOOK_STEPS) turn = seek;
+  // Chase a pickup when that way stays clear for at least half the look-ahead (like a player would).
+  if (seek !== null && clear[seek + 1] >= LOOK_STEPS / 2) turn = seek;
   else if (bot.wanderTicks > 0 && clear[bot.wanderTurn + 1] === LOOK_STEPS) turn = bot.wanderTurn;
   else if (clear[1] === best) turn = 0;
   else {
@@ -60,13 +61,14 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
       use = rngNext(bot.rng) < (near ? 0.08 : 0.005);
       break;
     case 'ghost':
-      use = best < LOOK_STEPS / 3; // escape when boxed in
+      // Escape when boxed in; otherwise use it eventually so it doesn't block the queue.
+      use = best < LOOK_STEPS / 3 || rngNext(bot.rng) < 0.005;
       break;
     case 'turbo':
       use = best === LOOK_STEPS && rngNext(bot.rng) < 0.01;
       break;
     case 'dozer':
-      use = best < LOOK_STEPS / 2;
+      use = best < LOOK_STEPS / 2 || rngNext(bot.rng) < 0.005;
       break;
   }
   return { turn, boost: bot.boostTicks > 0, use };

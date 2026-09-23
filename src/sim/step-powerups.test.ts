@@ -6,7 +6,8 @@ import { step } from './step';
 import { createTrail, trailPush } from './trail';
 import { NO_INPUT, type MatchState, type PlayerInput, type SimEvent } from './types';
 
-const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000 };
+// One heart: these tests exercise the one-hit death rules (hearts have their own tests).
+const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000, hearts: 1 };
 const idle: PlayerInput[] = [NO_INPUT, NO_INPUT];
 
 function run(s: MatchState, ticks: number): SimEvent[] {

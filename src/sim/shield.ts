@@ -1,4 +1,4 @@
-import { nearestSolidTilePoint } from './arena';
+import { circleHitsWall, nearestSolidTilePoint } from './arena';
 import { forEachSolidPointNear } from './collision';
 import { ARENA_HEIGHT, ARENA_WIDTH, TICK_RATE, type Config } from './config';
 import { HALF_PI, PI, detAtan2, detCos, detSin } from './detmath';
@@ -7,18 +7,41 @@ import type { DeathCause, MatchState, SimEvent, SnakeState } from './types';
 
 /**
  * Pops a Shield bubble to survive `cause`. A blast is simply absorbed; a wall turns the head to
- * slide along it; anything else pushes the head clear and turns it along the surface. Grants
- * shieldGrace. Returns false (changing nothing) when the snake holds no Shield.
+ * slide along it; anything else pushes the head clear and turns it along the surface. A head left
+ * crossing a wall either way slides along it too. Grants shieldGrace. Returns false (changing nothing) when the snake holds no Shield.
  */
 export function tryShield(state: MatchState, idx: number, cause: DeathCause, cfg: Config, events: SimEvent[]): boolean {
   const s = state.snakes[idx];
   if (!s.shield) return false;
   s.shield = false;
-  if (cause === 'wall') slideAlongWall(s, cfg.snakeRadius);
-  else if (cause !== 'blast') pushClear(state, idx, cause, cfg);
+  deflect(state, idx, cause, cfg);
   s.effects.grace = Math.max(1, Math.round(cfg.shieldGrace * TICK_RATE));
   events.push({ type: 'shieldBlocked', player: idx, x: s.x, y: s.y, cause });
   return true;
+}
+
+/**
+ * Spends a heart to survive `cause` when one would remain: the snake deflects exactly as a Shield
+ * would, then gets heartGrace. Returns false (changing nothing) on the last heart.
+ */
+export function tryHeart(state: MatchState, idx: number, cause: DeathCause, cfg: Config, events: SimEvent[]): boolean {
+  const s = state.snakes[idx];
+  if (s.hearts <= 1) return false;
+  s.hearts--;
+  deflect(state, idx, cause, cfg);
+  s.effects.grace = Math.max(1, Math.round(cfg.heartGrace * TICK_RATE));
+  events.push({ type: 'heartLost', player: idx, heartsLeft: s.hearts, cause, x: s.x, y: s.y });
+  return true;
+}
+
+/**
+ * Blasts leave you where you are and anything but a wall pushes you clear. Then, because grace never
+ * covers walls, a head crossing one (hit by it, blasted against it, or pushed into it) slides along it.
+ */
+function deflect(state: MatchState, idx: number, cause: DeathCause, cfg: Config): void {
+  const s = state.snakes[idx];
+  if (cause !== 'wall' && cause !== 'blast') pushClear(state, idx, cause, cfg);
+  if (cause === 'wall' || circleHitsWall(s.x, s.y, cfg.snakeRadius)) slideAlongWall(s, cfg.snakeRadius);
 }
 
 /** The nearest point that blocks the head for `cause` (a head, trail point or block edge), or null. */
@@ -109,7 +132,6 @@ function pushClear(state: MatchState, idx: number, cause: DeathCause, cfg: Confi
     }
     s.heading = detAtan2(ty, tx);
   }
-  clampInside(s, r);
   s.prevX = s.x;
   s.prevY = s.y;
 }

@@ -60,8 +60,8 @@ export interface Config {
   /** Fuse given to a bomb caught in another bomb's blast. */
   chainDelay: number;
   ghostDuration: number;
-  /** The final part of a Ghost during which the head flickers as a warning. */
-  ghostWarning: number;
+  /** Timed specials (Ghost, Turbo, Slow, Reverse, Bulldozer) flash for this many seconds before they run out. */
+  effectWarning: number;
   /** Invulnerability (except walls) after a Shield absorbs a hit. */
   shieldGrace: number;
   turboDuration: number;
@@ -71,22 +71,27 @@ export interface Config {
   reverseDuration: number;
   /** Seconds a Bulldozer plow lasts. */
   dozerDuration: number;
+  /** Hits a snake can take per round; the last one kills. */
+  hearts: number;
+  /** Invulnerability (except walls) after losing a heart. */
+  heartGrace: number;
   winsToWin: number;
   countdownSeconds: number;
   roundOverSeconds: number;
 }
 
+/** Defaults: the values from the 2026-09-23 playtest tuning session, plus hearts and effect warnings. */
 export const DEFAULT_CONFIG: Config = {
-  snakeRadius: 7,
-  baseSpeed: 170,
-  turnRate: 3.4,
-  neckLength: 24,
-  startLength: 120,
-  growthPerSecond: 40,
-  overtimeAt: 150,
+  snakeRadius: 8,
+  baseSpeed: 240,
+  turnRate: 5.4,
+  neckLength: 30,
+  startLength: 60,
+  growthPerSecond: 20,
+  overtimeAt: 180,
   overtimeGrowthMultiplier: 3,
-  roundMaxSeconds: 300,
-  boostMultiplier: 1.6,
+  roundMaxSeconds: 90,
+  boostMultiplier: 2,
   boostMeterSeconds: 2,
   boostRefillSeconds: 6,
   maxPickups: 4,
@@ -96,7 +101,7 @@ export const DEFAULT_CONFIG: Config = {
   pickupRadius: 14,
   pickupMinHeadDistance: 150,
   pickupClearance: 40,
-  pickupWeights: { bomb: 25, ghost: 12.5, shield: 12.5, turbo: 12.5, slow: 12.5, reverse: 12.5, dozer: 12.5 },
+  pickupWeights: { bomb: 25, ghost: 13, shield: 20, turbo: 20, slow: 20, reverse: 12.5, dozer: 35 },
   itemSlots: 3,
   bombCharges: 3,
   bombThrowCooldown: 0.5,
@@ -106,13 +111,15 @@ export const DEFAULT_CONFIG: Config = {
   blastRadius: 70,
   chainDelay: 0.12,
   ghostDuration: 3,
-  ghostWarning: 0.75,
+  effectWarning: 3,
   shieldGrace: 0.5,
   turboDuration: 4,
   slowDuration: 4,
   slowFactor: 0.6,
   reverseDuration: 4,
   dozerDuration: 5,
+  hearts: 3,
+  heartGrace: 1,
   winsToWin: 5,
   countdownSeconds: 3,
   roundOverSeconds: 2.5,

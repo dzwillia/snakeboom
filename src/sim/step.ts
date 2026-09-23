@@ -8,9 +8,9 @@ import { detectNearMisses } from './nearMiss';
 import { collectPickups, updatePickups } from './pickups';
 import { createRng } from './rng';
 import { advanceSnake, growthRate } from './snake';
-import { tryShield } from './shield';
+import { tryHeart, tryShield } from './shield';
 import { pickNextMap, startRound } from './state';
-import { NO_INPUT, type DeathRecord, type MatchState, type PlayerInput, type SimEvent } from './types';
+import { NO_INPUT, type DeathRecord, type MatchState, type PlayerInput, type SimEvent, type SnakeState } from './types';
 
 /** Advances the match by one tick, mutating `state`, and returns what happened. */
 export function step(state: MatchState, inputs: readonly PlayerInput[], cfg: Config): SimEvent[] {
@@ -79,7 +79,7 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   const blasted = updateBombs(state, cfg, events);
 
   // Everyone alive at the start of the tick is judged before anyone moves or dies, so
-  // simultaneous deaths are fair. Grace ignores blasts; a held Shield turns a death into a save.
+  // simultaneous deaths are fair. Grace ignores blasts; a Shield, then a spare heart, turns a hit into a save.
   const hits: DeathRecord[] = [];
   state.snakes.forEach((s, i) => {
     if (!s.alive) return;
@@ -93,7 +93,9 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   });
   for (const d of hits) {
     if (tryShield(state, d.player, d.cause, cfg, events)) continue;
+    if (tryHeart(state, d.player, d.cause, cfg, events)) continue;
     state.snakes[d.player].alive = false;
+    state.snakes[d.player].hearts = 0;
     state.deaths.push(d);
     events.push({ type: 'death', ...d });
   }
@@ -101,9 +103,17 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   const alive = state.snakes.filter((s) => s.alive);
   const timeUp = state.roundTicks >= Math.round(cfg.roundMaxSeconds * TICK_RATE);
   if (alive.length === 1) return endRound(state, cfg, events, alive[0].id);
-  if (alive.length === 0 || timeUp) return endRound(state, cfg, events, null);
+  if (alive.length === 0) return endRound(state, cfg, events, null);
+  if (timeUp) return endRound(state, cfg, events, mostHearts(alive));
   detectNearMisses(state, cfg, events);
   updatePickups(state, cfg, events);
+}
+
+/** When time runs out: the snake with strictly the most hearts left, or null on a tie. */
+function mostHearts(snakes: SnakeState[]): number | null {
+  const top = Math.max(...snakes.map((s) => s.hearts));
+  const leaders = snakes.filter((s) => s.hearts === top);
+  return leaders.length === 1 ? leaders[0].id : null;
 }
 
 function endRound(state: MatchState, cfg: Config, events: SimEvent[], winner: number | null): void {

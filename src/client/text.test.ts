@@ -20,6 +20,7 @@ describe('text', () => {
     expect(describeRound(null, [d(0, 'headOn', 1), d(1, 'headOn', 0)])).toEqual({ title: 'DRAW', detail: 'Head-on collision' });
     expect(describeRound(null, [d(0, 'wall', null), d(1, 'wall', null)]).detail).toBe('CYAN hit the wall · PINK hit the wall');
     expect(describeRound(null, [])).toEqual({ title: 'DRAW', detail: 'Time ran out' });
+    expect(describeRound(0, [])).toEqual({ title: 'CYAN SCORES', detail: "Time's up · CYAN had more hearts" });
   });
 
   it('labels held items for the HUD', () => {

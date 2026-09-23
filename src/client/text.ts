@@ -32,7 +32,8 @@ export function describeRound(
     const line = describeDeath(d, names);
     if (!lines.includes(line)) lines.push(line);
   }
-  return { title, detail: lines.length > 0 ? lines.join(' · ') : 'Time ran out' };
+  if (lines.length > 0) return { title, detail: lines.join(' · ') };
+  return { title, detail: winner === null ? 'Time ran out' : `Time's up · ${names[winner]} had more hearts` };
 }
 
 /** HUD label for an item slot; empty string when the slot is empty. */

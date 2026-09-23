@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { setTile } from './arena';
-import { ARENA_WIDTH, DEFAULT_CONFIG, TICK_RATE } from './config';
+import { ARENA_HEIGHT, ARENA_WIDTH, DEFAULT_CONFIG, TICK_RATE } from './config';
 import { HALF_PI, PI } from './detmath';
 import { tryShield } from './shield';
 import { createMatch, rebuildGrid } from './state';
@@ -94,5 +94,26 @@ describe('shield', () => {
     verticalBody(s, ARENA_WIDTH - 20);
     tryShield(s, 0, 'body', cfg, []);
     expect(s.snakes[0].x).toBeLessThanOrEqual(ARENA_WIDTH - r - 0.5);
+  });
+
+  // Grace never covers walls, so a save that left the head crossing or facing into one would cost a second hit next tick.
+  it('a blast that catches you crossing a wall still slides you along it', () => {
+    const s = shielded(800, ARENA_HEIGHT - 5, HALF_PI - 0.3);
+    tryShield(s, 0, 'blast', cfg, []);
+    const me = s.snakes[0];
+    expect([me.x, me.y, me.heading]).toEqual([800, ARENA_HEIGHT - r - 0.5, 0]);
+  });
+
+  it('a push-out that ends against a wall turns you along it, not into it', () => {
+    const s = shielded(ARENA_WIDTH - 8, 500, 0.2);
+    const pink = s.snakes[1];
+    pink.trail = createTrail();
+    trailPush(pink.trail, ARENA_WIDTH - 16, 490);
+    Object.assign(pink, { x: 400, y: 400 });
+    rebuildGrid(s);
+    tryShield(s, 0, 'body', cfg, []);
+    const me = s.snakes[0];
+    expect(me.x).toBe(ARENA_WIDTH - r - 0.5);
+    expect(me.heading).toBe(-HALF_PI);
   });
 });

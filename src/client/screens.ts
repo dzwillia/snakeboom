@@ -15,7 +15,7 @@ export class Screens {
     this.show('', 'none');
   }
 
-  title(winsToWin: number): void {
+  title(winsToWin: number, hearts: number): void {
     this.show(
       `
       <div class="panel">
@@ -29,6 +29,7 @@ export class Screens {
         <div class="small">PICKUPS: BOMB · GHOST · SHIELD · TURBO · SLOW · REVERSE · DOZER</div>
         <div class="hint">PRESS SPACE TO START</div>
         <div class="selector">FIRST TO <kbd>◀</kbd> <span class="wins">${winsToWin}</span> <kbd>▶</kbd></div>
+        <div class="small">${hearts} ${hearts === 1 ? 'HEART' : 'HEARTS'} EACH PER ROUND</div>
         <div class="small"><kbd>ESC</kbd> PAUSE · <kbd>M</kbd> MUTE · <kbd>\`</kbd> TUNING</div>
       </div>`,
       'title',

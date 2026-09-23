@@ -9,7 +9,8 @@ import { step } from './step';
 import { createTrail, trailPush } from './trail';
 import { NO_INPUT, type MatchState, type SimEvent } from './types';
 
-const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000 };
+// One heart: these tests exercise the one-hit death rules (hearts have their own tests).
+const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000, hearts: 1 };
 
 /** CYAN dozing at (x, y) facing `heading`. */
 function dozing(x: number, y: number, heading: number): MatchState {

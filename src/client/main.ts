@@ -71,7 +71,7 @@ async function boot(): Promise<void> {
     onChange: () => {
       applyBloom(world, settings);
       persist();
-      if (!state) screens.title(cfg.winsToWin);
+      if (!state) screens.title(cfg.winsToWin, cfg.hearts);
     },
   });
 
@@ -157,6 +157,10 @@ async function boot(): Promise<void> {
           fx.debris(e.crushed);
           sound.play('scrape', 0.6);
           break;
+        case 'heartLost':
+          fx.heartBurst(e.x, e.y);
+          sound.play('hurt');
+          break;
         case 'shieldBlocked':
           fx.shieldBurst(e.x, e.y);
           sound.play('shield');
@@ -198,7 +202,7 @@ async function boot(): Promise<void> {
         if (state?.phase === 'matchOver') {
           state = null;
           fx.clear();
-          screens.title(cfg.winsToWin);
+          screens.title(cfg.winsToWin, cfg.hearts);
         } else {
           setPaused(!paused);
         }
@@ -211,7 +215,7 @@ async function boot(): Promise<void> {
           cfg.winsToWin = nextWins(cfg.winsToWin, code === 'ArrowLeft' || code === 'KeyA' ? -1 : 1);
           tuning.refresh();
           persist();
-          screens.title(cfg.winsToWin);
+          screens.title(cfg.winsToWin, cfg.hearts);
         }
         return;
       case 'Space':
@@ -239,7 +243,7 @@ async function boot(): Promise<void> {
     };
   }
 
-  screens.title(cfg.winsToWin);
+  screens.title(cfg.winsToWin, cfg.hearts);
   new FixedLoop(
     () => {
       if (state && !paused) handle(step(state, input.sample(), cfg));
@@ -252,7 +256,7 @@ async function boot(): Promise<void> {
       fx.setFlash(f ? f.flash : 0);
       renderer.draw(state, alpha, cfg, performance.now() / 1000);
       fx.update(frameSeconds);
-      hud.update(state, cfg);
+      hud.update(state, cfg, performance.now() / 1000);
       tickFuses();
     },
   ).start();

@@ -25,6 +25,7 @@ export function createSnake(id: number, x: number, y: number, heading: number, c
     trail,
     items: [],
     shield: false,
+    hearts: Math.max(1, Math.round(cfg.hearts)),
     useCooldown: 0,
     holeVersion: 0,
     effects: noEffects(),
