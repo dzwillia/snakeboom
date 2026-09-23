@@ -1,0 +1,67 @@
+import GUI from 'lil-gui';
+import { DEFAULT_CONFIG, type Config } from '../sim';
+import { DEFAULT_SETTINGS, type ClientSettings } from './settings';
+
+export interface TuningPanel {
+  show(): void;
+  hide(): void;
+  /** Re-reads values changed outside the panel (e.g. the M mute key). */
+  refresh(): void;
+}
+
+/** Live sliders for every M1 tunable. The sim reads `cfg` each tick, so changes apply at once. */
+export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: { onChange(): void }): TuningPanel {
+  const gui = new GUI({ title: 'SnakeBoom tuning  ( ` to hide )' });
+
+  const move = gui.addFolder('Movement');
+  move.add(cfg, 'baseSpeed', 60, 400, 5).name('speed');
+  move.add(cfg, 'turnRate', 1, 8, 0.1).name('turn rate (rad/s)');
+  move.add(cfg, 'snakeRadius', 3, 14, 0.5).name('thickness (radius)');
+  move.add(cfg, 'neckLength', 10, 60, 1).name('neck length');
+
+  const growth = gui.addFolder('Growth');
+  growth.add(cfg, 'startLength', 20, 600, 10).name('start length');
+  growth.add(cfg, 'growthPerSecond', 0, 200, 5).name('growth per second');
+  growth.add(cfg, 'overtimeAt', 10, 300, 5).name('overtime at (s)');
+  growth.add(cfg, 'overtimeGrowthMultiplier', 1, 10, 0.5).name('overtime growth ×');
+  growth.add(cfg, 'roundMaxSeconds', 30, 600, 10).name('round cap (s)');
+
+  const boost = gui.addFolder('Boost');
+  boost.add(cfg, 'boostMultiplier', 1, 3, 0.1).name('speed ×');
+  boost.add(cfg, 'boostMeterSeconds', 0.5, 6, 0.1).name('meter (s)');
+  boost.add(cfg, 'boostRefillSeconds', 1, 20, 0.5).name('refill (s)');
+
+  const match = gui.addFolder('Match');
+  match.add(cfg, 'winsToWin', 1, 10, 1).name('first to');
+  match.add(cfg, 'countdownSeconds', 1, 5, 1).name('countdown (s)');
+  match.add(cfg, 'roundOverSeconds', 1, 6, 0.5).name('round banner (s)');
+
+  const fx = gui.addFolder('Effects');
+  fx.add(settings, 'bloom');
+  fx.add(settings, 'bloomStrength', 0, 4, 0.1).name('bloom strength');
+  fx.add(settings, 'bloomThreshold', 0, 1, 0.05).name('bloom threshold');
+  fx.add(settings, 'shakeScale', 0, 3, 0.1).name('screen shake');
+
+  const audio = gui.addFolder('Audio');
+  audio.add(settings, 'masterVolume', 0, 1, 0.05).name('volume');
+  audio.add(settings, 'muted');
+
+  const refresh = () => gui.controllersRecursive().forEach((c) => c.updateDisplay());
+  const actions = {
+    reset: () => {
+      Object.assign(cfg, structuredClone(DEFAULT_CONFIG));
+      Object.assign(settings, structuredClone(DEFAULT_SETTINGS));
+      refresh();
+      hooks.onChange();
+    },
+    copy: () => {
+      void navigator.clipboard?.writeText(JSON.stringify({ config: cfg, settings }, null, 2)).catch(() => {});
+    },
+  };
+  gui.add(actions, 'reset').name('Reset to defaults');
+  gui.add(actions, 'copy').name('Copy config JSON');
+  gui.onChange(() => hooks.onChange());
+  gui.hide();
+
+  return { show: () => gui.show(), hide: () => gui.hide(), refresh };
+}

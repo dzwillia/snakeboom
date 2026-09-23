@@ -1,0 +1,65 @@
+import { circleHitsTiles, circleHitsWall } from './arena';
+import type { Config } from './config';
+import { gridQuery } from './grid';
+import { headCum } from './trail';
+import type { DeathCause, MatchState } from './types';
+
+export interface Hit {
+  cause: DeathCause;
+  killer: number | null;
+}
+
+/** Visits each live, solid trail point strictly within `radius` of (x, y). Order is unspecified. */
+export function forEachSolidPointNear(
+  state: MatchState,
+  x: number,
+  y: number,
+  radius: number,
+  visit: (snake: number, index: number) => void,
+): void {
+  const r2 = radius * radius;
+  gridQuery(state.grid, x, y, radius, (snake, seq) => {
+    const t = state.snakes[snake].trail;
+    const i = seq - t.baseSeq;
+    if (i < t.start || i >= t.xs.length || !t.solid[i]) return;
+    const dx = t.xs[i] - x;
+    const dy = t.ys[i] - y;
+    if (dx * dx + dy * dy < r2) visit(snake, i);
+  });
+}
+
+/**
+ * Checks one live head against heads, bodies, blocks and walls (blasts are resolved elsewhere).
+ * Priority: headOn > body > self > obstacle > wall. Ties pick the lowest snake index, so the
+ * result never depends on grid visit order.
+ */
+export function detectHit(state: MatchState, idx: number, cfg: Config): Hit | null {
+  const me = state.snakes[idx];
+  const r = cfg.snakeRadius;
+  const touch = 2 * r;
+
+  let headOn = -1;
+  for (let j = 0; j < state.snakes.length; j++) {
+    const other = state.snakes[j];
+    if (j === idx || !other.alive) continue;
+    const dx = other.x - me.x;
+    const dy = other.y - me.y;
+    if (dx * dx + dy * dy < touch * touch && (headOn < 0 || j < headOn)) headOn = j;
+  }
+  if (headOn >= 0) return { cause: 'headOn', killer: headOn };
+
+  const neckStart = headCum(me.trail) - cfg.neckLength;
+  const found = { body: -1, self: false };
+  forEachSolidPointNear(state, me.x, me.y, touch, (snake, i) => {
+    if (snake === idx) {
+      if (me.trail.cum[i] < neckStart) found.self = true;
+    } else if (found.body < 0 || snake < found.body) {
+      found.body = snake;
+    }
+  });
+  if (found.body >= 0) return { cause: 'body', killer: found.body };
+  if (found.self) return { cause: 'self', killer: idx };
+  if (circleHitsTiles(state.tiles, me.x, me.y, r)) return { cause: 'obstacle', killer: null };
+  if (circleHitsWall(me.x, me.y, r)) return { cause: 'wall', killer: null };
+  return null;
+}

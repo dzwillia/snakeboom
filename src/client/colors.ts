@@ -1,0 +1,12 @@
+export const PLAYER_COLORS: number[] = [0x22f3ff, 0xff2e97];
+
+export const PALETTE = {
+  background: 0x05060d,
+  gridLine: 0x0f1a2e,
+  border: 0x9fd8ff,
+  obstacle: 0xffb020,
+  obstacleFill: 0x2a1a00,
+  core: 0xffffff,
+};
+
+export const PLAYER_CSS = ['var(--cyan)', 'var(--pink)'];
