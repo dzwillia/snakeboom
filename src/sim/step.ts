@@ -4,6 +4,7 @@ import { TICK_RATE, type Config } from './config';
 import { tickItemTimers, useItem } from './items';
 import { MAPS } from './maps';
 import { plow } from './dozer';
+import { detectNearMisses } from './nearMiss';
 import { collectPickups, updatePickups } from './pickups';
 import { createRng } from './rng';
 import { advanceSnake, growthRate } from './snake';
@@ -101,6 +102,7 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   const timeUp = state.roundTicks >= Math.round(cfg.roundMaxSeconds * TICK_RATE);
   if (alive.length === 1) return endRound(state, cfg, events, alive[0].id);
   if (alive.length === 0 || timeUp) return endRound(state, cfg, events, null);
+  detectNearMisses(state, cfg, events);
   updatePickups(state, cfg, events);
 }
 

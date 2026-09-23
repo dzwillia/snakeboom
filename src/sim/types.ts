@@ -112,6 +112,8 @@ export interface SnakeState {
   /** Bumped whenever a blast punches holes in this trail, so the renderer redraws it. */
   holeVersion: number;
   effects: EffectTimers;
+  /** Ticks until another near miss can be reported for this snake. */
+  nearMissCooldown: number;
 }
 
 export interface DeathRecord {
@@ -173,6 +175,7 @@ export type SimEvent =
   | { type: 'effectStarted'; player: number; effect: EffectName }
   | { type: 'effectEnded'; player: number; effect: EffectName }
   | { type: 'shieldBlocked'; player: number; x: number; y: number; cause: DeathCause }
+  | { type: 'nearMiss'; player: number; x: number; y: number }
   | { type: 'plowed'; player: number; moved: number; crushed: number[] }
   | {
       type: 'explosion';
