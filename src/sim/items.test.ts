@@ -35,7 +35,7 @@ describe('items', () => {
     useItem(s, 0, cfg, events);
     useItem(s, 0, cfg, events);
     expect(s.bombs).toHaveLength(1);
-    for (let t = 0; t < Math.round(cfg.bombDropCooldown * TICK_RATE); t++) tickItemTimers(s);
+    for (let t = 0; t < Math.round(cfg.bombDropCooldown * TICK_RATE); t++) tickItemTimers(s, []);
     useItem(s, 0, cfg, events);
     expect(s.bombs).toHaveLength(2);
   });

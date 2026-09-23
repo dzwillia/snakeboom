@@ -2,7 +2,11 @@ import { DT, type Config } from './config';
 import { detCos, detSin, wrapAngle } from './detmath';
 import { gridInsert } from './grid';
 import { createTrail, trailPush, trailTrim } from './trail';
-import type { Grid, PlayerInput, SnakeState } from './types';
+import type { EffectTimers, Grid, PlayerInput, SnakeState } from './types';
+
+export function noEffects(): EffectTimers {
+  return { ghost: 0, turbo: 0, slow: 0, reverse: 0, grace: 0 };
+}
 
 export function createSnake(id: number, x: number, y: number, heading: number, cfg: Config): SnakeState {
   const trail = createTrail();
@@ -22,6 +26,7 @@ export function createSnake(id: number, x: number, y: number, heading: number, c
     item: null,
     useCooldown: 0,
     holeVersion: 0,
+    effects: noEffects(),
   };
 }
 
@@ -30,9 +35,15 @@ export function growthRate(cfg: Config, overtime: boolean): number {
   return cfg.growthPerSecond * (overtime ? cfg.overtimeGrowthMultiplier : 1);
 }
 
+/** Current speed in units per second: boosting and Slow both multiply. */
+export function snakeSpeed(s: SnakeState, cfg: Config): number {
+  return cfg.baseSpeed * (s.boosting ? cfg.boostMultiplier : 1) * (s.effects.slow > 0 ? cfg.slowFactor : 1);
+}
+
 /**
- * Advances a live snake by one tick: boost meter, steering, movement, a new trail point
- * (indexed in the grid), growth and tail trimming. Returns true on the tick boosting starts.
+ * Advances a live snake by one tick: boost meter (Turbo makes boosting free), steering
+ * (Reverse swaps left and right), movement, a new trail point (indexed in the grid), growth
+ * and tail trimming. Returns true on the tick boosting starts.
  */
 export function advanceSnake(
   s: SnakeState,
@@ -43,9 +54,10 @@ export function advanceSnake(
   grid: Grid,
 ): boolean {
   const wasBoosting = s.boosting;
-  if (input.boost && s.boostMeter > 0) {
+  const turbo = s.effects.turbo > 0;
+  if (input.boost && (s.boostMeter > 0 || turbo)) {
     s.boosting = true;
-    s.boostMeter = Math.max(0, s.boostMeter - DT / cfg.boostMeterSeconds);
+    if (!turbo) s.boostMeter = Math.max(0, s.boostMeter - DT / cfg.boostMeterSeconds);
   } else {
     s.boosting = false;
     if (!input.boost) s.boostMeter = Math.min(1, s.boostMeter + DT / cfg.boostRefillSeconds);
@@ -53,8 +65,9 @@ export function advanceSnake(
 
   s.prevX = s.x;
   s.prevY = s.y;
-  s.heading = wrapAngle(s.heading + input.turn * cfg.turnRate * DT);
-  const dist = cfg.baseSpeed * (s.boosting ? cfg.boostMultiplier : 1) * DT;
+  const turn = s.effects.reverse > 0 ? -input.turn : input.turn;
+  s.heading = wrapAngle(s.heading + turn * cfg.turnRate * DT);
+  const dist = snakeSpeed(s, cfg) * DT;
   s.x += detCos(s.heading) * dist;
   s.y += detSin(s.heading) * dist;
 

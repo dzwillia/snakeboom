@@ -25,6 +25,11 @@ describe('text', () => {
   it('labels held items for the HUD', () => {
     expect(describeItem(null)).toBe('');
     expect(describeItem({ kind: 'bomb', charges: 3 })).toBe('BOMB ×3');
+    expect(describeItem({ kind: 'ghost', charges: 1 })).toBe('GHOST');
+    expect(describeItem({ kind: 'shield', charges: 1 })).toBe('SHIELD');
+    expect(describeItem({ kind: 'turbo', charges: 1 })).toBe('TURBO');
+    expect(describeItem({ kind: 'slow', charges: 1 })).toBe('SLOW');
+    expect(describeItem({ kind: 'reverse', charges: 1 })).toBe('REVERSE');
   });
 
   it('formats the round clock', () => {

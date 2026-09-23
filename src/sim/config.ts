@@ -9,8 +9,8 @@ export const MAP_ROWS = 25;
 export const TICK_RATE = 60;
 export const DT = 1 / TICK_RATE;
 
-/** What a pickup can contain. M3 adds the power-ups. */
-export type PickupKind = 'bomb';
+/** What a pickup can contain. */
+export type PickupKind = 'bomb' | 'ghost' | 'shield' | 'turbo' | 'slow' | 'reverse';
 
 /** Tunable gameplay values. Seconds and world units unless noted. */
 export interface Config {
@@ -48,6 +48,16 @@ export interface Config {
   blastRadius: number;
   /** Fuse given to a bomb caught in another bomb's blast. */
   chainDelay: number;
+  ghostDuration: number;
+  /** The final part of a Ghost during which the head flickers as a warning. */
+  ghostWarning: number;
+  /** Invulnerability (except walls) after a Shield absorbs a hit. */
+  shieldGrace: number;
+  turboDuration: number;
+  slowDuration: number;
+  /** Speed multiplier while slowed. */
+  slowFactor: number;
+  reverseDuration: number;
   winsToWin: number;
   countdownSeconds: number;
   roundOverSeconds: number;
@@ -73,12 +83,19 @@ export const DEFAULT_CONFIG: Config = {
   pickupRadius: 14,
   pickupMinHeadDistance: 150,
   pickupClearance: 40,
-  pickupWeights: { bomb: 35 },
+  pickupWeights: { bomb: 35, ghost: 13, shield: 13, turbo: 13, slow: 13, reverse: 13 },
   bombCharges: 3,
   bombDropCooldown: 0.3,
   bombFuse: 1.5,
   blastRadius: 70,
   chainDelay: 0.12,
+  ghostDuration: 3,
+  ghostWarning: 0.75,
+  shieldGrace: 0.5,
+  turboDuration: 4,
+  slowDuration: 4,
+  slowFactor: 0.6,
+  reverseDuration: 4,
   winsToWin: 5,
   countdownSeconds: 3,
   roundOverSeconds: 2.5,

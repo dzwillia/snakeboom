@@ -57,7 +57,7 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
     events.push({ type: 'overtime' });
   }
 
-  tickItemTimers(state);
+  tickItemTimers(state, events);
   state.snakes.forEach((s, i) => {
     if (s.alive && (inputs[i] ?? NO_INPUT).use) useItem(state, i, cfg, events);
   });
