@@ -11,8 +11,9 @@ import { Fx } from './render/fx';
 import { Renderer } from './render/renderer';
 import { applyBloom, createWorld } from './render/world';
 import { Screens } from './screens';
-import { browserStorage, CONFIG_KEY, DEFAULT_SETTINGS, loadStored, saveStored, SETTINGS_KEY } from './settings';
-import { describeRound } from './text';
+import { deathBeatAt } from './deathBeat';
+import { browserStorage, CONFIG_KEY, loadStored, saveStored, SETTINGS_KEY, settingsDefaults } from './settings';
+import { describeRound, nextWins } from './text';
 import { createTuningPanel } from './tuning';
 
 declare global {
@@ -43,7 +44,8 @@ function element(id: string): HTMLElement {
 async function boot(): Promise<void> {
   const storage = browserStorage();
   const cfg = loadStored(storage, CONFIG_KEY, DEFAULT_CONFIG);
-  const settings = loadStored(storage, SETTINGS_KEY, DEFAULT_SETTINGS);
+  const prefersCalm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const settings = loadStored(storage, SETTINGS_KEY, settingsDefaults(prefersCalm));
 
   const world = await createWorld(element('game'), settings);
   const renderer = new Renderer(world);
@@ -57,6 +59,8 @@ async function boot(): Promise<void> {
   let paused = false;
   let tuningOpen = false;
   const fuseStage = new Map<number, number>();
+  let beat: { start: number; x: number; y: number } | null = null;
+  const now = () => performance.now() / 1000;
   const newSeed = () => Math.floor(Math.random() * 2 ** 31);
   const persist = () => {
     saveStored(storage, CONFIG_KEY, cfg);
@@ -96,10 +100,16 @@ async function boot(): Promise<void> {
           break;
         case 'overtime':
           sound.play('overtime');
+          screens.flash(`OVERTIME · GROWTH ×${cfg.overtimeGrowthMultiplier}`, 'var(--red)', 1600);
           break;
         case 'death':
           fx.deathBurst(state.snakes[e.player], PLAYER_COLORS[e.player]);
           sound.play('death');
+          beat = { start: now(), x: e.x, y: e.y };
+          break;
+        case 'nearMiss':
+          fx.nearMissSparks(e.x, e.y, PLAYER_COLORS[e.player]);
+          sound.play('nearMiss', 0.5);
           break;
         case 'roundOver': {
           const { title, detail } = describeRound(e.winner, e.deaths);
@@ -193,6 +203,17 @@ async function boot(): Promise<void> {
           setPaused(!paused);
         }
         return;
+      case 'ArrowLeft':
+      case 'KeyA':
+      case 'ArrowRight':
+      case 'KeyD':
+        if (!state) {
+          cfg.winsToWin = nextWins(cfg.winsToWin, code === 'ArrowLeft' || code === 'KeyA' ? -1 : 1);
+          tuning.refresh();
+          persist();
+          screens.title(cfg.winsToWin);
+        }
+        return;
       case 'Space':
         if (!state) {
           state = createMatch(cfg, newSeed());
@@ -224,6 +245,11 @@ async function boot(): Promise<void> {
       if (state && !paused) handle(step(state, input.sample(), cfg));
     },
     (alpha, frameSeconds) => {
+      const f = beat ? deathBeatAt(now() - beat.start, settings) : null;
+      if (beat && f && f.fxTimeScale === 1 && f.zoom === 1) beat = null;
+      fx.timeScale = f ? f.fxTimeScale : 1;
+      fx.setCamera(f ? f.zoom : 1, beat ? beat.x : 0, beat ? beat.y : 0);
+      fx.setFlash(f ? f.flash : 0);
       renderer.draw(state, alpha, cfg, performance.now() / 1000);
       fx.update(frameSeconds);
       hud.update(state, cfg);

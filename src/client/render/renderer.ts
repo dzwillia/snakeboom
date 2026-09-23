@@ -36,6 +36,7 @@ export class Renderer {
         this.lastTilesVersion = -1;
       }
       for (const view of this.snakes) view.hide();
+      this.arena.setAlert(false, timeSeconds);
       return;
     }
     if (state.tiles !== this.lastTiles) {
@@ -47,6 +48,7 @@ export class Renderer {
       this.arena.drawTiles(state.tiles);
       this.lastTilesVersion = state.tilesVersion;
     }
+    this.arena.setAlert(state.overtime && state.phase === 'playing', timeSeconds);
     this.pickups.draw(state.pickups, cfg, timeSeconds);
     state.snakes.forEach((s, i) => {
       const view = this.snakes[i];

@@ -1,5 +1,5 @@
 import { Graphics } from 'pixi.js';
-import { TILE_COLS, TILE_SIZE, type SnakeState } from '../../sim';
+import { ARENA_HEIGHT, ARENA_WIDTH, TILE_COLS, TILE_SIZE, type SnakeState } from '../../sim';
 import { PALETTE, PICKUP_COLORS } from '../colors';
 import type { ClientSettings } from '../settings';
 import type { World } from './world';
@@ -32,17 +32,25 @@ interface Flash {
   maxLife: number;
 }
 
-const MAX_PARTICLES = 2000;
+const MAX_PARTICLES = 2500;
 
-/** Client-only juice: sparks, shockwave rings, flashes and screen shake, driven by sim events. */
+/**
+ * Client-only juice: sparks, shockwave rings, flashes, screen shake, a camera that can punch in
+ * around a point, and a full-screen flash. Reduced motion turns off shake, flashes and the punch.
+ */
 export class Fx {
-  /** Scales particle and ring time (slow motion); shake always decays in real time. */
+  /** Scales particle and ring time (hit-stop and slow motion); shake always decays in real time. */
   timeScale = 1;
   private readonly g = new Graphics();
+  /** Full-screen flashes, drawn above the bloom layer with normal blending. */
+  private readonly overlay = new Graphics();
   private particles: Particle[] = [];
   private rings: Ring[] = [];
   private flashes: Flash[] = [];
   private shake = 0;
+  private screenFlash = 0;
+  private chainFlash = 0;
+  private camera = { zoom: 1, x: 0, y: 0 };
 
   constructor(
     private readonly world: World,
@@ -50,17 +58,18 @@ export class Fx {
   ) {
     this.g.blendMode = 'add';
     world.glow.addChild(this.g);
+    world.root.addChild(this.overlay);
   }
 
   /** Shatters a dead snake into sparks along its whole body, with a flash at the head. */
   deathBurst(s: SnakeState, color: number): void {
     const t = s.trail;
-    const stride = Math.max(1, Math.floor((t.xs.length - t.start) / 220));
+    const stride = Math.max(1, Math.floor((t.xs.length - t.start) / 260));
     for (let i = t.start; i < t.xs.length; i += stride) {
       if (!t.solid[i]) continue;
       this.spark(t.xs[i], t.ys[i], color, 30 + Math.random() * 110, 0.5 + Math.random() * 0.9, 2 + Math.random() * 2);
     }
-    for (let k = 0; k < 60; k++) {
+    for (let k = 0; k < 70; k++) {
       const c = k % 3 === 0 ? 0xffffff : color;
       this.spark(s.x, s.y, c, 120 + Math.random() * 260, 0.4 + Math.random() * 0.8, 2 + Math.random() * 3);
     }
@@ -69,17 +78,20 @@ export class Fx {
     this.addShake(14);
   }
 
-  /** A bomb going off: flash, shockwave, sparks, and amber debris from destroyed blocks. */
+  /** A bomb going off. Chain links grow: bigger flash, more sparks, wider rings, more shake. */
   explosion(x: number, y: number, radius: number, chainDepth: number, tiles: readonly number[]): void {
-    this.flashes.push({ x, y, r: radius, life: 0.18, maxLife: 0.18 });
-    this.ring(x, y, radius * 1.15, 0.45, 0xffffff);
-    this.ring(x, y, radius * 0.8, 0.32, PALETTE.fuse);
-    for (let k = 0; k < 70; k++) {
+    const depth = Math.min(chainDepth, 6);
+    const grow = 1 + 0.12 * depth;
+    this.flashes.push({ x, y, r: radius * grow, life: 0.18, maxLife: 0.18 });
+    this.ring(x, y, radius * 1.15 * grow, 0.45, 0xffffff);
+    this.ring(x, y, radius * 0.8 * grow, 0.32, depth >= 2 ? 0xff3030 : PALETTE.fuse);
+    for (let k = 0; k < 70 + 20 * depth; k++) {
       const c = k % 4 === 0 ? 0xffffff : k % 2 === 0 ? PALETTE.bomb : PALETTE.fuse;
-      this.spark(x, y, c, 150 + Math.random() * 380, 0.3 + Math.random() * 0.6, 2 + Math.random() * 3);
+      this.spark(x, y, c, 150 + Math.random() * 380 * grow, 0.3 + Math.random() * 0.6, 2 + Math.random() * 3);
     }
     this.debris(tiles);
     this.addShake(8 + 4 * Math.min(chainDepth, 4));
+    if (depth >= 2) this.chainFlash = Math.max(this.chainFlash, Math.min(0.18, 0.04 + 0.025 * depth));
   }
 
   /** Amber rubble from blocks that were blown up or crushed. */
@@ -101,6 +113,13 @@ export class Fx {
     this.addShake(6);
   }
 
+  /** A close call: a quick spray of white and colored sparks off the head. */
+  nearMissSparks(x: number, y: number, color: number): void {
+    for (let k = 0; k < 14; k++) {
+      this.spark(x, y, k % 2 === 0 ? 0xffffff : color, 90 + Math.random() * 160, 0.18 + Math.random() * 0.2, 1.5);
+    }
+  }
+
   pickupBurst(x: number, y: number, color: number): void {
     this.ring(x, y, 34, 0.3, color);
     for (let k = 0; k < 18; k++) this.spark(x, y, color, 80 + Math.random() * 140, 0.25 + Math.random() * 0.3, 2);
@@ -120,24 +139,44 @@ export class Fx {
     this.shake = Math.min(30, this.shake + amount * this.settings.shakeScale);
   }
 
+  /** Zooms the camera by `zoom` around world point (x, y); 1 means no punch. */
+  setCamera(zoom: number, x: number, y: number): void {
+    this.camera = { zoom, x, y };
+  }
+
+  /** Sets the full-screen flash (the death beat drives this every frame). */
+  setFlash(alpha: number): void {
+    this.screenFlash = alpha;
+  }
+
   clear(): void {
     this.particles = [];
     this.rings = [];
     this.flashes = [];
     this.shake = 0;
+    this.screenFlash = 0;
+    this.chainFlash = 0;
+    this.camera = { zoom: 1, x: 0, y: 0 };
     this.g.clear();
+    this.overlay.clear();
   }
 
   update(frameSeconds: number): void {
+    const calm = this.settings.reduceMotion;
     const dt = frameSeconds * this.timeScale;
     const drag = Math.pow(0.04, dt);
     const g = this.g;
     g.clear();
 
+    const flashAlpha = calm ? 0 : Math.max(this.screenFlash, this.chainFlash);
+    this.overlay.clear();
+    if (flashAlpha > 0.005) this.overlay.rect(0, 0, ARENA_WIDTH, ARENA_HEIGHT).fill({ color: 0xffffff, alpha: flashAlpha });
+    this.chainFlash *= Math.pow(0.0005, frameSeconds);
+
     this.flashes = this.flashes.filter((f) => (f.life -= dt) > 0);
     for (const f of this.flashes) {
       const k = 1 - f.life / f.maxLife;
-      g.circle(f.x, f.y, f.r * (0.55 + 0.45 * k)).fill({ color: 0xffffff, alpha: 0.75 * (1 - k) });
+      g.circle(f.x, f.y, f.r * (0.55 + 0.45 * k)).fill({ color: 0xffffff, alpha: (calm ? 0.35 : 0.75) * (1 - k) });
     }
 
     this.particles = this.particles.filter((p) => (p.life -= dt) > 0);
@@ -160,7 +199,13 @@ export class Fx {
 
     this.shake *= Math.pow(0.001, frameSeconds);
     const b = this.world.base;
-    const jitter = () => (this.shake > 0.3 ? (Math.random() * 2 - 1) * this.shake * b.scale : 0);
-    this.world.root.position.set(b.x + jitter(), b.y + jitter());
+    const shake = calm ? 0 : this.shake;
+    const jitter = () => (shake > 0.3 ? (Math.random() * 2 - 1) * shake * b.scale : 0);
+    const zoom = calm ? 1 : this.camera.zoom;
+    this.world.root.scale.set(b.scale * zoom);
+    this.world.root.position.set(
+      b.x + this.camera.x * b.scale * (1 - zoom) + jitter(),
+      b.y + this.camera.y * b.scale * (1 - zoom) + jitter(),
+    );
   }
 }

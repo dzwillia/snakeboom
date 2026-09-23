@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DeathCause, DeathRecord } from '../sim';
-import { describeDeath, describeItem, describeRound, formatClock } from './text';
+import { describeDeath, describeItem, describeRound, formatClock, nextWins } from './text';
 
 const d = (player: number, cause: DeathCause, killer: number | null): DeathRecord => ({ player, cause, killer, x: 0, y: 0 });
 
@@ -31,6 +31,15 @@ describe('text', () => {
     expect(describeItem({ kind: 'slow', charges: 1 })).toBe('SLOW');
     expect(describeItem({ kind: 'reverse', charges: 1 })).toBe('REVERSE');
     expect(describeItem({ kind: 'dozer', charges: 1 })).toBe('DOZER');
+  });
+
+  // Review Focus 4: the title selector clamps to 1–10.
+  it('steps the first-to-N target and clamps it to 1–10', () => {
+    expect(nextWins(5, 1)).toBe(6);
+    expect(nextWins(5, -1)).toBe(4);
+    expect(nextWins(10, 1)).toBe(10);
+    expect(nextWins(1, -1)).toBe(1);
+    expect(nextWins(3.4, 1)).toBe(4);
   });
 
   it('formats the round clock', () => {

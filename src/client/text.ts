@@ -56,6 +56,11 @@ export function describeItem(item: ItemState | null): string {
   }
 }
 
+/** The title screen's first-to-N selector: one step at a time, clamped to 1–10. */
+export function nextWins(current: number, delta: number): number {
+  return Math.min(10, Math.max(1, Math.round(current) + delta));
+}
+
 export function formatClock(ticks: number, tickRate = 60): string {
   const seconds = Math.floor(ticks / tickRate);
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;

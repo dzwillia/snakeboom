@@ -73,6 +73,10 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   fx.add(settings, 'bloomStrength', 0, 4, 0.1).name('bloom strength');
   fx.add(settings, 'bloomThreshold', 0, 1, 0.05).name('bloom threshold');
   fx.add(settings, 'shakeScale', 0, 3, 0.1).name('screen shake');
+  fx.add(settings, 'reduceMotion').name('reduce motion');
+  fx.add(settings, 'hitStopSeconds', 0, 0.5, 0.01).name('death freeze (s)');
+  fx.add(settings, 'slowMoScale', 0.05, 1, 0.05).name('death slow-mo ×');
+  fx.add(settings, 'slowMoSeconds', 0, 3, 0.1).name('death slow-mo (s)');
 
   const audio = gui.addFolder('Audio');
   audio.add(settings, 'masterVolume', 0, 1, 0.05).name('volume');

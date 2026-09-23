@@ -1,10 +1,6 @@
 # SnakeBoom
 
-A two-player neon snake duel. Your snake keeps growing: trap your opponent so they crash into your body, a wall, or themselves.
-
-Pickups also hold power-ups: **Ghost** (your head slips through bodies and blocks for 3 s), **Shield** (automatically survive your next crash), **Turbo** (free boost), **Slow** / **Reverse** (slow your opponent or swap their left and right), and **Bulldozer** (for 5 s your plow shoves blocks around, straight into your opponent if you're good). You carry up to three items and Use fires the oldest; a Shield is a bubble that doesn't take a slot. Both queues show on the HUD, so you always know what your opponent has.
-
-Grab glowing pickups for bombs (three per pickup, thrown with Use): a bomb arcs toward the spot your opponent is heading for, a reticle shows its blast zone, and it goes off a second after landing, so they get a chance to swerve. Blasts kill any head in range (yours too), punch holes through bodies, destroy blocks, and set off other bombs in chain reactions. Every round after the first plays on a different hand-made map.
+A two-player neon snake duel on one keyboard. Your snake never stops growing: trap your opponent so they crash into your body, a block, a wall, or themselves, and throw bombs that blow holes in everything.
 
 ## Play
 
@@ -18,15 +14,36 @@ pnpm dev        # opens the game in your browser (http://localhost:5199)
 | **CYAN** | A / D | W | S |
 | **PINK** | ← / → | ↑ | ↓ |
 
-<kbd>Space</kbd> start / rematch · <kbd>Esc</kbd> pause · <kbd>M</kbd> mute · <kbd>`</kbd> tuning panel (every gameplay number is a live slider).
+On the title screen, ← / → picks the match length (first to 1–10). <kbd>Space</kbd> starts or rematches, <kbd>Esc</kbd> pauses, <kbd>M</kbd> mutes, and <kbd>`</kbd> opens the tuning panel, where every gameplay number is a live slider.
+
+## How it plays
+
+- **Dying:** you die if your head hits a wall, a block, your opponent's body or your own. A head-on collision means both die, and the round is a draw. First to the target wins.
+- **Growth and overtime:** snakes keep growing, and after 2:30 overtime triples the growth.
+- **Pickups** spawn all round. You carry up to **three items** and Use fires the oldest. Both item queues show on the HUD, so you always know what your opponent has.
+
+| Item | What it does |
+|---|---|
+| **Bomb ×3** | Thrown ahead of your opponent. A reticle marks the blast zone, and it goes off 1 s after landing. Blasts kill heads (yours too), punch holes through bodies, destroy blocks and set off other bombs. |
+| **Ghost** | For 3 s your head slips through bodies, heads and blocks. Walls and blasts still kill. |
+| **Shield** | A bubble that saves you from your next crash. It never takes a slot. |
+| **Turbo** | 4 s of free boost. |
+| **Slow** | Your opponent moves at 60% speed for 4 s. |
+| **Reverse** | Your opponent's left and right are swapped for 4 s. |
+| **Bulldozer** | For 5 s your plow shoves blocks (and crushes the ones it can't move), straight into your opponent if you aim well. |
+
+Five hand-made, symmetrical maps rotate between rounds: Open, Pillars, Cross, Bunkers and Lanes.
 
 ## Develop
 
 ```bash
-pnpm test        # unit tests (rules engine + client helpers)
+pnpm test                 # unit tests (rules engine + client helpers)
 pnpm typecheck
-pnpm build
-pnpm soak --rounds 100   # headless bot-vs-bot stats: round lengths, death causes, speed
+pnpm build                # static site in dist/
+pnpm soak --rounds 100    # headless bot-vs-bot stats: round lengths, deaths, pickups, speed
 ```
 
-The rules engine (`src/sim`) is deterministic, pure TypeScript that also runs in Node, ready for a future game server. Design: `docs/superpowers/specs/2026-09-23-snakeboom-v1-design.md`.
+- `src/sim` is the rules engine. It's deterministic, pure TypeScript with no browser APIs: fixed 60 Hz ticks, seeded random numbers, its own trig functions, and plain-data state. The same code can run on a game server, which is the next milestone: online 1v1 duels with invite links.
+- `src/client` is the PixiJS renderer with bloom, plus HTML overlays, ZzFX-generated sounds and a lil-gui tuning panel.
+
+Design: `docs/superpowers/specs/2026-09-23-snakeboom-v1-design.md` · Plans: `docs/superpowers/plans/`
