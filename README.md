@@ -2,7 +2,7 @@
 
 A two-player neon snake duel. Your snake keeps growing: trap your opponent so they crash into your body, a wall, or themselves.
 
-Pickups also hold power-ups: **Ghost** (your head slips through bodies and blocks for 3 s), **Shield** (automatically survive your next crash), **Turbo** (free boost), and **Slow** / **Reverse** (slow your opponent or swap their left and right). Both item slots show on the HUD, so you always know what your opponent is holding.
+Pickups also hold power-ups: **Ghost** (your head slips through bodies and blocks for 3 s), **Shield** (automatically survive your next crash), **Turbo** (free boost), **Slow** / **Reverse** (slow your opponent or swap their left and right), and **Bulldozer** (for 5 s your plow shoves blocks around, straight into your opponent if you're good). You carry up to three items and Use fires the oldest; a Shield is a bubble that doesn't take a slot. Both queues show on the HUD, so you always know what your opponent has.
 
 Grab glowing pickups for bombs (three per pickup, thrown with Use): a bomb arcs toward the spot your opponent is heading for, a reticle shows its blast zone, and it goes off a second after landing, so they get a chance to swerve. Blasts kill any head in range (yours too), punch holes through bodies, destroy blocks, and set off other bombs in chain reactions. Every round after the first plays on a different hand-made map.
 

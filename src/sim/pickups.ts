@@ -3,7 +3,7 @@ import { forEachSolidPointNear } from './collision';
 import { ARENA_HEIGHT, ARENA_WIDTH, TICK_RATE, type Config, type PickupKind } from './config';
 import { createItem } from './items';
 import { rngNext, rngRange, type RngState } from './rng';
-import type { MatchState, PickupState, SimEvent } from './types';
+import type { MatchState, PickupState, SimEvent, SnakeState } from './types';
 
 const SPAWN_TRIES = 50;
 
@@ -65,7 +65,9 @@ export function updatePickups(state: MatchState, cfg: Config, events: SimEvent[]
   if (state.pickupTimer > 0) return;
   state.pickupTimer = Math.max(1, Math.round(cfg.pickupInterval * TICK_RATE));
   if (state.pickups.length >= cfg.maxPickups) return;
-  const kind = pickKind(cfg.pickupWeights, state.rng);
+  // A Bulldozer is pointless on a map without blocks.
+  const weights = state.tiles.includes(1) ? cfg.pickupWeights : { ...cfg.pickupWeights, dozer: 0 };
+  const kind = pickKind(weights, state.rng);
   if (!kind) return;
   const spot = findSpawnPoint(state, cfg);
   if (!spot) return;
@@ -80,7 +82,12 @@ export function updatePickups(state: MatchState, cfg: Config, events: SimEvent[]
   events.push({ type: 'pickupSpawned', id: pickup.id, kind, x: pickup.x, y: pickup.y });
 }
 
-/** Heads with an empty slot collect pickups they touch; when both reach one, the closer head wins. */
+/** A Shield needs no bubble already; anything else needs a free item slot. */
+function canCarry(s: SnakeState, kind: PickupKind, cfg: Config): boolean {
+  return kind === 'shield' ? !s.shield : s.items.length < cfg.itemSlots;
+}
+
+/** Heads with room collect pickups they touch; when both reach one, the closer head wins. */
 export function collectPickups(state: MatchState, cfg: Config, events: SimEvent[]): void {
   if (state.pickups.length === 0) return;
   const reach = cfg.snakeRadius + cfg.pickupRadius;
@@ -89,7 +96,7 @@ export function collectPickups(state: MatchState, cfg: Config, events: SimEvent[
     let winner = -1;
     let best = reach * reach;
     state.snakes.forEach((s, i) => {
-      if (!s.alive || s.item) return;
+      if (!s.alive || !canCarry(s, p.kind, cfg)) return;
       const d = dist2(s, p.x, p.y);
       if (d < best) {
         best = d;
@@ -100,7 +107,9 @@ export function collectPickups(state: MatchState, cfg: Config, events: SimEvent[
       kept.push(p);
       continue;
     }
-    state.snakes[winner].item = createItem(p.kind, cfg);
+    const taker = state.snakes[winner];
+    if (p.kind === 'shield') taker.shield = true;
+    else taker.items.push(createItem(p.kind, cfg));
     events.push({ type: 'pickupCollected', id: p.id, kind: p.kind, player: winner });
   }
   state.pickups = kept;

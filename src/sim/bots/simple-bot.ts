@@ -36,7 +36,7 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
     bot.wanderTurn = rngNext(bot.rng) < 0.5 ? -1 : 1;
   }
 
-  const seek = seekTurn(state, me);
+  const seek = seekTurn(state, me, cfg);
   let turn: -1 | 0 | 1;
   if (seek !== null && clear[seek + 1] === LOOK_STEPS) turn = seek;
   else if (bot.wanderTicks > 0 && clear[bot.wanderTurn + 1] === LOOK_STEPS) turn = bot.wanderTurn;
@@ -51,7 +51,7 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
 
   const near = state.snakes.some((o, j) => j !== idx && o.alive && dist2(o, me.x, me.y) < BOMB_RANGE * BOMB_RANGE);
   let use = false;
-  switch (me.item?.kind) {
+  switch (me.items[0]?.kind) {
     case 'bomb':
       use = rngNext(bot.rng) < (state.snakes.some((o, j) => j !== idx && o.alive) ? 0.03 : 0);
       break;
@@ -65,6 +65,9 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
     case 'turbo':
       use = best === LOOK_STEPS && rngNext(bot.rng) < 0.01;
       break;
+    case 'dozer':
+      use = best < LOOK_STEPS / 2;
+      break;
   }
   return { turn, boost: bot.boostTicks > 0, use };
 }
@@ -76,8 +79,8 @@ function dist2(p: { x: number; y: number }, x: number, y: number): number {
 }
 
 /** Turn toward the nearest pickup in range while the slot is empty; null when there's nothing to chase. */
-function seekTurn(state: MatchState, me: SnakeState): -1 | 0 | 1 | null {
-  if (me.item) return null;
+function seekTurn(state: MatchState, me: SnakeState, cfg: Config): -1 | 0 | 1 | null {
+  if (me.items.length >= cfg.itemSlots) return null;
   let target: { x: number; y: number } | null = null;
   let best = SEEK_RANGE * SEEK_RANGE;
   for (const p of state.pickups) {

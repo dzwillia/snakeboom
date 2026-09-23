@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { setTile } from './arena';
 import { ARENA_WIDTH, DEFAULT_CONFIG, TICK_RATE } from './config';
 import { HALF_PI, PI } from './detmath';
-import { createItem } from './items';
 import { tryShield } from './shield';
 import { createMatch, rebuildGrid } from './state';
 import { createTrail, trailPush } from './trail';
@@ -17,7 +16,7 @@ function shielded(x: number, y: number, heading: number): MatchState {
   const me = s.snakes[0];
   me.trail = createTrail();
   trailPush(me.trail, x, y);
-  Object.assign(me, { x, y, prevX: x, prevY: y, heading, item: createItem('shield', cfg) });
+  Object.assign(me, { x, y, prevX: x, prevY: y, heading, shield: true });
   rebuildGrid(s);
   return s;
 }
@@ -33,7 +32,7 @@ function verticalBody(s: MatchState, x: number): void {
 describe('shield', () => {
   it('does nothing without a shield', () => {
     const s = shielded(3, 500, PI);
-    s.snakes[0].item = null;
+    s.snakes[0].shield = false;
     const events: SimEvent[] = [];
     expect(tryShield(s, 0, 'wall', cfg, events)).toBe(false);
     expect(events).toEqual([]);
@@ -47,7 +46,7 @@ describe('shield', () => {
     const me = s.snakes[0];
     expect(me.x).toBe(r + 0.5);
     expect(me.heading).toBe(HALF_PI);
-    expect(me.item).toBeNull();
+    expect(me.shield).toBe(false);
     expect(me.effects.grace).toBe(Math.round(cfg.shieldGrace * TICK_RATE));
     expect(events).toEqual([{ type: 'shieldBlocked', player: 0, x: r + 0.5, y: 500, cause: 'wall' }]);
   });

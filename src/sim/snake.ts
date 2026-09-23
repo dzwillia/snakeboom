@@ -5,7 +5,7 @@ import { createTrail, trailPush, trailTrim } from './trail';
 import type { EffectTimers, Grid, PlayerInput, SnakeState } from './types';
 
 export function noEffects(): EffectTimers {
-  return { ghost: 0, turbo: 0, slow: 0, reverse: 0, grace: 0 };
+  return { ghost: 0, turbo: 0, slow: 0, reverse: 0, dozer: 0, grace: 0 };
 }
 
 export function createSnake(id: number, x: number, y: number, heading: number, cfg: Config): SnakeState {
@@ -23,7 +23,8 @@ export function createSnake(id: number, x: number, y: number, heading: number, c
     boostMeter: 1,
     boosting: false,
     trail,
-    item: null,
+    items: [],
+    shield: false,
     useCooldown: 0,
     holeVersion: 0,
     effects: noEffects(),

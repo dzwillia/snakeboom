@@ -50,12 +50,14 @@ export interface EffectTimers {
   turbo: number;
   slow: number;
   reverse: number;
+  /** Bulldozer: the plow shoves blocks and the head ignores them. */
+  dozer: number;
   /** Shield grace: immune to everything except walls. */
   grace: number;
 }
 
 /** Effects announced by effectStarted/effectEnded events (grace is internal). */
-export type EffectName = 'ghost' | 'turbo' | 'slow' | 'reverse';
+export type EffectName = 'ghost' | 'turbo' | 'slow' | 'reverse' | 'dozer';
 
 export interface PickupState {
   id: number;
@@ -101,7 +103,10 @@ export interface SnakeState {
   boostMeter: number;
   boosting: boolean;
   trail: Trail;
-  item: ItemState | null;
+  /** Carried items, oldest first; Use fires items[0]. */
+  items: ItemState[];
+  /** A Shield bubble: absorbs the next death. Never takes an item slot. */
+  shield: boolean;
   /** Ticks until Use works again. */
   useCooldown: number;
   /** Bumped whenever a blast punches holes in this trail, so the renderer redraws it. */
@@ -168,6 +173,7 @@ export type SimEvent =
   | { type: 'effectStarted'; player: number; effect: EffectName }
   | { type: 'effectEnded'; player: number; effect: EffectName }
   | { type: 'shieldBlocked'; player: number; x: number; y: number; cause: DeathCause }
+  | { type: 'plowed'; player: number; moved: number; crushed: number[] }
   | {
       type: 'explosion';
       id: number;

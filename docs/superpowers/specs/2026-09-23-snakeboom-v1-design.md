@@ -105,20 +105,21 @@ Pickups are the only source of bombs and power-ups.
 - **Placement:** the spawn point comes from the seeded random generator. It must be at least `pickupClearance` from walls, solid tiles, solid trail points and bombs, and at least `pickupMinHeadDistance` from every head. The game tries up to 50 random points. If none fit, it skips that spawn.
 - **Kind:** chosen by weight. The defaults are Bomb 25 and 15 each for the other five kinds.
 - **Lifetime:** `pickupLifetime`. The pickup blinks for its last 3 seconds (a client-side effect) and then disappears. This stops pickups that get walled in from blocking new spawns.
-- **Collecting:** a head collects a pickup on contact (`distance < r + pickupRadius`), but only if its item slot is empty. Bodies never collect pickups.
+- **Collecting:** a head collects a pickup on contact (`distance < r + pickupRadius`) if it has room: a free item slot, or, for a Shield, no bubble already. Bodies never collect pickups. When both heads reach the same pickup, the closer one gets it.
 
 ### 3.5 Items
 
-Each player has one item slot, and both slots are shown on the HUD. The Use key fires the item in the slot. It triggers once per press.
+Each player carries up to `itemSlots` (3) items in a queue, oldest first, and both queues are shown on the HUD. The Use key fires the item at the front of the queue, once per press. A bomb pickup stays at the front until its last bomb is thrown. A Shield never takes a slot: it becomes a bubble around your head instead, one at a time.
 
 | Item | What Use does | Details |
 |---|---|---|
 | **Bomb ×3** | Throws a bomb ahead of your opponent | It arcs through the air for `bombFlightTime` and lands where they'll be if they hold course, then blasts `bombFuse` later. A reticle marks the blast zone from the moment it's thrown. The slot empties after the third bomb, and throws must be at least `bombThrowCooldown` apart. |
 | **Ghost** | For `ghostDuration`, your **head** passes through bodies, other heads and obstacles | Walls and blasts still kill. Your body stays solid to your opponent. The head flickers for the final `ghostWarning`. If the head is inside something when Ghost ends, it dies. |
-| **Shield** | Nothing: it is passive while held | It absorbs your next death of any kind, and then the slot empties. |
+| **Shield** | (never in the queue) | Picking it up puts a bubble on you straight away. The bubble absorbs your next death of any kind, then pops. You can only have one at a time; while you have one, Shield pickups stay on the field. |
 | **Turbo** | For `turboDuration`, boosting doesn't drain the meter | You still hold the boost key to go fast. |
 | **Slow** | For `slowDuration`, every opponent moves at `slowFactor` speed | Using it again restarts the timer. |
 | **Reverse** | For `reverseDuration`, every opponent's left and right are swapped | The sim applies the swap to inputs, so a future server does it too. |
+| **Bulldozer** | For `dozerDuration`, a plow on your head shoves blocks | Blocks the plow touches move one tile ahead along your heading's main axis, pushing rows of up to 4 blocks. A block that can't move (a longer row, or one at the arena edge) is crushed. While plowing, blocks can't hurt you, but bodies, heads and walls still can. Shoving a block into your opponent's head kills them. It never spawns on maps without blocks. |
 
 **How a Shield deflects:**
 
@@ -197,7 +198,7 @@ Effects run only in the client. The sim reports events, and the client reacts to
 
 The HUD and screens are HTML/CSS overlays on top of the canvas.
 
-- **Top bar:** CYAN's score pips, boost meter and item slot on the left, with bomb charges shown on the slot. The round clock is in the center and shows "OVERTIME" in red. PINK's side mirrors CYAN's on the right.
+- **Top bar:** CYAN's score pips, boost meter, Shield chip and item queue are on the left. The next item is highlighted, and bomb charges show on the bomb's slot. The round clock is in the center and shows "OVERTIME" in red. PINK's side mirrors CYAN's on the right.
 - **Screens:**
   - **Title:** the logo, both players' controls, a "First to N" selector, and "SPACE to start".
   - **Countdown:** 3-2-1-GO.
@@ -371,7 +372,8 @@ Because the engine is deterministic and each player's input per tick is tiny (ab
 | Pickups | `maxPickups` · `firstPickupDelay` · `pickupInterval` | 4 · 1 s · 2.5 s |
 | | `pickupLifetime` · `pickupRadius` | 12 s · 14 |
 | | `pickupMinHeadDistance` · `pickupClearance` | 150 · 40 |
-| | Weights | bomb 25 · ghost 15 · shield 15 · turbo 15 · slow 15 · reverse 15 |
+| | Weights | bomb 25 · ghost 12.5 · shield 12.5 · turbo 12.5 · slow 12.5 · reverse 12.5 · dozer 12.5 |
+| | `itemSlots` | 3 |
 | Bombs | `bombCharges` · `bombThrowCooldown` · `bombFlightTime` | 3 · 0.5 s · 0.45 s |
 | | `bombFuse` (after landing) · `blastRadius` · `chainDelay` · `bombLeadFactor` | 1 s · 70 · 0.12 s · 1 |
 | Items | `ghostDuration` · `ghostWarning` | 3 s · 0.75 s |
@@ -379,6 +381,7 @@ Because the engine is deterministic and each player's input per tick is tiny (ab
 | | `turboDuration` | 4 s |
 | | `slowDuration` · `slowFactor` | 4 s · 0.6 |
 | | `reverseDuration` | 4 s |
+| | `dozerDuration` | 5 s |
 | Match | `winsToWin` · `countdownSeconds` · `roundOverSeconds` | 5 · 3 s · 2.5 s |
 | Effects (client) | bloom on · strength · threshold | on · 1.5 · 0.2 |
 | | `shakeScale` · `hitStopSeconds` · `slowMoScale` · `slowMoSeconds` | 1.0 · 0.12 s · 0.3 · 0.8 s |
@@ -497,3 +500,4 @@ Playtest focus: the "one more match" test.
 ## 11. Changes from playtesting
 
 - **v0.4.0.** Bombs are thrown, not dropped. The old drop-at-your-head bomb felt random. A thrown bomb lands where the opponent is heading, shows a reticle over its blast zone, and gives them about 1.45 s to react. More pickups spawn: up to 4 on the field, the first after 1 s, then one every 2.5 s, each lasting 12 s. Power-ups have more weight relative to bombs.
+- **v0.5.0.** Snakes carry up to 3 items in a queue, and Use fires the oldest. A Shield becomes a bubble that never takes a slot. There's a new **Bulldozer** power-up: for 5 s your plow shoves blocks, pushing rows of up to 4 and crushing any it can't move. It can shove a block into your opponent's head.

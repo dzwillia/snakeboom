@@ -57,7 +57,7 @@ describe('soak', () => {
     [
       'shields only',
       {
-        pickupWeights: { bomb: 0, ghost: 0, shield: 1, turbo: 0, slow: 0, reverse: 0 },
+        pickupWeights: { bomb: 0, ghost: 0, shield: 1, turbo: 0, slow: 0, reverse: 0, dozer: 0 },
         firstPickupDelay: 0,
         pickupInterval: 1,
         maxPickups: 4,
@@ -66,11 +66,21 @@ describe('soak', () => {
     [
       'ghosts only',
       {
-        pickupWeights: { bomb: 0, ghost: 1, shield: 0, turbo: 0, slow: 0, reverse: 0 },
+        pickupWeights: { bomb: 0, ghost: 1, shield: 0, turbo: 0, slow: 0, reverse: 0, dozer: 0 },
         firstPickupDelay: 0,
         pickupInterval: 1,
         maxPickups: 4,
         ghostDuration: 10,
+      },
+    ],
+    [
+      'dozers everywhere',
+      {
+        pickupWeights: { bomb: 0, ghost: 0, shield: 0, turbo: 0, slow: 0, reverse: 0, dozer: 1 },
+        firstPickupDelay: 0,
+        pickupInterval: 1,
+        maxPickups: 4,
+        dozerDuration: 10,
       },
     ],
     [

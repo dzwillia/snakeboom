@@ -3,7 +3,7 @@ import { detCos, detSin } from './detmath';
 import { snakeSpeed } from './snake';
 import type { EffectName, ItemState, MatchState, SimEvent } from './types';
 
-const ANNOUNCED: EffectName[] = ['ghost', 'turbo', 'slow', 'reverse'];
+const ANNOUNCED: EffectName[] = ['ghost', 'turbo', 'slow', 'reverse', 'dozer'];
 
 export function createItem(kind: PickupKind, cfg: Config): ItemState {
   return { kind, charges: kind === 'bomb' ? Math.max(1, Math.round(cfg.bombCharges)) : 1 };
@@ -52,11 +52,11 @@ export function throwTarget(state: MatchState, idx: number, cfg: Config): { x: n
   return { x: Math.min(Math.max(x, r), ARENA_WIDTH - r), y: Math.min(Math.max(y, r), ARENA_HEIGHT - r) };
 }
 
-/** Uses the held item. A Shield is passive (Use does nothing); everything else is spent. */
+/** Uses the oldest carried item (items[0]); a bomb stays at the front until its last charge is thrown. */
 export function useItem(state: MatchState, idx: number, cfg: Config, events: SimEvent[]): void {
   const s = state.snakes[idx];
-  const item = s.item;
-  if (!item || s.useCooldown > 0 || item.kind === 'shield') return;
+  const item = s.items[0];
+  if (!item || s.useCooldown > 0) return;
   const opponents = state.snakes.flatMap((o, j) => (j !== idx && o.alive ? [j] : []));
   if (item.kind !== 'bomb') events.push({ type: 'itemUsed', player: idx, kind: item.kind });
   switch (item.kind) {
@@ -82,7 +82,13 @@ export function useItem(state: MatchState, idx: number, cfg: Config, events: Sim
     case 'reverse':
       for (const j of opponents) startEffect(state, j, 'reverse', cfg.reverseDuration, events);
       break;
+    case 'dozer':
+      startEffect(state, idx, 'dozer', cfg.dozerDuration, events);
+      break;
+    case 'shield':
+      s.shield = true; // Shields are bubbles, but never let one jam the queue
+      break;
   }
   item.charges--;
-  if (item.charges <= 0) s.item = null;
+  if (item.charges <= 0) s.items.shift();
 }

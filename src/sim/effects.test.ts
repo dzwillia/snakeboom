@@ -12,7 +12,7 @@ const cfg: Config = structuredClone(DEFAULT_CONFIG);
 function holding(kind: PickupKind): MatchState {
   const s = createMatch(cfg, 1);
   s.phase = 'playing';
-  s.snakes[0].item = createItem(kind, cfg);
+  s.snakes[0].items = [createItem(kind, cfg)];
   return s;
 }
 
@@ -36,14 +36,16 @@ describe('power-ups', () => {
         { type: 'effectStarted', player: target, effect: kind },
       ]);
       expect(s.snakes[target].effects[kind]).toBe(Math.round(cfg[`${kind}Duration`] * TICK_RATE));
-      expect(s.snakes[0].item).toBeNull();
+      expect(s.snakes[0].items).toEqual([]);
     }
   });
 
-  it('a Shield is passive: Use does nothing', () => {
-    const s = holding('shield');
+  it('Use with an empty queue does nothing, even while shielded', () => {
+    const s = holding('bomb');
+    s.snakes[0].items = [];
+    s.snakes[0].shield = true;
     expect(use(s)).toEqual([]);
-    expect(s.snakes[0].item).toEqual({ kind: 'shield', charges: 1 });
+    expect(s.snakes[0].shield).toBe(true);
   });
 
   it('Slow and Reverse skip dead opponents', () => {

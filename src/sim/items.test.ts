@@ -12,7 +12,7 @@ const FUSE = Math.round(cfg.bombFuse * TICK_RATE);
 function withBombs(): MatchState {
   const s = createMatch(cfg, 1);
   s.phase = 'playing';
-  s.snakes[0].item = createItem('bomb', cfg);
+  s.snakes[0].items = [createItem('bomb', cfg)];
   return s;
 }
 
@@ -42,7 +42,7 @@ describe('items', () => {
     expect(bomb.x).toBeCloseTo(pink.x - lead, 6); // PINK is heading west
     expect(bomb.y).toBeCloseTo(pink.y, 6);
     expect(events).toEqual([{ type: 'bombThrown', id: 1, player: 0, fromX: cyan.x, fromY: cyan.y, x: bomb.x, y: bomb.y }]);
-    expect(s.snakes[0].item).toEqual({ kind: 'bomb', charges: 2 });
+    expect(s.snakes[0].items).toEqual([{ kind: 'bomb', charges: 2 }]);
   });
 
   it('keeps the landing spot inside the arena', () => {
@@ -72,7 +72,7 @@ describe('items', () => {
       s.snakes[0].useCooldown = 0;
     }
     expect(s.bombs).toHaveLength(3);
-    expect(s.snakes[0].item).toBeNull();
+    expect(s.snakes[0].items).toEqual([]);
     useItem(s, 0, cfg, events);
     expect(s.bombs).toHaveLength(3);
   });
@@ -87,9 +87,9 @@ describe('items', () => {
 
   it('starts every round with empty slots, no bombs and the first pickup scheduled', () => {
     const s = createMatch(cfg, 1);
-    expect(s.snakes.map((sn) => [sn.item, sn.useCooldown, sn.holeVersion])).toEqual([
-      [null, 0, 0],
-      [null, 0, 0],
+    expect(s.snakes.map((sn) => [sn.items, sn.shield, sn.useCooldown, sn.holeVersion])).toEqual([
+      [[], false, 0, 0],
+      [[], false, 0, 0],
     ]);
     expect(s.pickups).toEqual([]);
     expect(s.bombs).toEqual([]);

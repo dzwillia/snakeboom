@@ -1,5 +1,6 @@
 import { ZZFX, zzfx } from 'zzfx';
 import type { ClientSettings } from './settings';
+import { SoundGate } from './soundGate';
 
 export type SoundName =
   | 'beep'
@@ -21,7 +22,9 @@ export type SoundName =
   | 'shield'
   | 'turbo'
   | 'slow'
-  | 'reverse';
+  | 'reverse'
+  | 'dozer'
+  | 'scrape';
 
 // ZzFX parameters: volume, randomness, frequency, attack, sustain, release, shape, shapeCurve,
 // slide, deltaSlide, pitchJump, pitchJumpTime, repeatTime, noise, modulation, bitCrush, delay,
@@ -47,10 +50,14 @@ const BANK: Record<SoundName, number[]> = {
   turbo: [0.6, 0, 200, 0.02, 0.3, 0.2, 2, 1, 6, 0.5],
   slow: [0.6, 0, 600, 0.02, 0.3, 0.3, 1, 1, -6, -0.2],
   reverse: [0.6, 0, 440, 0.01, 0.3, 0.2, 1, 1, 0, 0, 0, 0, 0, 0, 12],
+  dozer: [0.6, 0.05, 90, 0.05, 0.3, 0.2, 2, 1, 0, 0, 0, 0, 0, 0.2, 0, 0, 0, 1, 0, 0.3],
+  scrape: [0.25, 0.2, 120, 0, 0.03, 0.06, 4, 1, 0, 0, 0, 0, 0, 2],
 };
 
 /** Synthesized sound effects (no audio files). */
 export class Sound {
+  private readonly gate = new SoundGate({ scrape: 150, tick: 60, explosion: 45 });
+
   constructor(private readonly settings: ClientSettings) {}
 
   /** Browsers keep audio suspended until a user gesture; call on every key press. */
@@ -62,6 +69,7 @@ export class Sound {
   /** `pitchScale` multiplies the base frequency (chain reactions climb in pitch). */
   play(name: SoundName, volumeScale = 1, pitchScale = 1): void {
     if (this.settings.muted || this.settings.masterVolume <= 0) return;
+    if (!this.gate.allow(name, performance.now())) return;
     ZZFX.volume = this.settings.masterVolume * volumeScale;
     const params = BANK[name].slice();
     params[2] *= pitchScale;

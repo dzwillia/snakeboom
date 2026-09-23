@@ -51,6 +51,8 @@ export function describeItem(item: ItemState | null): string {
       return 'SLOW';
     case 'reverse':
       return 'REVERSE';
+    case 'dozer':
+      return 'DOZER';
   }
 }
 

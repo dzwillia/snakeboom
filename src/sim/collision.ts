@@ -37,7 +37,7 @@ export function isProtected(s: SnakeState): boolean {
  * Checks one live head against heads, bodies, blocks and walls (blasts are resolved elsewhere).
  * Priority: headOn > body > self > obstacle > wall. Ties pick the lowest snake index, so the
  * result never depends on grid visit order. A ghost's head (its newest 2r of path) is
- * intangible to others; the rest of its body is solid.
+ * intangible to others; the rest of its body is solid. A bulldozing head ignores blocks.
  */
 export function detectHit(state: MatchState, idx: number, cfg: Config): Hit | null {
   const me = state.snakes[idx];
@@ -68,7 +68,7 @@ export function detectHit(state: MatchState, idx: number, cfg: Config): Hit | nu
     });
     if (found.body >= 0) return { cause: 'body', killer: found.body };
     if (found.self) return { cause: 'self', killer: idx };
-    if (circleHitsTiles(state.tiles, me.x, me.y, r)) return { cause: 'obstacle', killer: null };
+    if (me.effects.dozer <= 0 && circleHitsTiles(state.tiles, me.x, me.y, r)) return { cause: 'obstacle', killer: null };
   }
 
   if (circleHitsWall(me.x, me.y, r)) return { cause: 'wall', killer: null };

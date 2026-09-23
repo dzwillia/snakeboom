@@ -24,7 +24,11 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
     if (t.start < 0 || t.start >= t.xs.length) problems.push(`snake ${i}: trail start ${t.start} out of range`);
     const len = trailLength(t);
     if (len > Math.max(0, s.targetLength) + 1e-6) problems.push(`snake ${i}: trail ${len} longer than ${s.targetLength}`);
-    if (s.item && s.item.charges < 1) problems.push(`snake ${i}: holds an empty item`);
+    if (s.items.length > Math.max(0, cfg.itemSlots)) problems.push(`snake ${i}: carries ${s.items.length} items (max ${cfg.itemSlots})`);
+    for (const item of s.items) {
+      if (item.charges < 1) problems.push(`snake ${i}: carries an empty ${item.kind}`);
+      if (item.kind === 'shield') problems.push(`snake ${i}: a Shield is taking a slot`);
+    }
     for (const [name, v] of Object.entries(s.effects)) {
       if (!Number.isInteger(v) || v < 0) problems.push(`snake ${i}: effect ${name} is ${v}`);
     }

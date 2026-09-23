@@ -77,6 +77,15 @@ export function nearestSolidTilePoint(
   return found.d < Infinity ? { x: found.x, y: found.y } : null;
 }
 
+/** Indices of the solid tiles a circle touches, ascending. */
+export function solidTilesTouching(tiles: readonly number[], x: number, y: number, r: number): number[] {
+  const out: number[] = [];
+  forEachSolidTileTouching(tiles, x, y, r, (index) => {
+    out.push(index);
+  });
+  return out;
+}
+
 /** Clears every solid tile a circle touches; returns the cleared indices in ascending order. */
 export function destroyTilesInCircle(tiles: number[], x: number, y: number, r: number): number[] {
   const destroyed: number[] = [];

@@ -135,6 +135,28 @@ export class SnakeView {
       g.circle(x, y, r * 2.7).stroke({ width: 3, color: PICKUP_COLORS.slow, alpha: 0.55 + 0.3 * Math.sin(t * 10) });
     }
 
+    if (e.dozer > 0) {
+      // Bulldozer blade across the front of the head.
+      const hx = Math.cos(s.heading);
+      const hy = Math.sin(s.heading);
+      const cx = x + hx * r * 1.7;
+      const cy = y + hy * r * 1.7;
+      const w = r * 1.6;
+      const d = r * 0.7;
+      g.poly([
+        cx - hy * w,
+        cy + hx * w,
+        cx + hy * w,
+        cy - hx * w,
+        cx + hy * w * 0.8 - hx * d,
+        cy - hx * w * 0.8 - hy * d,
+        cx - hy * w * 0.8 - hx * d,
+        cy + hx * w * 0.8 - hy * d,
+      ])
+        .fill({ color: PICKUP_COLORS.dozer })
+        .stroke({ width: 1.5, color: PALETTE.core, alpha: 0.6 });
+    }
+
     const flicker = e.ghost > 0 && e.ghost < cfg.ghostWarning * TICK_RATE && Math.floor(t * 12) % 2 === 0;
     if (e.ghost > 0 && !flicker) {
       g.circle(x, y, r * 2).fill({ color: PICKUP_COLORS.ghost, alpha: 0.25 });
@@ -147,7 +169,7 @@ export class SnakeView {
     const ey = y + Math.sin(s.heading) * r * 0.55;
     g.circle(ex, ey, Math.max(1.2, r * 0.28)).fill({ color: PALETTE.background });
 
-    if (s.item?.kind === 'shield') {
+    if (s.shield) {
       g.circle(x, y, r * 3).stroke({ width: 3, color: PICKUP_COLORS.shield, alpha: 0.85 });
     }
     if (e.grace > 0 && Math.floor(t * 16) % 2 === 0) {

@@ -10,7 +10,7 @@ export const TICK_RATE = 60;
 export const DT = 1 / TICK_RATE;
 
 /** What a pickup can contain. */
-export type PickupKind = 'bomb' | 'ghost' | 'shield' | 'turbo' | 'slow' | 'reverse';
+export type PickupKind = 'bomb' | 'ghost' | 'shield' | 'turbo' | 'slow' | 'reverse' | 'dozer';
 
 /** Tunable gameplay values. Seconds and world units unless noted. */
 export interface Config {
@@ -41,6 +41,8 @@ export interface Config {
   pickupClearance: number;
   /** Relative spawn chance per kind. */
   pickupWeights: Record<PickupKind, number>;
+  /** Items a snake can carry at once, used oldest first (a Shield is a bubble and never takes a slot). */
+  itemSlots: number;
   /** Bombs in one bomb pickup. */
   bombCharges: number;
   /** Seconds between throws. */
@@ -67,6 +69,8 @@ export interface Config {
   /** Speed multiplier while slowed. */
   slowFactor: number;
   reverseDuration: number;
+  /** Seconds a Bulldozer plow lasts. */
+  dozerDuration: number;
   winsToWin: number;
   countdownSeconds: number;
   roundOverSeconds: number;
@@ -92,7 +96,8 @@ export const DEFAULT_CONFIG: Config = {
   pickupRadius: 14,
   pickupMinHeadDistance: 150,
   pickupClearance: 40,
-  pickupWeights: { bomb: 25, ghost: 15, shield: 15, turbo: 15, slow: 15, reverse: 15 },
+  pickupWeights: { bomb: 25, ghost: 12.5, shield: 12.5, turbo: 12.5, slow: 12.5, reverse: 12.5, dozer: 12.5 },
+  itemSlots: 3,
   bombCharges: 3,
   bombThrowCooldown: 0.5,
   bombFlightTime: 0.45,
@@ -107,6 +112,7 @@ export const DEFAULT_CONFIG: Config = {
   slowDuration: 4,
   slowFactor: 0.6,
   reverseDuration: 4,
+  dozerDuration: 5,
   winsToWin: 5,
   countdownSeconds: 3,
   roundOverSeconds: 2.5,
