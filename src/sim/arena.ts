@@ -54,6 +54,29 @@ export function circleHitsTiles(tiles: readonly number[], x: number, y: number, 
   return found.hit;
 }
 
+/** The closest point on any solid tile a circle touches, or null when it touches none. */
+export function nearestSolidTilePoint(
+  tiles: readonly number[],
+  x: number,
+  y: number,
+  r: number,
+): { x: number; y: number } | null {
+  const found = { x: 0, y: 0, d: Infinity };
+  forEachSolidTileTouching(tiles, x, y, r, (index) => {
+    const left = (index % TILE_COLS) * TILE_SIZE;
+    const top = Math.floor(index / TILE_COLS) * TILE_SIZE;
+    const nx = x < left ? left : x > left + TILE_SIZE ? left + TILE_SIZE : x;
+    const ny = y < top ? top : y > top + TILE_SIZE ? top + TILE_SIZE : y;
+    const d = (x - nx) * (x - nx) + (y - ny) * (y - ny);
+    if (d < found.d) {
+      found.x = nx;
+      found.y = ny;
+      found.d = d;
+    }
+  });
+  return found.d < Infinity ? { x: found.x, y: found.y } : null;
+}
+
 /** Clears every solid tile a circle touches; returns the cleared indices in ascending order. */
 export function destroyTilesInCircle(tiles: number[], x: number, y: number, r: number): number[] {
   const destroyed: number[] = [];
