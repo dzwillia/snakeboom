@@ -18,22 +18,48 @@ export function circleHitsWall(x: number, y: number, r: number): boolean {
   return !(x - r >= 0 && y - r >= 0 && x + r <= ARENA_WIDTH && y + r <= ARENA_HEIGHT);
 }
 
-export function circleHitsTiles(tiles: number[], x: number, y: number, r: number): boolean {
+/** Visits each solid tile a circle touches, in ascending index order; stop early by returning true. */
+function forEachSolidTileTouching(
+  tiles: readonly number[],
+  x: number,
+  y: number,
+  r: number,
+  visit: (index: number) => boolean | void,
+): void {
   const tx0 = Math.max(0, Math.floor((x - r) / TILE_SIZE));
   const tx1 = Math.min(TILE_COLS - 1, Math.floor((x + r) / TILE_SIZE));
   const ty0 = Math.max(0, Math.floor((y - r) / TILE_SIZE));
   const ty1 = Math.min(TILE_ROWS - 1, Math.floor((y + r) / TILE_SIZE));
   for (let ty = ty0; ty <= ty1; ty++) {
     for (let tx = tx0; tx <= tx1; tx++) {
-      if (tiles[ty * TILE_COLS + tx] !== 1) continue;
+      const index = ty * TILE_COLS + tx;
+      if (tiles[index] !== 1) continue;
       const left = tx * TILE_SIZE;
       const top = ty * TILE_SIZE;
       const nx = x < left ? left : x > left + TILE_SIZE ? left + TILE_SIZE : x;
       const ny = y < top ? top : y > top + TILE_SIZE ? top + TILE_SIZE : y;
       const dx = x - nx;
       const dy = y - ny;
-      if (dx * dx + dy * dy < r * r) return true;
+      if (dx * dx + dy * dy < r * r && visit(index) === true) return;
     }
   }
-  return false;
+}
+
+export function circleHitsTiles(tiles: readonly number[], x: number, y: number, r: number): boolean {
+  const found = { hit: false };
+  forEachSolidTileTouching(tiles, x, y, r, () => {
+    found.hit = true;
+    return true;
+  });
+  return found.hit;
+}
+
+/** Clears every solid tile a circle touches; returns the cleared indices in ascending order. */
+export function destroyTilesInCircle(tiles: number[], x: number, y: number, r: number): number[] {
+  const destroyed: number[] = [];
+  forEachSolidTileTouching(tiles, x, y, r, (index) => {
+    destroyed.push(index);
+  });
+  for (const index of destroyed) tiles[index] = 0;
+  return destroyed;
 }
