@@ -56,6 +56,16 @@ describe('KeyboardInput', () => {
     expect(input.sample()[0]).toEqual(idle);
   });
 
+  // M2 Review Focus 1: a Use press made while paused must not fire on resume.
+  it('forgets latched Use presses on clearLatches', () => {
+    const target = new EventTarget();
+    const input = new KeyboardInput(target);
+    target.dispatchEvent(key('keydown', 'KeyS'));
+    target.dispatchEvent(key('keydown', 'ArrowDown'));
+    input.clearLatches();
+    expect(input.sample()).toEqual([idle, idle]);
+  });
+
   // Review Focus 2: losing focus mid-round must not leave a snake turning forever.
   it('releases every key and notifies listeners when the window loses focus', () => {
     const target = new EventTarget();

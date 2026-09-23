@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DeathCause, DeathRecord } from '../sim';
-import { describeDeath, describeRound, formatClock } from './text';
+import { describeDeath, describeItem, describeRound, formatClock } from './text';
 
 const d = (player: number, cause: DeathCause, killer: number | null): DeathRecord => ({ player, cause, killer, x: 0, y: 0 });
 
@@ -20,6 +20,11 @@ describe('text', () => {
     expect(describeRound(null, [d(0, 'headOn', 1), d(1, 'headOn', 0)])).toEqual({ title: 'DRAW', detail: 'Head-on collision' });
     expect(describeRound(null, [d(0, 'wall', null), d(1, 'wall', null)]).detail).toBe('CYAN hit the wall · PINK hit the wall');
     expect(describeRound(null, [])).toEqual({ title: 'DRAW', detail: 'Time ran out' });
+  });
+
+  it('labels held items for the HUD', () => {
+    expect(describeItem(null)).toBe('');
+    expect(describeItem({ kind: 'bomb', charges: 3 })).toBe('BOMB ×3');
   });
 
   it('formats the round clock', () => {

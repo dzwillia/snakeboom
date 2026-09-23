@@ -1,4 +1,4 @@
-import type { DeathRecord } from '../sim';
+import type { DeathRecord, ItemState } from '../sim';
 
 export const PLAYER_NAMES: readonly string[] = ['CYAN', 'PINK'];
 
@@ -33,6 +33,15 @@ export function describeRound(
     if (!lines.includes(line)) lines.push(line);
   }
   return { title, detail: lines.length > 0 ? lines.join(' · ') : 'Time ran out' };
+}
+
+/** HUD label for an item slot; empty string when the slot is empty. */
+export function describeItem(item: ItemState | null): string {
+  if (!item) return '';
+  switch (item.kind) {
+    case 'bomb':
+      return `BOMB ×${item.charges}`;
+  }
 }
 
 export function formatClock(ticks: number, tickRate = 60): string {
