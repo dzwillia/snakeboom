@@ -214,6 +214,73 @@ describe('relay server', () => {
   });
 });
 
+describe('relay quick-match', () => {
+  let server: RunningServer;
+  beforeAll(async () => {
+    server = await startServer({ port: 0, log: () => {} });
+  });
+  afterAll(async () => {
+    await server.close();
+  });
+
+  const queued = async (port: number, name: string, winsToWin = 3) => {
+    const c = new TestClient(port);
+    await c.opened;
+    c.send(hello(name));
+    c.send({ type: 'queue', winsToWin });
+    return c;
+  };
+
+  it('pairs the second player into the first player’s open room, and a third waits alone', async () => {
+    const a = await queued(server.port, 'A', 4);
+    const wa = await a.expect('welcome');
+    expect(wa.player).toBe(0);
+    expect((await a.expect('queued')).waiting).toBe(1);
+    const health = await fetch(`http://127.0.0.1:${server.port}/health`).then((r) => r.json());
+    expect(health.queued).toBe(1);
+
+    const b = await queued(server.port, 'B', 9);
+    const wb = await b.expect('welcome');
+    expect(wb).toMatchObject({ player: 1, room: wa.room });
+    const lobby = await a.expect('lobby', (m) => m.players[1] !== null);
+    expect(lobby.winsToWin).toBe(4);
+    expect(lobby.players.map((p) => p?.name)).toEqual(['A', 'B']);
+    expect(b.messages.some((m) => m.type === 'queued')).toBe(false);
+
+    const c = await queued(server.port, 'C');
+    const wc = await c.expect('welcome');
+    expect(wc.room).not.toBe(wa.room);
+    expect((await c.expect('queued')).waiting).toBe(1);
+    for (const x of [a, b, c]) x.close();
+    await c.waitClosed();
+  });
+
+  it('drops a cancelled queue entry and a room filled by link', async () => {
+    const a = await queued(server.port, 'A');
+    await a.expect('welcome');
+    await a.expect('queued');
+    a.send({ type: 'leaveQueue' });
+    await a.waitClosed();
+
+    const b = await queued(server.port, 'B');
+    const wb = await b.expect('welcome');
+    expect((await b.expect('queued')).waiting).toBe(1);
+    const friend = new TestClient(server.port);
+    await friend.opened;
+    friend.send(hello('F'));
+    friend.send({ type: 'join', room: wb.room });
+    expect((await friend.expect('welcome')).room).toBe(wb.room);
+    await b.expect('lobby', (m) => m.players[1] !== null);
+
+    const c = await queued(server.port, 'C');
+    const wc = await c.expect('welcome');
+    expect(wc.room).not.toBe(wb.room);
+    expect(wc.player).toBe(0);
+    for (const x of [b, friend, c]) x.close();
+    await c.waitClosed();
+  });
+});
+
 describe('relay origin check', () => {
   let server: RunningServer;
   beforeAll(async () => {

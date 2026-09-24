@@ -6,6 +6,7 @@ import { WebSocketServer, type RawData, type WebSocket } from 'ws';
 import { sanitizeName, isRoomCode } from '../net/names';
 import { isClientMessage, PROTOCOL, type ClientMessage, type ServerMessage } from '../net/protocol';
 import { logLine } from './log';
+import { QuickMatch } from '../net/quickMatch';
 import { Registry, type RoomEntry } from './registry';
 
 export interface ServerOptions {
@@ -52,6 +53,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const log = opts.log ?? logLine;
   const version = opts.version ?? 'dev';
   const registry = new Registry(opts.maxRooms ?? DEFAULT_MAX_ROOMS, log, opts.lagMs ?? 0);
+  const quick = new QuickMatch();
   const app = new Hono();
   app.get('/health', (c) =>
     c.json({
@@ -60,12 +62,27 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       timestamp: new Date().toISOString(),
       rooms: registry.count,
       players: registry.players,
-      queued: 0,
+      queued: quick.size,
     }),
   );
 
   const wss = new WebSocketServer({ noServer: true });
   const connections = new Set<Connection>();
+
+  /** Tells everyone still waiting in the queue how things look. */
+  const broadcastQueued = () => {
+    for (const conn of connections) {
+      if (conn.entry && quick.has(conn.entry.room.code)) {
+        send(conn.socket, { type: 'queued', waiting: quick.size, online: connections.size });
+      }
+    }
+  };
+  registry.onRoomStatus = (code, status) => {
+    if (status !== 'waiting' && quick.has(code)) {
+      quick.withdraw(code);
+      broadcastQueued();
+    }
+  };
 
   const send = (socket: WebSocket, message: ServerMessage) => {
     if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(message));
@@ -96,6 +113,30 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         joinEntry(conn, entry);
         return;
       }
+      case 'queue': {
+        // Join the oldest open room if one is really still waiting; otherwise open my own.
+        for (;;) {
+          const code = quick.take();
+          if (code === null) break;
+          const open = registry.get(code);
+          // Only a room with someone actually waiting in it; stale ones just fall out of the queue.
+          if (open && open.room.status === 'waiting' && open.room.playerCount === 1) {
+            joinEntry(conn, open);
+            broadcastQueued();
+            return;
+          }
+        }
+        const entry = registry.create(clampWins(message.winsToWin));
+        if (!entry) return send(conn.socket, { type: 'error', code: 'busy', message: 'The server is full right now.' });
+        joinEntry(conn, entry);
+        if (conn.entry === entry) {
+          quick.offer(entry.room.code);
+          broadcastQueued();
+        }
+        return;
+      }
+      case 'leaveQueue':
+        return;
       case 'hello':
         return refuse(conn.socket, 'badMessage', 'hello was already sent');
       default:
@@ -157,6 +198,17 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     if (!parsed) return refuse(conn.socket, 'badMessage', 'Unreadable message.');
     if (!conn.entry) return onLobbyMessage(conn, parsed);
     if (parsed.type === 'hello' || parsed.type === 'create' || parsed.type === 'join') return;
+    if (parsed.type === 'queue') {
+      // Already in a room (waiting in the queue): just refresh the readout.
+      if (quick.has(conn.entry.room.code)) send(conn.socket, { type: 'queued', waiting: quick.size, online: connections.size });
+      return;
+    }
+    if (parsed.type === 'leaveQueue') {
+      quick.withdraw(conn.entry.room.code);
+      conn.entry.room.onMessage(conn.player, { type: 'leave' });
+      broadcastQueued();
+      return;
+    }
     conn.entry.room.onMessage(conn.player, parsed);
   };
 
@@ -176,7 +228,9 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       if (conn.entry) {
         conn.entry.host.detach(conn.player, socket);
         conn.entry.room.onDisconnect(conn.player);
+        if (conn.entry.room.playerCount === 0) quick.withdraw(conn.entry.room.code);
       }
+      broadcastQueued();
     });
     socket.on('error', () => socket.close());
   });

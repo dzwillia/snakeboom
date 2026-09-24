@@ -64,6 +64,8 @@ export function inputDelayFor(rttA: number | null, rttB: number | null): number 
 export class Room {
   readonly code: string;
   onClosed: (() => void) | null = null;
+  /** Called after every status change (the registry uses it for the quick-match queue). */
+  onStatus: ((status: RoomStatus) => void) | null = null;
 
   private readonly seats: (Seat | null)[] = [null, null];
   private statusNow: RoomStatus = 'waiting';
@@ -100,6 +102,12 @@ export class Room {
     return this.statusNow;
   }
 
+  private setStatus(status: RoomStatus): void {
+    if (status === this.statusNow) return;
+    this.statusNow = status;
+    this.onStatus?.(status);
+  }
+
   get playerCount(): number {
     return this.seats.filter((s) => s?.connected).length;
   }
@@ -128,7 +136,7 @@ export class Room {
     this.touch();
     this.clearEmpty();
     this.ensurePing();
-    this.statusNow = this.seats.every((s) => s !== null) ? 'lobby' : 'waiting';
+    this.setStatus(this.seats.every((s) => s !== null) ? 'lobby' : 'waiting');
     this.host.send(player, { type: 'welcome', player, room: this.code, session, name });
     this.broadcastLobby();
     return { player, session };
@@ -239,7 +247,7 @@ export class Room {
   /** Ends the room for everyone, for example when the server shuts down. */
   close(reason: CloseReason): void {
     if (this.statusNow === 'closed') return;
-    this.statusNow = 'closed';
+    this.setStatus('closed');
     for (const cancel of this.timers) cancel();
     this.timers.clear();
     this.seats.forEach((seat, player) => {
@@ -266,7 +274,7 @@ export class Room {
     }
     this.inputLog = [];
     this.hashes.clear();
-    this.statusNow = 'playing';
+    this.setStatus('playing');
     const message: ServerMessage = { type: 'start', seed: this.seed, winsToWin: this.winsToWin, inputDelay, startAt, rttMs };
     this.host.send(0, message);
     this.host.send(1, message);
@@ -287,7 +295,7 @@ export class Room {
     this.hashes.delete(tick);
     if (a !== b) {
       this.host.log({ event: 'desync', tick, hashes: [a, b], seed: this.seed, frames: this.inputLog.length });
-      this.statusNow = 'over';
+      this.setStatus('over');
       this.broadcast({ type: 'desync', tick });
       return;
     }
@@ -295,7 +303,7 @@ export class Room {
     const r0 = this.seats[0]?.result;
     const r1 = this.seats[1]?.result;
     if (result && other?.result && r0 && r1 && r0.round === r1.round && r0.matchWinner !== null && r0.matchWinner === r1.matchWinner) {
-      this.statusNow = 'over';
+      this.setStatus('over');
       this.host.log({ event: 'match', winner: r0.matchWinner, scores: r0.scores, rounds: r0.round, seed: this.seed });
     }
   }
@@ -322,11 +330,11 @@ export class Room {
     this.seats[player] = null;
     const other = this.seats[1 - player];
     if (this.statusNow === 'playing') {
-      this.statusNow = 'over';
+      this.setStatus('over');
       this.host.log({ event: 'forfeit', loser: player, reason, seed: this.seed });
       if (other?.connected) this.host.send(1 - player, { type: 'forfeit', winner: 1 - player, reason });
     } else {
-      this.statusNow = 'waiting';
+      this.setStatus('waiting');
       if (other) other.ready = false;
       if (other?.connected) this.host.send(1 - player, { type: 'peerLeft' });
       this.broadcastLobby();

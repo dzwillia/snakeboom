@@ -11,6 +11,8 @@ export interface RoomEntry {
 export class Registry {
   private readonly rooms = new Map<string, RoomEntry>();
   private readonly sessions = new Map<string, string>();
+  /** A room's status changed or it closed (status 'closed'). */
+  onRoomStatus: ((code: string, status: Room['status']) => void) | null = null;
 
   constructor(
     private readonly maxRooms: number,
@@ -40,7 +42,9 @@ export class Registry {
     room.onClosed = () => {
       this.rooms.delete(code);
       for (const [token, c] of this.sessions) if (c === code) this.sessions.delete(token);
+      this.onRoomStatus?.(code, 'closed');
     };
+    room.onStatus = (status) => this.onRoomStatus?.(code, status);
     this.log({ room: code, event: 'created', winsToWin });
     return entry;
   }
