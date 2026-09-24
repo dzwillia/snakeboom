@@ -1,0 +1,217 @@
+import { cloneState, createMatch, NO_INPUT, step, type Config, type MatchState, type PlayerInput, type SimEvent } from '../sim';
+
+export interface SessionOptions {
+  seed: number;
+  cfg: Config;
+  /** 0 or 1: which seat this machine plays. */
+  local: number;
+  /** Ticks between pressing a key and it taking effect, at least 1. */
+  inputDelay: number;
+  /** Ticks the predicted state may run ahead of the confirmed state. */
+  maxRollback?: number;
+  /** Outgoing local inputs, to be sent to the relay. */
+  send: (tick: number, input: PlayerInput) => void;
+  /** Called after every confirmed tick with the confirmed state; the place to take hashes. */
+  onConfirmed?: (tick: number, state: MatchState, events: readonly SimEvent[]) => void;
+}
+
+export interface TaggedEvent {
+  tick: number;
+  event: SimEvent;
+  /** True when the event came from a tick whose inputs are all known. */
+  confirmed: boolean;
+}
+
+export interface SessionStats {
+  rollbacks: number;
+  maxRollbackDepth: number;
+  stalledTicks: number;
+}
+
+export const DEFAULT_MAX_ROLLBACK = 10;
+/** How far behind the confirmed tick input history is kept, for late duplicates and rejoins. */
+const KEEP_TICKS = 600;
+const PRUNE_EVERY = 60;
+
+function sameInput(a: PlayerInput, b: PlayerInput): boolean {
+  return a.turn === b.turn && a.boost === b.boost && a.use === b.use;
+}
+
+function copyInput(i: PlayerInput): PlayerInput {
+  return { turn: i.turn, boost: i.boost, use: i.use };
+}
+
+/**
+ * Rollback netcode for one seat. Two copies of the sim run: `confirmed` only advances through
+ * ticks whose inputs from both seats are known, and `predicted` runs ahead of it using a guess
+ * for the remote seat (its last known input, without Use). When a guess turns out wrong, the
+ * predicted state is rebuilt from the confirmed one. The predicted state is the one to draw.
+ */
+export class NetSession {
+  readonly local: number;
+  readonly remote: number;
+  readonly inputDelay: number;
+  readonly maxRollback: number;
+  readonly stats: SessionStats = { rollbacks: 0, maxRollbackDepth: 0, stalledTicks: 0 };
+
+  private confirmed: MatchState;
+  private predicted: MatchState;
+  private readonly cfg: Config;
+  private readonly send: SessionOptions['send'];
+  private readonly onConfirmed: SessionOptions['onConfirmed'];
+  private readonly localInputs = new Map<number, PlayerInput>();
+  private readonly remoteInputs = new Map<number, PlayerInput>();
+  /** The remote input each predicted tick above the confirmed tick was stepped with. */
+  private readonly predictedRemote = new Map<number, PlayerInput>();
+  private latestRemote: PlayerInput = NO_INPUT;
+  private latestRemoteTick = -1;
+  private needRollback = false;
+  private stalledNow = false;
+
+  constructor(opts: SessionOptions) {
+    if (opts.local !== 0 && opts.local !== 1) throw new RangeError(`local seat must be 0 or 1, got ${opts.local}`);
+    if (!Number.isInteger(opts.inputDelay) || opts.inputDelay < 1) throw new RangeError('inputDelay must be at least 1');
+    this.local = opts.local;
+    this.remote = 1 - opts.local;
+    this.inputDelay = opts.inputDelay;
+    this.maxRollback = opts.maxRollback ?? DEFAULT_MAX_ROLLBACK;
+    this.cfg = opts.cfg;
+    this.send = opts.send;
+    this.onConfirmed = opts.onConfirmed;
+    this.confirmed = createMatch(opts.cfg, opts.seed);
+    this.predicted = cloneState(this.confirmed);
+    // Ticks before the first scheduled input are neutral on both sides by contract; nobody sends them.
+    for (let t = 1; t < opts.inputDelay; t++) {
+      this.localInputs.set(t, NO_INPUT);
+      this.remoteInputs.set(t, NO_INPUT);
+    }
+  }
+
+  /** The state to draw. Replaced by a rollback, so don't hold on to it across frames. */
+  get state(): MatchState {
+    return this.predicted;
+  }
+
+  /** The state every known input agrees on; what hashes are taken from. Read only. */
+  get confirmedState(): MatchState {
+    return this.confirmed;
+  }
+
+  get tick(): number {
+    return this.predicted.tick;
+  }
+
+  get confirmedTick(): number {
+    return this.confirmed.tick;
+  }
+
+  /** True when the last advance() refused to step because the remote is too far behind. */
+  get stalled(): boolean {
+    return this.stalledNow;
+  }
+
+  /** Highest remote tick received, or −1 before any. */
+  get remoteTickSeen(): number {
+    return this.latestRemoteTick;
+  }
+
+  /** A remote input for a tick. Any order is fine; duplicates and already-confirmed ticks are ignored. */
+  receive(tick: number, input: PlayerInput): void {
+    if (!Number.isInteger(tick) || tick <= this.confirmed.tick || this.remoteInputs.has(tick)) return;
+    const stored = copyInput(input);
+    this.remoteInputs.set(tick, stored);
+    if (tick > this.latestRemoteTick) {
+      this.latestRemoteTick = tick;
+      this.latestRemote = stored;
+    }
+    if (tick <= this.predicted.tick) {
+      const guessed = this.predictedRemote.get(tick);
+      if (!guessed || !sameInput(guessed, stored)) this.needRollback = true;
+    }
+  }
+
+  /**
+   * One local tick. Schedules `localInput` for tick + inputDelay and sends it (once, even across
+   * a stall), reconciles remote inputs, then steps the predicted state unless it is already
+   * maxRollback ticks ahead of the confirmed one.
+   */
+  advance(localInput: PlayerInput): TaggedEvent[] {
+    const target = this.predicted.tick + this.inputDelay;
+    if (!this.localInputs.has(target)) {
+      const stored = copyInput(localInput);
+      this.localInputs.set(target, stored);
+      this.send(target, stored);
+    }
+    const events = this.reconcile();
+    if (this.predicted.tick - this.confirmed.tick >= this.maxRollback) {
+      this.stalledNow = true;
+      this.stats.stalledTicks++;
+      return events;
+    }
+    this.stalledNow = false;
+    events.push(...this.stepPredicted());
+    if (this.predicted.tick % PRUNE_EVERY === 0) this.prune();
+    return events;
+  }
+
+  /**
+   * Ticks this machine is ahead of the peer. The peer sends its input for tick R + inputDelay
+   * while at tick R, and that input took about `oneWayTicks` to get here.
+   */
+  lead(oneWayTicks: number): number {
+    if (this.latestRemoteTick < 0) return 0;
+    const peerNow = this.latestRemoteTick - this.inputDelay + oneWayTicks;
+    return this.predicted.tick - peerNow;
+  }
+
+  private seatInputs(tick: number, remote: PlayerInput): PlayerInput[] {
+    const inputs: PlayerInput[] = [NO_INPUT, NO_INPUT];
+    inputs[this.local] = this.localInputs.get(tick) ?? NO_INPUT;
+    inputs[this.remote] = remote;
+    return inputs;
+  }
+
+  private guessRemote(): PlayerInput {
+    return { turn: this.latestRemote.turn, boost: this.latestRemote.boost, use: false };
+  }
+
+  private stepPredicted(): TaggedEvent[] {
+    const tick = this.predicted.tick + 1;
+    const remote = this.remoteInputs.get(tick) ?? this.guessRemote();
+    this.predictedRemote.set(tick, remote);
+    return step(this.predicted, this.seatInputs(tick, remote), this.cfg).map((event) => ({ tick, event, confirmed: false }));
+  }
+
+  private reconcile(): TaggedEvent[] {
+    const out: TaggedEvent[] = [];
+    const predictedTick = this.predicted.tick;
+    for (;;) {
+      const tick = this.confirmed.tick + 1;
+      if (tick > predictedTick) break;
+      const remote = this.remoteInputs.get(tick);
+      const local = this.localInputs.get(tick);
+      if (!remote || !local) break;
+      const events = step(this.confirmed, this.seatInputs(tick, remote), this.cfg);
+      for (const event of events) out.push({ tick, event, confirmed: true });
+      this.predictedRemote.delete(tick);
+      this.onConfirmed?.(tick, this.confirmed, events);
+    }
+    if (this.needRollback) {
+      this.needRollback = false;
+      const depth = predictedTick - this.confirmed.tick;
+      this.stats.rollbacks++;
+      if (depth > this.stats.maxRollbackDepth) this.stats.maxRollbackDepth = depth;
+      this.predicted = cloneState(this.confirmed);
+      this.predictedRemote.clear();
+      while (this.predicted.tick < predictedTick) out.push(...this.stepPredicted());
+    }
+    return out;
+  }
+
+  private prune(): void {
+    const cutoff = this.confirmed.tick - KEEP_TICKS;
+    for (const map of [this.localInputs, this.remoteInputs]) {
+      for (const tick of map.keys()) if (tick < cutoff) map.delete(tick);
+    }
+  }
+}

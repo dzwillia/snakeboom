@@ -139,6 +139,29 @@ body {
   box-shadow: 0 0 10px currentColor;
 }
 
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.ping {
+  min-height: 12px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+}
+
+.ping.slow {
+  color: var(--dozer);
+}
+
+.ping.stalled {
+  color: var(--red);
+  animation: pulse 0.6s ease-in-out infinite;
+}
+
 .clock {
   font-size: 26px;
   font-weight: 700;
@@ -254,6 +277,163 @@ kbd {
   font-size: 26px;
   font-weight: 900;
   text-shadow: 0 0 10px currentColor;
+}
+
+.menu {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 18px;
+  letter-spacing: 0.14em;
+}
+
+.menu .row {
+  padding: 6px 18px;
+  border-radius: 10px;
+  color: var(--dim);
+  transition: color 0.12s, background 0.12s;
+}
+
+.menu .row kbd {
+  visibility: hidden;
+}
+
+.menu .row.active {
+  color: var(--cyan);
+  background: rgba(34, 243, 255, 0.08);
+  text-shadow: 0 0 10px currentColor;
+}
+
+.menu .row.active kbd {
+  visibility: visible;
+}
+
+.menu .mode,
+.menu .wins {
+  display: inline-block;
+  min-width: 5em;
+  font-weight: 900;
+}
+
+.menu .wins {
+  min-width: 1.6em;
+  font-size: 22px;
+}
+
+.panel.form,
+.panel.lobby {
+  pointer-events: auto;
+}
+
+.name-input {
+  display: block;
+  width: min(60vw, 320px);
+  margin: 18px auto 0;
+  padding: 10px 14px;
+  border: 1px solid var(--cyan);
+  border-radius: 10px;
+  background: rgba(34, 243, 255, 0.06);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 22px;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+  outline: none;
+  box-shadow: 0 0 14px rgba(34, 243, 255, 0.35);
+}
+
+.lobby .code {
+  font-weight: 900;
+  font-size: 1.4em;
+  letter-spacing: 0.2em;
+  color: var(--cyan);
+  text-shadow: 0 0 10px currentColor;
+}
+
+.lobby .link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--dim);
+  user-select: text;
+}
+
+.lobby .copy {
+  padding: 6px 12px;
+  border: 1px solid var(--cyan);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cyan);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+}
+
+.lobby .copy:hover {
+  background: rgba(34, 243, 255, 0.12);
+}
+
+.lobby .seats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.lobby .seat {
+  padding: 14px 10px;
+  border: 1px solid currentColor;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.lobby .seat.p1 {
+  color: var(--cyan);
+}
+
+.lobby .seat.p2 {
+  color: var(--pink);
+}
+
+.lobby .seat.empty {
+  color: var(--dim);
+  font-weight: 400;
+  border-style: dashed;
+}
+
+.lobby .seat .state {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  opacity: 0.6;
+}
+
+.lobby .seat.ready .state {
+  opacity: 1;
+  text-shadow: 0 0 8px currentColor;
+}
+
+.lobby .seat .dim {
+  color: var(--dim);
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.caption {
+  font-size: clamp(16px, 2.4vw, 26px);
+  letter-spacing: 0.2em;
+  color: var(--text);
+  text-shadow: 0 0 12px rgba(159, 216, 255, 0.6);
+  animation: blink 1.4s ease-in-out infinite;
 }
 
 .hint {
@@ -476,6 +656,9 @@ kbd {
   .controls {
     grid-template-columns: 1fr;
     gap: 20px;
+  }
+  .lobby .seats {
+    grid-template-columns: 1fr;
   }
   .boost {
     width: 60px;

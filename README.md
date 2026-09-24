@@ -14,13 +14,13 @@ pnpm dev        # opens the game in your browser (http://localhost:5199)
 | **CYAN** | A / D | W | S |
 | **PINK** | ← / → | ↑ | ↓ |
 
-On the title screen, ← / → picks the match length (first to 1–10) and ↑ / ↓ picks who plays PINK: a second human, or the local AI at easy, normal or hard. <kbd>Space</kbd> starts or rematches, <kbd>Esc</kbd> pauses, <kbd>M</kbd> mutes, <kbd>H</kbd> (or <kbd>?</kbd>) opens the Powers page, and <kbd>`</kbd> opens the tuning panel, where every gameplay number is a live slider.
+The title screen is a short menu: ↑ / ↓ moves between **LOCAL** (← / → picks who plays PINK: a second human, or the local AI at easy, normal or hard), **FIRST TO N** (← / → picks the match length, 1–10), **CREATE LINK** and **QUICK MATCH**, and <kbd>Space</kbd> goes. In a match, <kbd>Space</kbd> rematches, <kbd>Esc</kbd> pauses, <kbd>M</kbd> mutes, <kbd>H</kbd> (or <kbd>?</kbd>) opens the Powers page, and <kbd>`</kbd> opens the tuning panel, where every gameplay number is a live slider.
 
 The Powers page lists every pickup with its icon, what it does and the numbers it currently runs on (durations, charges, blast radius, spawn share), read live from the tuning config. It opens from the title screen or from pause, so you can check a power mid-match.
 
 ### Playing solo against the AI
 
-Pick an AI level on the title screen (or in the tuning panel under **Opponent**) and PINK steers itself; you play CYAN on WASD. The choice is remembered, and changing it during a match takes effect at the next match.
+Pick an AI level on the title screen's LOCAL row (or in the tuning panel under **Opponent**) and PINK steers itself; you play CYAN on WASD. The choice is remembered, and changing it during a match takes effect at the next match.
 
 | Level | How it plays |
 |---|---|
@@ -51,6 +51,21 @@ Timed specials flash on and off for their last 3 seconds, on your snake and on t
 
 Five hand-made, symmetrical maps rotate between rounds: Open, Pillars, Cross, Bunkers and Lanes.
 
+## Online (preview)
+
+Since v0.8.0 two people can play from different computers. On the title screen pick **CREATE LINK**, type a name, and send the link (`/r/ABC123`) to a friend. They open it, both press Space in the lobby, and the match runs on both machines with rollback netcode: every tick each client sends its own input to a small relay and predicts the opponent's until the real one arrives. The HUD shows the ping between you next to the clock. If someone's tab goes away, the other player sees a 15 s countdown, then wins by forfeit. Quick-match, rematches and the public server at `snakeboom.com` come in the next milestones.
+
+Under the hood: `src/net` holds the protocol, the rollback session and the room state machine (pure, tested through an in-memory relay with latency and jitter), and `src/server` is the Node relay. It never runs the game; it pairs players, forwards inputs and compares both clients' state hashes every second.
+
+```bash
+pnpm dev                          # Vite on :5199 plus the relay on :3001
+pnpm dev:relay                    # the relay alone (PORT, ALLOWED_ORIGIN, APP_VERSION, RELAY_LAG_MS)
+RELAY_LAG_MS=50 pnpm dev:relay    # add 50 ms each way, to feel rollback on one machine
+pnpm build:server && pnpm start:server
+```
+
+To play across a LAN, run the relay on one machine and point the other at it: `VITE_API_URL=http://<lan-ip>:3001 pnpm dev:web --host`. The client reads `VITE_API_URL` at build time and defaults to `http://localhost:3001`.
+
 ## Develop
 
 ```bash
@@ -61,7 +76,7 @@ pnpm soak --rounds 100    # headless bot-vs-bot stats: round lengths, deaths, pi
 pnpm soak --bots hard,normal --rounds 40   # pit two AI levels (or `simple`, the soak bot) and count wins
 ```
 
-- `src/sim` is the rules engine. It's deterministic, pure TypeScript with no browser APIs: fixed 60 Hz ticks, seeded random numbers, its own trig functions, and plain-data state. The same code can run on a game server, which is the next milestone: online 1v1 duels with invite links.
+- `src/sim` is the rules engine. It's deterministic, pure TypeScript with no browser APIs: fixed 60 Hz ticks, seeded random numbers, its own trig functions, and plain-data state. Online play runs it on both machines and hashes it to referee.
 - `src/client` is the PixiJS renderer with bloom, plus HTML overlays, ZzFX-generated sounds and a lil-gui tuning panel.
 
-Design: `docs/superpowers/specs/2026-09-23-snakeboom-v1-design.md` · Plans: `docs/superpowers/plans/`
+Design: `docs/superpowers/specs/2026-09-23-snakeboom-v1-design.md` (local) and `docs/superpowers/specs/2026-09-24-snakeboom-online-design.md` (online) · Plans: `docs/superpowers/plans/`

@@ -35,6 +35,18 @@ export class KeyboardInput {
     return out;
   }
 
+  /**
+   * Online, one person owns the keyboard: either hand steers the local snake. Both hands turning
+   * different ways cancel out; Boost and Use come from either. Consumes both Use latches.
+   */
+  sampleLocal(): PlayerInput {
+    const a = inputFromKeys(this.down, BINDINGS[0], this.useLatched[0]);
+    const b = inputFromKeys(this.down, BINDINGS[1], this.useLatched[1]);
+    this.useLatched.fill(false);
+    const turn = a.turn === 0 ? b.turn : b.turn === 0 || b.turn === a.turn ? a.turn : 0;
+    return { turn, boost: a.boost || b.boost, use: a.use || b.use };
+  }
+
   /** Forgets pending Use presses (pausing and resuming must not fire items). */
   clearLatches(): void {
     this.useLatched.fill(false);

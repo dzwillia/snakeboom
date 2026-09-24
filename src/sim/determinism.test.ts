@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { botInput, createBot, type BotState } from './bots/simple-bot';
 import { DEFAULT_CONFIG } from './config';
+import { hashState } from './hash';
 import { cloneState, createMatch } from './state';
 import { step } from './step';
 import type { MatchState } from './types';
@@ -11,7 +12,19 @@ function drive(state: MatchState, bots: BotState[], ticks: number): void {
   }
 }
 
+/**
+ * Seed 2024, the simple bots, 4000 ticks. Any intentional rule or tuning change updates this
+ * constant (run the test and paste the new value); an unintended change is a determinism regression.
+ */
+const GOLDEN_HASH = 0x89da1710;
+
 describe('determinism', () => {
+  it('produces the golden hash for a fixed seed and input script', () => {
+    const a = createMatch(DEFAULT_CONFIG, 2024);
+    drive(a, [createBot(1), createBot(2)], 4000);
+    expect(hashState(a).toString(16)).toBe(GOLDEN_HASH.toString(16));
+  });
+
   it('replays identically from the same seed and inputs', () => {
     const a = createMatch(DEFAULT_CONFIG, 2024);
     const b = createMatch(DEFAULT_CONFIG, 2024);

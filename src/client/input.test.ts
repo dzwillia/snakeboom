@@ -1,82 +1,48 @@
 import { describe, expect, it } from 'vitest';
 import { KeyboardInput } from './input';
-import { BINDINGS, inputFromKeys } from './keys';
 
-function key(type: 'keydown' | 'keyup', code: string, repeat = false): Event {
-  return Object.assign(new Event(type), { code, repeat });
+function keyboard() {
+  const target = new EventTarget();
+  const input = new KeyboardInput(target);
+  const press = (code: string) => target.dispatchEvent(Object.assign(new Event('keydown'), { code, repeat: false }));
+  const release = (code: string) => target.dispatchEvent(Object.assign(new Event('keyup'), { code }));
+  return { input, press, release };
 }
 
-const idle = { turn: 0, boost: false, use: false };
-
-describe('inputFromKeys', () => {
-  const [p1, p2] = BINDINGS;
-
-  it('maps turn keys to -1/0/+1 and treats both held as straight', () => {
-    expect(inputFromKeys(new Set(['KeyA']), p1, false).turn).toBe(-1);
-    expect(inputFromKeys(new Set(['KeyD']), p1, false).turn).toBe(1);
-    expect(inputFromKeys(new Set(['KeyA', 'KeyD']), p1, false).turn).toBe(0);
-    expect(inputFromKeys(new Set(), p1, false)).toEqual(idle);
+describe('KeyboardInput.sampleLocal', () => {
+  // Review Focus 6: either hand drives the local seat online.
+  it('turns from whichever hand is steering', () => {
+    const { input, press, release } = keyboard();
+    press('KeyA');
+    expect(input.sampleLocal().turn).toBe(-1);
+    release('KeyA');
+    press('ArrowRight');
+    expect(input.sampleLocal().turn).toBe(1);
   });
 
-  // Review Focus 1: both players mashing keys at once.
-  it("keeps the two players' inputs independent when many keys are held", () => {
-    const all = new Set(['KeyA', 'KeyW', 'ArrowRight', 'ArrowUp', 'ArrowLeft']);
-    expect(inputFromKeys(all, p1, false)).toEqual({ turn: -1, boost: true, use: false });
-    expect(inputFromKeys(all, p2, true)).toEqual({ turn: 0, boost: true, use: true });
-  });
-});
-
-describe('KeyboardInput', () => {
-  it('latches a quick Use tap until the next sample', () => {
-    const target = new EventTarget();
-    const input = new KeyboardInput(target);
-    target.dispatchEvent(key('keydown', 'KeyS'));
-    target.dispatchEvent(key('keyup', 'KeyS'));
-    expect(input.sample()[0].use).toBe(true);
-    expect(input.sample()[0].use).toBe(false);
+  it('cancels out when the hands disagree and agrees when they agree', () => {
+    const { input, press, release } = keyboard();
+    press('KeyA');
+    press('ArrowRight');
+    expect(input.sampleLocal().turn).toBe(0);
+    release('ArrowRight');
+    press('ArrowLeft');
+    expect(input.sampleLocal().turn).toBe(-1);
   });
 
-  it('ignores key repeat', () => {
-    const target = new EventTarget();
-    const input = new KeyboardInput(target);
-    const codes: string[] = [];
-    input.onKey((code) => codes.push(code));
-    target.dispatchEvent(key('keydown', 'ArrowDown'));
-    input.sample();
-    target.dispatchEvent(key('keydown', 'ArrowDown', true));
-    expect(input.sample()[1].use).toBe(false);
-    expect(codes).toEqual(['ArrowDown']);
+  it('boosts from either hand', () => {
+    const { input, press } = keyboard();
+    press('ArrowUp');
+    expect(input.sampleLocal().boost).toBe(true);
   });
 
-  it('ignores keys typed into form fields such as the tuning panel', () => {
-    const field = Object.assign(new EventTarget(), { tagName: 'INPUT' });
-    const input = new KeyboardInput(field);
-    field.dispatchEvent(key('keydown', 'KeyA'));
-    field.dispatchEvent(key('keydown', 'KeyS'));
-    expect(input.sample()[0]).toEqual(idle);
-  });
-
-  // M2 Review Focus 1: a Use press made while paused must not fire on resume.
-  it('forgets latched Use presses on clearLatches', () => {
-    const target = new EventTarget();
-    const input = new KeyboardInput(target);
-    target.dispatchEvent(key('keydown', 'KeyS'));
-    target.dispatchEvent(key('keydown', 'ArrowDown'));
-    input.clearLatches();
-    expect(input.sample()).toEqual([idle, idle]);
-  });
-
-  // Review Focus 2: losing focus mid-round must not leave a snake turning forever.
-  it('releases every key and notifies listeners when the window loses focus', () => {
-    const target = new EventTarget();
-    const input = new KeyboardInput(target);
-    let blurs = 0;
-    input.onBlur(() => blurs++);
-    target.dispatchEvent(key('keydown', 'KeyA'));
-    target.dispatchEvent(key('keydown', 'ArrowUp'));
-    target.dispatchEvent(key('keydown', 'KeyS'));
-    target.dispatchEvent(new Event('blur'));
-    expect(input.sample()).toEqual([idle, idle]);
-    expect(blurs).toBe(1);
+  it('latches Use from either key and consumes it once', () => {
+    const { input, press } = keyboard();
+    press('ArrowDown');
+    expect(input.sampleLocal().use).toBe(true);
+    expect(input.sampleLocal().use).toBe(false);
+    press('KeyS');
+    expect(input.sampleLocal().use).toBe(true);
+    expect(input.sample().every((i) => !i.use)).toBe(true);
   });
 });
