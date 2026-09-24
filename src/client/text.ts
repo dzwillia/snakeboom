@@ -1,4 +1,4 @@
-import type { DeathRecord, ItemState } from '../sim';
+import { PLOW_PUSH_LIMIT, type Config, type DeathRecord, type ItemState, type PickupKind } from '../sim';
 import { OPPONENT_MODES, type OpponentMode } from './settings';
 
 export const PLAYER_NAMES: readonly string[] = ['CYAN', 'PINK'];
@@ -46,6 +46,88 @@ export function describeRound(
   }
   if (lines.length > 0) return { title, detail: lines.join(' · ') };
   return { title, detail: winner === null ? 'Time ran out' : `Time's up · ${names[winner]} had more hearts` };
+}
+
+/** The order the Powers page lists pickups in: the same as the title screen's line. */
+export const POWER_ORDER: readonly PickupKind[] = ['bomb', 'ghost', 'shield', 'turbo', 'slow', 'reverse', 'dozer'];
+
+export interface PowerInfo {
+  name: string;
+  /** Live numbers from the config, like "×3 per pickup · blast radius 70". */
+  stats: string;
+  /** What it does, in a sentence or two. */
+  detail: string;
+}
+
+/** Trims trailing zeros: 1 → "1", 0.45 → "0.45". */
+function num(v: number): string {
+  return String(Math.round(v * 100) / 100);
+}
+
+function secs(v: number): string {
+  return `${num(v)} s`;
+}
+
+/** The spawn share of a kind, as a percentage of all pickup weights. */
+export function spawnShare(kind: PickupKind, cfg: Config): number {
+  const total = Object.values(cfg.pickupWeights).reduce((a, b) => a + b, 0);
+  return total > 0 ? Math.round((100 * cfg.pickupWeights[kind]) / total) : 0;
+}
+
+/** Everything a player needs to know about one pickup, with the current tuning filled in. */
+export function describePower(kind: PickupKind, cfg: Config): PowerInfo {
+  const share = `${spawnShare(kind, cfg)}% of spawns`;
+  switch (kind) {
+    case 'bomb':
+      return {
+        name: 'BOMB',
+        stats: `×${num(cfg.bombCharges)} per pickup · blast radius ${num(cfg.blastRadius)} · ${share}`,
+        detail:
+          `Thrown ahead of your opponent, where they'll be if they hold course. A reticle marks the blast zone; ` +
+          `it lands after ${secs(cfg.bombFlightTime)} and goes off ${secs(cfg.bombFuse)} later. Blasts hit heads (yours too), ` +
+          `punch holes through bodies, destroy blocks and set off other bombs. One throw every ${secs(cfg.bombThrowCooldown)}.`,
+      };
+    case 'ghost':
+      return {
+        name: 'GHOST',
+        stats: `${secs(cfg.ghostDuration)} · ${share}`,
+        detail: `Your head slips through bodies, heads and blocks. Walls and blasts still hit you.`,
+      };
+    case 'shield':
+      return {
+        name: 'SHIELD',
+        stats: `one hit · ${secs(cfg.shieldGrace)} grace · ${share}`,
+        detail:
+          `A bubble that takes your next hit so you keep the heart, then a moment of grace to get clear. ` +
+          `It goes up the moment you collect it, stays until it takes a hit, never takes an item slot, and you can't carry two.`,
+      };
+    case 'turbo':
+      return {
+        name: 'TURBO',
+        stats: `${secs(cfg.turboDuration)} · ×${num(cfg.boostMultiplier)} speed · ${share}`,
+        detail: `Free boost: hold Boost as long as you like and the meter doesn't drain.`,
+      };
+    case 'slow':
+      return {
+        name: 'SLOW',
+        stats: `${secs(cfg.slowDuration)} · opponent at ${Math.round(cfg.slowFactor * 100)}% speed · ${share}`,
+        detail: `Your opponent crawls. Their turns get tighter too, so it's a chance to box them in, not a free kill.`,
+      };
+    case 'reverse':
+      return {
+        name: 'REVERSE',
+        stats: `${secs(cfg.reverseDuration)} · ${share}`,
+        detail: `Your opponent's left and right are swapped. Their snake flashes so they know, but knowing isn't the same as steering.`,
+      };
+    case 'dozer':
+      return {
+        name: 'BULLDOZER',
+        stats: `${secs(cfg.dozerDuration)} · pushes rows up to ${PLOW_PUSH_LIMIT} blocks · ${share}`,
+        detail:
+          `A plow on your head shoves blocks ahead of you, straight into your opponent if you aim well. ` +
+          `Rows too long to push, or pinned against the edge, get crushed instead. Blocks can't hurt you while it lasts.`,
+      };
+  }
 }
 
 /** HUD label for an item slot; empty string when the slot is empty. */

@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import type { DeathCause, DeathRecord } from '../sim';
-import { describeDeath, describeItem, describeOpponent, describeRound, formatClock, nextOpponent, nextWins } from './text';
+import { DEFAULT_CONFIG } from '../sim';
+import {
+  describeDeath,
+  describeItem,
+  describeOpponent,
+  describePower,
+  describeRound,
+  formatClock,
+  nextOpponent,
+  nextWins,
+  POWER_ORDER,
+  spawnShare,
+} from './text';
 
 const d = (player: number, cause: DeathCause, killer: number | null): DeathRecord => ({ player, cause, killer, x: 0, y: 0 });
 
@@ -50,6 +62,33 @@ describe('text', () => {
     expect(nextOpponent('human', -1)).toBe('hard');
     expect(describeOpponent('human')).toBe('HUMAN');
     expect(describeOpponent('normal')).toBe('AI · NORMAL');
+  });
+
+  it('describes every power with the live tuning numbers', () => {
+    const bomb = describePower('bomb', DEFAULT_CONFIG);
+    expect(bomb.name).toBe('BOMB');
+    expect(bomb.stats).toContain(`×${DEFAULT_CONFIG.bombCharges} per pickup`);
+    expect(bomb.stats).toContain(`blast radius ${DEFAULT_CONFIG.blastRadius}`);
+    expect(bomb.detail).toContain(`goes off ${DEFAULT_CONFIG.bombFuse} s later`);
+
+    const tuned = { ...DEFAULT_CONFIG, ghostDuration: 7.5, slowFactor: 0.25 };
+    expect(describePower('ghost', tuned).stats).toContain('7.5 s');
+    expect(describePower('slow', tuned).stats).toContain('25% speed');
+
+    for (const kind of POWER_ORDER) {
+      const info = describePower(kind, DEFAULT_CONFIG);
+      expect(info.name.length).toBeGreaterThan(0);
+      expect(info.detail.length).toBeGreaterThan(20);
+      expect(info.stats).toContain('% of spawns');
+    }
+  });
+
+  it('turns pickup weights into spawn percentages', () => {
+    const cfg = { ...DEFAULT_CONFIG, pickupWeights: { bomb: 50, ghost: 25, shield: 25, turbo: 0, slow: 0, reverse: 0, dozer: 0 } };
+    expect(spawnShare('bomb', cfg)).toBe(50);
+    expect(spawnShare('turbo', cfg)).toBe(0);
+    const none = { ...cfg, pickupWeights: { ...cfg.pickupWeights, bomb: 0, ghost: 0, shield: 0 } };
+    expect(spawnShare('bomb', none)).toBe(0);
   });
 
   it('formats the round clock', () => {

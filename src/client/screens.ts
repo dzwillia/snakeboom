@@ -1,8 +1,10 @@
+import type { Config } from '../sim';
 import { PLAYER_CSS } from './colors';
+import { glyphSvg } from './glyphs';
 import type { OpponentMode } from './settings';
-import { describeOpponent, PLAYER_NAMES } from './text';
+import { describeOpponent, describePower, PLAYER_NAMES, POWER_ORDER } from './text';
 
-type ScreenKind = 'none' | 'title' | 'countdown' | 'banner' | 'matchOver' | 'paused';
+type ScreenKind = 'none' | 'title' | 'countdown' | 'banner' | 'matchOver' | 'paused' | 'powers';
 
 /** Centered overlay messages. All strings are our own, never user input. */
 export class Screens {
@@ -35,10 +37,36 @@ export class Screens {
         <div class="selector">FIRST TO <kbd>◀</kbd> <span class="wins">${winsToWin}</span> <kbd>▶</kbd></div>
         <div class="selector">${PLAYER_NAMES[1]} <kbd>▲</kbd> <span class="mode">${describeOpponent(opponent)}</span> <kbd>▼</kbd></div>
         <div class="small">${hearts} ${hearts === 1 ? 'HEART' : 'HEARTS'} EACH PER ROUND</div>
-        <div class="small"><kbd>ESC</kbd> PAUSE · <kbd>M</kbd> MUTE · <kbd>\`</kbd> TUNING</div>
+        <div class="small"><kbd>H</kbd> POWERS · <kbd>ESC</kbd> PAUSE · <kbd>M</kbd> MUTE · <kbd>\`</kbd> TUNING</div>
       </div>`,
       'title',
     );
+  }
+
+  /** The Powers page: every pickup, what it does, and the numbers it currently runs on. */
+  powers(cfg: Config, back: 'title' | 'pause' = 'title'): void {
+    const cards = POWER_ORDER.map((kind) => {
+      const info = describePower(kind, cfg);
+      return (
+        `<div class="power" data-kind="${kind}"><div class="glyph">${glyphSvg(kind)}</div>` +
+        `<h3>${info.name}</h3><div class="stats">${info.stats}</div><p>${info.detail}</p></div>`
+      );
+    });
+    const slots = cfg.itemSlots === 1 ? 'one item' : `up to ${cfg.itemSlots} items`;
+    this.show(
+      `
+      <div class="panel powers">
+        <h2>POWERS</h2>
+        <p class="lead">PICKUPS SPAWN ALL ROUND · YOU CARRY ${slots.toUpperCase()} · USE FIRES THE OLDEST · TIMED POWERS FLASH FOR THEIR LAST ${cfg.effectWarning} S</p>
+        <div class="grid">${cards.join('')}</div>
+        <div class="small footer"><kbd>H</kbd> OR <kbd>ESC</kbd> BACK TO ${back === 'title' ? 'TITLE' : 'PAUSE'}</div>
+      </div>`,
+      'powers',
+    );
+  }
+
+  get showing(): ScreenKind {
+    return this.kind;
   }
 
   countdown(n: number | 'GO'): void {
@@ -72,9 +100,9 @@ export class Screens {
     );
   }
 
-  /** Shows the pause panel, remembering what it covers. */
+  /** Shows the pause panel, remembering what it covers (coming back from the Powers page keeps that memory). */
   paused(): void {
-    this.beforePause = { kind: this.kind, html: this.root.innerHTML };
+    if (this.kind !== 'powers') this.beforePause = { kind: this.kind, html: this.root.innerHTML };
     this.show(
       `<div class="panel"><div class="banner-title" style="color:var(--text)">PAUSED</div><div class="hint">ESC TO RESUME</div></div>`,
       'paused',
