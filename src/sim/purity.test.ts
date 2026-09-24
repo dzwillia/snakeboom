@@ -1,9 +1,10 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const SIM_DIR = fileURLToPath(new URL('.', import.meta.url));
+/** The rules engine and the shared netcode must both run unchanged in browsers, Node and any relay runtime. */
+const PURE_DIRS = ['.', '../net'].map((rel) => fileURLToPath(new URL(rel, import.meta.url))).filter((dir) => existsSync(dir));
 
 const FORBIDDEN: Array<[RegExp, string]> = [
   [/Math\.random\b/, 'Math.random'],
@@ -33,10 +34,10 @@ function stripComments(text: string): string {
   return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 }
 
-describe('sim purity', () => {
+describe('sim and net purity', () => {
   it('uses no browser, clock, or engine-dependent math APIs', () => {
     const problems: string[] = [];
-    for (const file of simSources(SIM_DIR)) {
+    for (const file of PURE_DIRS.flatMap(simSources)) {
       const code = stripComments(readFileSync(file, 'utf8'));
       for (const [pattern, label] of FORBIDDEN) {
         if (pattern.test(code)) problems.push(`${file}: ${label}`);
