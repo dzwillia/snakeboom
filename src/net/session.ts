@@ -1,4 +1,5 @@
 import { cloneState, createMatch, NO_INPUT, step, type Config, type MatchState, type PlayerInput, type SimEvent } from '../sim';
+import { smoothLead } from './timeSync';
 
 export interface SessionOptions {
   seed: number;
@@ -9,6 +10,8 @@ export interface SessionOptions {
   inputDelay: number;
   /** Ticks the predicted state may run ahead of the confirmed state. */
   maxRollback?: number;
+  /** Estimated one-way latency to the peer in ticks, for the lead estimate. Can be set later. */
+  oneWayTicks?: number;
   /** Outgoing local inputs, to be sent to the relay. */
   send: (tick: number, input: PlayerInput) => void;
   /** Called after every confirmed tick with the confirmed state; the place to take hashes. */
@@ -94,6 +97,8 @@ export class NetSession {
   private latestRemoteTick = -1;
   private needRollback = false;
   private stalledNow = false;
+  private oneWayTicks: number;
+  private leadEma: number | null = null;
 
   constructor(opts: SessionOptions) {
     if (opts.local !== 0 && opts.local !== 1) throw new RangeError(`local seat must be 0 or 1, got ${opts.local}`);
@@ -103,6 +108,7 @@ export class NetSession {
     this.inputDelay = opts.inputDelay;
     this.maxRollback = opts.maxRollback ?? DEFAULT_MAX_ROLLBACK;
     this.cfg = opts.cfg;
+    this.oneWayTicks = opts.oneWayTicks ?? 2;
     this.send = opts.send;
     this.onConfirmed = opts.onConfirmed;
     this.confirmed = createMatch(opts.cfg, opts.seed);
@@ -135,6 +141,15 @@ export class NetSession {
   /** True when the last advance() refused to step because the remote is too far behind. */
   get stalled(): boolean {
     return this.stalledNow;
+  }
+
+  setOneWayTicks(ticks: number): void {
+    this.oneWayTicks = ticks;
+  }
+
+  /** The lead estimate smoothed over recent ticks; what time sync acts on. 0 before any remote input. */
+  get smoothedLead(): number {
+    return this.leadEma ?? 0;
   }
 
   /** Highest remote tick received, or −1 before any. */
@@ -216,6 +231,7 @@ export class NetSession {
     this.stalledNow = false;
     this.stats.ticks++;
     events.push(...this.stepPredicted());
+    if (this.latestRemoteTick >= 0) this.leadEma = smoothLead(this.leadEma, this.lead(this.oneWayTicks));
     if (this.predicted.tick % PRUNE_EVERY === 0) this.prune();
     return events;
   }

@@ -4,6 +4,7 @@ import { EventGate } from '../../net/events';
 import { displayName } from '../../net/names';
 import { PROTOCOL, type ClientMessage, type RoundResult, type ServerMessage } from '../../net/protocol';
 import { emptyStats, NetSession, statsDelta, type SessionStats } from '../../net/session';
+import { timeScaleFor } from '../../net/timeSync';
 import { PLAYER_CSS } from '../colors';
 import { describeRound } from '../text';
 import type { EventSink } from '../events';
@@ -72,7 +73,6 @@ const TICK_MS = 1000 / 60;
 const STALL_CAPTION_MS = 500;
 const LEAVE_PROMPT_MS = 3000;
 const HASH_EVERY = 60;
-const SLOW_SCALE = 0.97;
 const AI_OFFER_MS = 10_000;
 const CATCH_UP_PER_FRAME = 600;
 
@@ -191,7 +191,7 @@ export class OnlineMatch {
     }
     const session = this.session;
     const stalled = this.phase === 'playing' && !!session?.stalled;
-    this.timeScale = session && this.phase === 'playing' && session.lead(this.oneWayTicks) > 1 ? SLOW_SCALE : 1;
+    this.timeScale = session && this.phase === 'playing' ? timeScaleFor(session.smoothedLead) : 1;
     this.deps.setTimeScale(this.timeScale);
     this.deps.hud.setPing(this.lobby?.pingMs ?? null, stalled);
     this.updateNetReadout(nowMs);
@@ -247,7 +247,7 @@ export class OnlineMatch {
       rollbacksPerMin: this.rates.rollbacksPerMin,
       maxRollbackDepth: stats.maxRollbackDepth,
       stallsPerMin: this.rates.stallsPerMin,
-      lead: session.lead(this.oneWayTicks),
+      lead: session.smoothedLead,
       timeScale: this.timeScale,
     });
   }
@@ -435,6 +435,7 @@ export class OnlineMatch {
       cfg: this.cfg,
       local: this.me,
       inputDelay: m.inputDelay,
+      oneWayTicks: this.oneWayTicks,
       send: (tick, input) => this.conn.sendFrame(encodeInput(tick, input)),
       onConfirmed: (tick, state, events) => this.onConfirmed(tick, state, events),
     });
@@ -542,6 +543,7 @@ export class OnlineMatch {
       cfg: this.cfg,
       local: this.me,
       inputDelay: m.inputDelay,
+      oneWayTicks: this.oneWayTicks,
       send: (tick, input) => this.conn.sendFrame(encodeInput(tick, input)),
       onConfirmed: (tick, state, events) => this.onConfirmed(tick, state, events),
     });
