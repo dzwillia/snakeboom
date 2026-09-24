@@ -7,6 +7,7 @@ import { sanitizeName, isRoomCode } from '../net/names';
 import { isClientMessage, PROTOCOL, type ClientMessage, type ServerMessage } from '../net/protocol';
 import { logLine } from './log';
 import { QuickMatch } from '../net/quickMatch';
+import { RateLimit } from './rateLimit';
 import { Registry, type RoomEntry } from './registry';
 
 export interface ServerOptions {
@@ -16,6 +17,10 @@ export interface ServerOptions {
   allowedOrigin?: string;
   version?: string;
   maxRooms?: number;
+  /** Room creations (create or queue) allowed per address per minute. */
+  roomsPerMinute?: number;
+  /** Open quick-match rooms allowed at once. */
+  maxQueued?: number;
   /** Delay every message the relay sends, to test rollback without a real network. */
   lagMs?: number;
   log?: (entry: Record<string, unknown>) => void;
@@ -29,10 +34,14 @@ export interface RunningServer {
 
 export const MAX_MESSAGE_BYTES = 1024;
 const DEFAULT_MAX_ROOMS = 200;
+const DEFAULT_ROOMS_PER_MINUTE = 5;
+const DEFAULT_MAX_QUEUED = 50;
 const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 interface Connection {
   socket: WebSocket;
+  /** The client's address (the first X-Forwarded-For entry behind Caddy), for rate limits. */
+  ip: string;
   name: string;
   entry: RoomEntry | null;
   player: number;
@@ -42,6 +51,12 @@ interface Connection {
 function originAllowed(origin: string | undefined, allowed: string | undefined): boolean {
   if (allowed) return origin === allowed;
   return origin === undefined || LOCAL_ORIGIN.test(origin);
+}
+
+function clientAddress(req: IncomingMessage): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim();
+  return first || req.socket.remoteAddress || 'unknown';
 }
 
 function clampWins(value: unknown): number {
@@ -54,6 +69,10 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const version = opts.version ?? 'dev';
   const registry = new Registry(opts.maxRooms ?? DEFAULT_MAX_ROOMS, log, opts.lagMs ?? 0);
   const quick = new QuickMatch();
+  const creations = new RateLimit(opts.roomsPerMinute ?? DEFAULT_ROOMS_PER_MINUTE, 60_000);
+  const maxQueued = opts.maxQueued ?? DEFAULT_MAX_QUEUED;
+  const pruneTimer = setInterval(() => creations.prune(Date.now()), 60_000);
+  pruneTimer.unref();
   const app = new Hono();
   app.get('/health', (c) =>
     c.json({
@@ -99,9 +118,13 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     registry.remember(session, entry.room.code);
   };
 
+  const slowDown = (conn: Connection) =>
+    send(conn.socket, { type: 'error', code: 'busy', message: 'Slow down a little.' });
+
   const onLobbyMessage = (conn: Connection, message: ClientMessage) => {
     switch (message.type) {
       case 'create': {
+        if (!creations.allow(conn.ip, Date.now())) return slowDown(conn);
         const entry = registry.create(clampWins(message.winsToWin));
         if (!entry) return send(conn.socket, { type: 'error', code: 'busy', message: 'The server is full right now.' });
         joinEntry(conn, entry);
@@ -115,6 +138,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       }
       case 'queue': {
         // Join the oldest open room if one is really still waiting; otherwise open my own.
+        if (!creations.allow(conn.ip, Date.now())) return slowDown(conn);
         for (;;) {
           const code = quick.take();
           if (code === null) break;
@@ -126,6 +150,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
             return;
           }
         }
+        if (quick.size >= maxQueued) return send(conn.socket, { type: 'error', code: 'busy', message: 'Too many players are waiting right now.' });
         const entry = registry.create(clampWins(message.winsToWin));
         if (!entry) return send(conn.socket, { type: 'error', code: 'busy', message: 'The server is full right now.' });
         joinEntry(conn, entry);
@@ -213,8 +238,8 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     conn.entry.room.onMessage(conn.player, parsed);
   };
 
-  wss.on('connection', (socket: WebSocket) => {
-    const conn: Connection = { socket, name: '', entry: null, player: -1, helloed: false };
+  wss.on('connection', (socket: WebSocket, req: IncomingMessage) => {
+    const conn: Connection = { socket, ip: clientAddress(req), name: '', entry: null, player: -1, helloed: false };
     connections.add(conn);
     socket.on('message', (data, isBinary) => {
       try {
@@ -264,6 +289,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     registry,
     close: () =>
       new Promise<void>((resolve) => {
+        clearInterval(pruneTimer);
         registry.closeAll();
         for (const conn of connections) conn.socket.close(1001, 'restart');
         wss.close();

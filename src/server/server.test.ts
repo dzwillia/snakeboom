@@ -83,7 +83,7 @@ describe('relay server', () => {
   const logs: Record<string, unknown>[] = [];
 
   beforeAll(async () => {
-    server = await startServer({ port: 0, version: '0.8.0-test', log: (e) => logs.push(e) });
+    server = await startServer({ port: 0, version: '0.8.0-test', roomsPerMinute: 1000, log: (e) => logs.push(e) });
   });
   afterAll(async () => {
     await server.close();
@@ -225,7 +225,7 @@ describe('relay server', () => {
 describe('relay quick-match', () => {
   let server: RunningServer;
   beforeAll(async () => {
-    server = await startServer({ port: 0, log: () => {} });
+    server = await startServer({ port: 0, roomsPerMinute: 1000, log: () => {} });
   });
   afterAll(async () => {
     await server.close();
@@ -286,6 +286,66 @@ describe('relay quick-match', () => {
     expect(wc.player).toBe(0);
     for (const x of [b, friend, c]) x.close();
     await c.waitClosed();
+  });
+});
+
+describe('relay limits', () => {
+  let server: RunningServer;
+  beforeAll(async () => {
+    server = await startServer({ port: 0, roomsPerMinute: 5, maxQueued: 1, log: () => {} });
+  });
+  afterAll(async () => {
+    await server.close();
+  });
+
+  // Review Focus 5: the limits sit above anything a real player does.
+  it('refuses a sixth room from one address within a minute, keeping the socket open', async () => {
+    const clients: TestClient[] = [];
+    for (let i = 0; i < 6; i++) {
+      const c = new TestClient(server.port);
+      await c.opened;
+      c.send(hello(`P${i}`));
+      c.send({ type: 'create', winsToWin: 5 });
+      clients.push(c);
+    }
+    for (let i = 0; i < 5; i++) await clients[i].expect('welcome');
+    const err = await clients[5].expect('error');
+    expect(err).toMatchObject({ code: 'busy', message: 'Slow down a little.' });
+    expect(clients[5].closed).toBe(false);
+    for (const c of clients) c.close();
+  });
+
+  it('caps the number of open quick-match rooms', async () => {
+    // Fresh addresses aren't available in a test, so use a new server with a roomy per-address limit.
+    const s2 = await startServer({ port: 0, roomsPerMinute: 1000, maxQueued: 1, log: () => {} });
+    const a = new TestClient(s2.port);
+    await a.opened;
+    a.send(hello('A'));
+    a.send({ type: 'queue', winsToWin: 5 });
+    await a.expect('queued');
+    a.send({ type: 'queue', winsToWin: 5 });
+    expect((await a.expect('queued')).waiting).toBe(1);
+    const health = await fetch(`http://127.0.0.1:${s2.port}/health`).then((r) => r.json());
+    expect(health.queued).toBe(1);
+    // A second queuer joins the open room rather than opening another, so fill it by link first.
+    const f = new TestClient(s2.port);
+    await f.opened;
+    f.send(hello('F'));
+    f.send({ type: 'join', room: (a.messages.find((m) => m.type === 'welcome') as { room: string }).room });
+    await f.expect('welcome');
+    const b = new TestClient(s2.port);
+    await b.opened;
+    b.send(hello('B'));
+    b.send({ type: 'queue', winsToWin: 5 });
+    await b.expect('queued');
+    const c = new TestClient(s2.port);
+    await c.opened;
+    c.send(hello('C'));
+    c.send({ type: 'queue', winsToWin: 5 });
+    // c pairs with b's open room; d finds the queue empty again but the cap counts open rooms only.
+    await c.expect('welcome');
+    for (const x of [a, f, b, c]) x.close();
+    await s2.close();
   });
 });
 
