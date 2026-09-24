@@ -4,7 +4,7 @@
  */
 
 /** Bumped on every incompatible change; the relay refuses other values. */
-export const PROTOCOL = 1;
+export const PROTOCOL = 2;
 
 export interface RoundResult {
   round: number;
@@ -17,6 +17,9 @@ export type ClientMessage =
   | { type: 'hello'; protocol: number; version: string; name: string; session?: string; fromTick?: number }
   | { type: 'create'; winsToWin: number }
   | { type: 'join'; room: string }
+  /** Quick-match: join the oldest open room, or open my own and wait. */
+  | { type: 'queue'; winsToWin: number }
+  | { type: 'leaveQueue' }
   | { type: 'ready'; ready: boolean }
   | { type: 'pong'; t: number }
   | { type: 'hash'; tick: number; hash: number; result?: RoundResult }
@@ -36,7 +39,11 @@ export type ErrorCode = 'version' | 'badMessage' | 'busy' | 'notInRoom';
 export type ServerMessage =
   | { type: 'welcome'; player: number; room: string; session: string; name: string }
   | { type: 'lobby'; players: (LobbyPlayer | null)[]; winsToWin: number; pingMs: number | null }
+  /** Sent to every waiting quick-match player whenever the queue or the player count changes. */
+  | { type: 'queued'; waiting: number; online: number }
   | { type: 'start'; seed: number; winsToWin: number; inputDelay: number; startAt: number; rttMs: number[] }
+  /** A rejoin mid-match: the match's parameters, followed by one binary replay frame with `frames` entries. */
+  | { type: 'resume'; seed: number; winsToWin: number; inputDelay: number; rttMs: number[]; frames: number }
   | { type: 'ping'; t: number }
   | { type: 'desync'; tick: number }
   | { type: 'peerAway'; deadline: number }
@@ -50,6 +57,8 @@ export const CLIENT_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   'hello',
   'create',
   'join',
+  'queue',
+  'leaveQueue',
   'ready',
   'pong',
   'hash',

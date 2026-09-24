@@ -6,6 +6,8 @@ import { WebSocketServer, type RawData, type WebSocket } from 'ws';
 import { sanitizeName, isRoomCode } from '../net/names';
 import { isClientMessage, PROTOCOL, type ClientMessage, type ServerMessage } from '../net/protocol';
 import { logLine } from './log';
+import { QuickMatch } from '../net/quickMatch';
+import { RateLimit } from './rateLimit';
 import { Registry, type RoomEntry } from './registry';
 
 export interface ServerOptions {
@@ -15,6 +17,10 @@ export interface ServerOptions {
   allowedOrigin?: string;
   version?: string;
   maxRooms?: number;
+  /** Room creations (create or queue) allowed per address per minute. */
+  roomsPerMinute?: number;
+  /** Open quick-match rooms allowed at once. */
+  maxQueued?: number;
   /** Delay every message the relay sends, to test rollback without a real network. */
   lagMs?: number;
   log?: (entry: Record<string, unknown>) => void;
@@ -28,10 +34,14 @@ export interface RunningServer {
 
 export const MAX_MESSAGE_BYTES = 1024;
 const DEFAULT_MAX_ROOMS = 200;
+const DEFAULT_ROOMS_PER_MINUTE = 5;
+const DEFAULT_MAX_QUEUED = 50;
 const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 interface Connection {
   socket: WebSocket;
+  /** The client's address (the first X-Forwarded-For entry behind Caddy), for rate limits. */
+  ip: string;
   name: string;
   entry: RoomEntry | null;
   player: number;
@@ -43,6 +53,12 @@ function originAllowed(origin: string | undefined, allowed: string | undefined):
   return origin === undefined || LOCAL_ORIGIN.test(origin);
 }
 
+function clientAddress(req: IncomingMessage): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim();
+  return first || req.socket.remoteAddress || 'unknown';
+}
+
 function clampWins(value: unknown): number {
   const n = typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : 5;
   return Math.min(10, Math.max(1, n));
@@ -52,6 +68,11 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const log = opts.log ?? logLine;
   const version = opts.version ?? 'dev';
   const registry = new Registry(opts.maxRooms ?? DEFAULT_MAX_ROOMS, log, opts.lagMs ?? 0);
+  const quick = new QuickMatch();
+  const creations = new RateLimit(opts.roomsPerMinute ?? DEFAULT_ROOMS_PER_MINUTE, 60_000);
+  const maxQueued = opts.maxQueued ?? DEFAULT_MAX_QUEUED;
+  const pruneTimer = setInterval(() => creations.prune(Date.now()), 60_000);
+  pruneTimer.unref();
   const app = new Hono();
   app.get('/health', (c) =>
     c.json({
@@ -60,12 +81,27 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       timestamp: new Date().toISOString(),
       rooms: registry.count,
       players: registry.players,
-      queued: 0,
+      queued: quick.size,
     }),
   );
 
   const wss = new WebSocketServer({ noServer: true });
   const connections = new Set<Connection>();
+
+  /** Tells everyone still waiting in the queue how things look. */
+  const broadcastQueued = () => {
+    for (const conn of connections) {
+      if (conn.entry && quick.has(conn.entry.room.code)) {
+        send(conn.socket, { type: 'queued', waiting: quick.size, online: connections.size });
+      }
+    }
+  };
+  registry.onRoomStatus = (code, status) => {
+    if (status !== 'waiting' && quick.has(code)) {
+      quick.withdraw(code);
+      broadcastQueued();
+    }
+  };
 
   const send = (socket: WebSocket, message: ServerMessage) => {
     if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(message));
@@ -82,9 +118,13 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     registry.remember(session, entry.room.code);
   };
 
+  const slowDown = (conn: Connection) =>
+    send(conn.socket, { type: 'error', code: 'busy', message: 'Slow down a little.' });
+
   const onLobbyMessage = (conn: Connection, message: ClientMessage) => {
     switch (message.type) {
       case 'create': {
+        if (!creations.allow(conn.ip, Date.now())) return slowDown(conn);
         const entry = registry.create(clampWins(message.winsToWin));
         if (!entry) return send(conn.socket, { type: 'error', code: 'busy', message: 'The server is full right now.' });
         joinEntry(conn, entry);
@@ -92,10 +132,39 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       }
       case 'join': {
         const entry = isRoomCode(message.room) ? registry.get(message.room) : undefined;
-        if (!entry) return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });
+        if (!entry) {
+          log({ event: 'joinFailed', room: message.room });
+          return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });
+        }
         joinEntry(conn, entry);
         return;
       }
+      case 'queue': {
+        // Join the oldest open room if one is really still waiting; otherwise open my own.
+        if (!creations.allow(conn.ip, Date.now())) return slowDown(conn);
+        for (;;) {
+          const code = quick.take();
+          if (code === null) break;
+          const open = registry.get(code);
+          // Only a room with someone actually waiting in it; stale ones just fall out of the queue.
+          if (open && open.room.status === 'waiting' && open.room.playerCount === 1) {
+            joinEntry(conn, open);
+            broadcastQueued();
+            return;
+          }
+        }
+        if (quick.size >= maxQueued) return send(conn.socket, { type: 'error', code: 'busy', message: 'Too many players are waiting right now.' });
+        const entry = registry.create(clampWins(message.winsToWin));
+        if (!entry) return send(conn.socket, { type: 'error', code: 'busy', message: 'The server is full right now.' });
+        joinEntry(conn, entry);
+        if (conn.entry === entry) {
+          quick.offer(entry.room.code);
+          broadcastQueued();
+        }
+        return;
+      }
+      case 'leaveQueue':
+        return;
       case 'hello':
         return refuse(conn.socket, 'badMessage', 'hello was already sent');
       default:
@@ -105,7 +174,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
 
   const joinEntry = (conn: Connection, entry: RoomEntry) => {
     // Attach first so the room's welcome and lobby messages reach this socket.
-    const reserved = entry.room.status === 'waiting' || entry.room.status === 'lobby' || entry.room.status === 'over';
+    const reserved = entry.room.status === 'waiting' || entry.room.status === 'lobby';
     if (!reserved) return send(conn.socket, { type: 'closed', reason: 'full' });
     const probe = entry.room.playerCount;
     const player = probe === 0 ? 0 : 1;
@@ -126,10 +195,14 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     const session = message.session as string;
     const entry = registry.bySession(session);
     const player = entry?.room.seatForSession(session) ?? null;
-    if (!entry || player === null) return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });
+    if (!entry || player === null) {
+      log({ event: 'rejoinFailed', known: !!entry, room: entry?.room.code ?? null, status: entry?.room.status ?? null });
+      return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });
+    }
     // Attach first so rejoin()'s welcome reaches this socket.
     entry.host.attach(player, conn.socket);
-    if (entry.room.rejoin(session) === null) {
+    const fromTick = typeof message.fromTick === 'number' && message.fromTick >= 0 ? Math.floor(message.fromTick) : 0;
+    if (entry.room.rejoin(session, fromTick) === null) {
       entry.host.detach(player, conn.socket);
       return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });
     }
@@ -157,11 +230,22 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     if (!parsed) return refuse(conn.socket, 'badMessage', 'Unreadable message.');
     if (!conn.entry) return onLobbyMessage(conn, parsed);
     if (parsed.type === 'hello' || parsed.type === 'create' || parsed.type === 'join') return;
+    if (parsed.type === 'queue') {
+      // Already in a room (waiting in the queue): just refresh the readout.
+      if (quick.has(conn.entry.room.code)) send(conn.socket, { type: 'queued', waiting: quick.size, online: connections.size });
+      return;
+    }
+    if (parsed.type === 'leaveQueue') {
+      quick.withdraw(conn.entry.room.code);
+      conn.entry.room.onMessage(conn.player, { type: 'leave' });
+      broadcastQueued();
+      return;
+    }
     conn.entry.room.onMessage(conn.player, parsed);
   };
 
-  wss.on('connection', (socket: WebSocket) => {
-    const conn: Connection = { socket, name: '', entry: null, player: -1, helloed: false };
+  wss.on('connection', (socket: WebSocket, req: IncomingMessage) => {
+    const conn: Connection = { socket, ip: clientAddress(req), name: '', entry: null, player: -1, helloed: false };
     connections.add(conn);
     socket.on('message', (data, isBinary) => {
       try {
@@ -176,7 +260,9 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       if (conn.entry) {
         conn.entry.host.detach(conn.player, socket);
         conn.entry.room.onDisconnect(conn.player);
+        if (conn.entry.room.playerCount === 0) quick.withdraw(conn.entry.room.code);
       }
+      broadcastQueued();
     });
     socket.on('error', () => socket.close());
   });
@@ -209,6 +295,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     registry,
     close: () =>
       new Promise<void>((resolve) => {
+        clearInterval(pruneTimer);
         registry.closeAll();
         for (const conn of connections) conn.socket.close(1001, 'restart');
         wss.close();

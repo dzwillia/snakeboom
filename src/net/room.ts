@@ -1,4 +1,4 @@
-import { decodeInput, encodeRelayed } from './codec';
+import { decodeInput, encodeRelayed, encodeReplay, relayedTick } from './codec';
 import { ROOM_ALPHABET } from './names';
 import type { ClientMessage, CloseReason, LobbyPlayer, RoundResult, ServerMessage } from './protocol';
 
@@ -26,7 +26,11 @@ export interface RoomOptions {
   emptyMs?: number;
 }
 
-export type RoomStatus = 'waiting' | 'lobby' | 'playing' | 'over' | 'closed';
+/**
+ * waiting: one seat filled · lobby: both seated, not playing · playing: a match is on · closed: gone.
+ * After a match (result, forfeit or desync) the room goes back to lobby or waiting for a rematch.
+ */
+export type RoomStatus = 'waiting' | 'lobby' | 'playing' | 'closed';
 
 export const DEFAULT_GRACE_MS = 15_000;
 export const DEFAULT_IDLE_MS = 600_000;
@@ -64,6 +68,8 @@ export function inputDelayFor(rttA: number | null, rttB: number | null): number 
 export class Room {
   readonly code: string;
   onClosed: (() => void) | null = null;
+  /** Called after every status change (the registry uses it for the quick-match queue). */
+  onStatus: ((status: RoomStatus) => void) | null = null;
 
   private readonly seats: (Seat | null)[] = [null, null];
   private statusNow: RoomStatus = 'waiting';
@@ -81,6 +87,10 @@ export class Room {
   private readonly hashes = new Map<number, (number | undefined)[]>();
   private lastPingShown: number | null = null;
   private seed = 0;
+  /** The current match's parameters, for rejoins. */
+  private match: { seed: number; winsToWin: number; inputDelay: number; rttMs: number[] } | null = null;
+  /** Input frames are forwarded from start until a seat empties, including the round-over play-out after a result. */
+  private relaying = false;
 
   constructor(
     private readonly host: RoomHost,
@@ -100,6 +110,12 @@ export class Room {
     return this.statusNow;
   }
 
+  private setStatus(status: RoomStatus): void {
+    if (status === this.statusNow) return;
+    this.statusNow = status;
+    this.onStatus?.(status);
+  }
+
   get playerCount(): number {
     return this.seats.filter((s) => s?.connected).length;
   }
@@ -110,7 +126,7 @@ export class Room {
   }
 
   join(name: string): { player: number; session: string } | 'full' {
-    if (this.statusNow === 'closed' || this.statusNow === 'playing') return 'full';
+    if (this.statusNow !== 'waiting') return 'full';
     const player = this.seats.findIndex((s) => s === null);
     if (player < 0) return 'full';
     const session = this.token();
@@ -128,7 +144,7 @@ export class Room {
     this.touch();
     this.clearEmpty();
     this.ensurePing();
-    this.statusNow = this.seats.every((s) => s !== null) ? 'lobby' : 'waiting';
+    this.setStatus(this.seats.every((s) => s !== null) ? 'lobby' : 'waiting');
     this.host.send(player, { type: 'welcome', player, room: this.code, session, name });
     this.broadcastLobby();
     return { player, session };
@@ -140,8 +156,11 @@ export class Room {
     return player < 0 || this.statusNow === 'closed' ? null : player;
   }
 
-  /** A returning socket with its session token. */
-  rejoin(session: string): number | null {
+  /**
+   * A returning socket with its session token. Mid-match it gets the match parameters and the
+   * input log from `fromTick` on, so it can rebuild the match before it sends anything.
+   */
+  rejoin(session: string, fromTick = 0): number | null {
     const player = this.seats.findIndex((s) => s !== null && s.session === session);
     if (player < 0 || this.statusNow === 'closed') return null;
     const seat = this.seats[player]!;
@@ -151,6 +170,11 @@ export class Room {
     this.clearEmpty();
     this.ensurePing();
     this.host.send(player, { type: 'welcome', player, room: this.code, session, name: seat.name });
+    if (this.match && this.statusNow === 'playing') {
+      const frames = this.inputLog.filter((f) => relayedTick(f) >= fromTick);
+      this.host.send(player, { type: 'resume', ...this.match, frames: frames.length });
+      this.host.send(player, encodeReplay(frames));
+    }
     if (seat.cancelGrace) {
       seat.cancelGrace();
       seat.cancelGrace = null;
@@ -209,9 +233,9 @@ export class Room {
 
   onInput(player: number, frame: Uint8Array): void {
     const seat = this.seats[player];
-    // Frames keep flowing after the result, so both clients can play out the round-over banner
-    // and reach the match-over screen together.
-    if (!seat || (this.statusNow !== 'playing' && this.statusNow !== 'over') || !seat.connected) return;
+    // Frames keep flowing after the result (the room is back in the lobby by then), so both
+    // clients can play out the round-over banner and reach the match-over screen together.
+    if (!seat || !this.relaying || !seat.connected) return;
     const decoded = decodeInput(frame);
     if (!decoded) return;
     const other = this.seats[1 - player];
@@ -239,7 +263,7 @@ export class Room {
   /** Ends the room for everyone, for example when the server shuts down. */
   close(reason: CloseReason): void {
     if (this.statusNow === 'closed') return;
-    this.statusNow = 'closed';
+    this.setStatus('closed');
     for (const cancel of this.timers) cancel();
     this.timers.clear();
     this.seats.forEach((seat, player) => {
@@ -252,7 +276,7 @@ export class Room {
   }
 
   private maybeStart(): void {
-    if (this.statusNow !== 'lobby' && this.statusNow !== 'over') return;
+    if (this.statusNow !== 'lobby') return;
     const [a, b] = this.seats;
     if (!a || !b || !a.ready || !b.ready || !a.connected || !b.connected) return;
     this.seed = Math.floor(this.host.random() * 2147483648);
@@ -266,8 +290,10 @@ export class Room {
     }
     this.inputLog = [];
     this.hashes.clear();
-    this.statusNow = 'playing';
-    const message: ServerMessage = { type: 'start', seed: this.seed, winsToWin: this.winsToWin, inputDelay, startAt, rttMs };
+    this.relaying = true;
+    this.setStatus('playing');
+    this.match = { seed: this.seed, winsToWin: this.winsToWin, inputDelay, rttMs };
+    const message: ServerMessage = { type: 'start', ...this.match, startAt };
     this.host.send(0, message);
     this.host.send(1, message);
     this.host.log({ event: 'start', seed: this.seed, inputDelay, rttMs, names: [a.name, b.name] });
@@ -279,6 +305,8 @@ export class Room {
     if (!pair) {
       pair = [undefined, undefined];
       this.hashes.set(tick, pair);
+      // A rejoining client re-sends hashes for ticks already settled; drop old half-pairs.
+      for (const t of this.hashes.keys()) if (t < tick - 1200) this.hashes.delete(t);
     }
     pair[player] = hash;
     if (result) seat.result = result;
@@ -287,17 +315,32 @@ export class Room {
     this.hashes.delete(tick);
     if (a !== b) {
       this.host.log({ event: 'desync', tick, hashes: [a, b], seed: this.seed, frames: this.inputLog.length });
-      this.statusNow = 'over';
       this.broadcast({ type: 'desync', tick });
+      this.backToLobby();
       return;
     }
     const other = this.seats[1 - player];
     const r0 = this.seats[0]?.result;
     const r1 = this.seats[1]?.result;
     if (result && other?.result && r0 && r1 && r0.round === r1.round && r0.matchWinner !== null && r0.matchWinner === r1.matchWinner) {
-      this.statusNow = 'over';
       this.host.log({ event: 'match', winner: r0.matchWinner, scores: r0.scores, rounds: r0.round, seed: this.seed });
+      this.backToLobby();
     }
+  }
+
+  /** The match is finished: clear the ready flags so both must opt into a rematch. */
+  private backToLobby(): void {
+    this.match = null;
+    for (const seat of this.seats) {
+      if (!seat) continue;
+      seat.ready = false;
+      if (seat.cancelGrace) {
+        seat.cancelGrace();
+        seat.cancelGrace = null;
+      }
+    }
+    this.setStatus(this.seats.every((s) => s !== null) ? 'lobby' : 'waiting');
+    this.broadcastLobby();
   }
 
   private startGrace(player: number, seat: Seat): void {
@@ -320,17 +363,18 @@ export class Room {
       seat.cancelGrace = null;
     }
     this.seats[player] = null;
+    this.relaying = false;
     const other = this.seats[1 - player];
     if (this.statusNow === 'playing') {
-      this.statusNow = 'over';
       this.host.log({ event: 'forfeit', loser: player, reason, seed: this.seed });
       if (other?.connected) this.host.send(1 - player, { type: 'forfeit', winner: 1 - player, reason });
-    } else {
-      this.statusNow = 'waiting';
-      if (other) other.ready = false;
-      if (other?.connected) this.host.send(1 - player, { type: 'peerLeft' });
-      this.broadcastLobby();
+      this.match = null;
+    } else if (other?.connected) {
+      this.host.send(1 - player, { type: 'peerLeft' });
     }
+    if (other) other.ready = false;
+    this.setStatus('waiting');
+    this.broadcastLobby();
     if (this.playerCount === 0) this.scheduleEmpty();
   }
 

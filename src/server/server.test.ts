@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import { NO_INPUT } from '../sim';
-import { decodeRelayed, encodeInput } from '../net/codec';
+import { decodeRelayed, decodeReplay, encodeInput } from '../net/codec';
 import { PROTOCOL, type ClientMessage, type ServerMessage } from '../net/protocol';
 import { startServer, type RunningServer } from './index';
 
@@ -83,7 +83,7 @@ describe('relay server', () => {
   const logs: Record<string, unknown>[] = [];
 
   beforeAll(async () => {
-    server = await startServer({ port: 0, version: '0.8.0-test', log: (e) => logs.push(e) });
+    server = await startServer({ port: 0, version: '0.8.0-test', roomsPerMinute: 1000, log: (e) => logs.push(e) });
   });
   afterAll(async () => {
     await server.close();
@@ -202,15 +202,150 @@ describe('relay server', () => {
     await a.expect('start');
     b.close();
     await a.expect('peerAway');
+    a.sendFrame(encodeInput(1, NO_INPUT));
+    a.sendFrame(encodeInput(2, NO_INPUT));
+    await new Promise((r) => setTimeout(r, 50));
     const b2 = new TestClient(server.port);
     await b2.opened;
-    b2.send({ ...hello('B'), session: wb.session });
+    b2.send({ ...hello('B'), session: wb.session, fromTick: 0 });
     expect((await b2.expect('welcome')).player).toBe(1);
+    const resume = await b2.expect('resume');
+    expect(resume).toMatchObject({ winsToWin: 1, frames: 2 });
+    const replay = decodeReplay((await b2.waitFrames(1))[0]);
+    expect(replay?.map((f) => f.tick)).toEqual([1, 2]);
+    b2.frames.length = 0;
     await a.expect('peerBack');
-    a.sendFrame(encodeInput(1, NO_INPUT));
+    a.sendFrame(encodeInput(3, NO_INPUT));
     expect(await b2.waitFrames(1)).toHaveLength(1);
     a.close();
     b2.close();
+  });
+});
+
+describe('relay quick-match', () => {
+  let server: RunningServer;
+  beforeAll(async () => {
+    server = await startServer({ port: 0, roomsPerMinute: 1000, log: () => {} });
+  });
+  afterAll(async () => {
+    await server.close();
+  });
+
+  const queued = async (port: number, name: string, winsToWin = 3) => {
+    const c = new TestClient(port);
+    await c.opened;
+    c.send(hello(name));
+    c.send({ type: 'queue', winsToWin });
+    return c;
+  };
+
+  it('pairs the second player into the first player’s open room, and a third waits alone', async () => {
+    const a = await queued(server.port, 'A', 4);
+    const wa = await a.expect('welcome');
+    expect(wa.player).toBe(0);
+    expect((await a.expect('queued')).waiting).toBe(1);
+    const health = await fetch(`http://127.0.0.1:${server.port}/health`).then((r) => r.json());
+    expect(health.queued).toBe(1);
+
+    const b = await queued(server.port, 'B', 9);
+    const wb = await b.expect('welcome');
+    expect(wb).toMatchObject({ player: 1, room: wa.room });
+    const lobby = await a.expect('lobby', (m) => m.players[1] !== null);
+    expect(lobby.winsToWin).toBe(4);
+    expect(lobby.players.map((p) => p?.name)).toEqual(['A', 'B']);
+    expect(b.messages.some((m) => m.type === 'queued')).toBe(false);
+
+    const c = await queued(server.port, 'C');
+    const wc = await c.expect('welcome');
+    expect(wc.room).not.toBe(wa.room);
+    expect((await c.expect('queued')).waiting).toBe(1);
+    for (const x of [a, b, c]) x.close();
+    await c.waitClosed();
+  });
+
+  it('drops a cancelled queue entry and a room filled by link', async () => {
+    const a = await queued(server.port, 'A');
+    await a.expect('welcome');
+    await a.expect('queued');
+    a.send({ type: 'leaveQueue' });
+    await a.waitClosed();
+
+    const b = await queued(server.port, 'B');
+    const wb = await b.expect('welcome');
+    expect((await b.expect('queued')).waiting).toBe(1);
+    const friend = new TestClient(server.port);
+    await friend.opened;
+    friend.send(hello('F'));
+    friend.send({ type: 'join', room: wb.room });
+    expect((await friend.expect('welcome')).room).toBe(wb.room);
+    await b.expect('lobby', (m) => m.players[1] !== null);
+
+    const c = await queued(server.port, 'C');
+    const wc = await c.expect('welcome');
+    expect(wc.room).not.toBe(wb.room);
+    expect(wc.player).toBe(0);
+    for (const x of [b, friend, c]) x.close();
+    await c.waitClosed();
+  });
+});
+
+describe('relay limits', () => {
+  let server: RunningServer;
+  beforeAll(async () => {
+    server = await startServer({ port: 0, roomsPerMinute: 5, maxQueued: 1, log: () => {} });
+  });
+  afterAll(async () => {
+    await server.close();
+  });
+
+  // Review Focus 5: the limits sit above anything a real player does.
+  it('refuses a sixth room from one address within a minute, keeping the socket open', async () => {
+    const clients: TestClient[] = [];
+    for (let i = 0; i < 6; i++) {
+      const c = new TestClient(server.port);
+      await c.opened;
+      c.send(hello(`P${i}`));
+      c.send({ type: 'create', winsToWin: 5 });
+      clients.push(c);
+    }
+    for (let i = 0; i < 5; i++) await clients[i].expect('welcome');
+    const err = await clients[5].expect('error');
+    expect(err).toMatchObject({ code: 'busy', message: 'Slow down a little.' });
+    expect(clients[5].closed).toBe(false);
+    for (const c of clients) c.close();
+  });
+
+  it('caps the number of open quick-match rooms', async () => {
+    // Fresh addresses aren't available in a test, so use a new server with a roomy per-address limit.
+    const s2 = await startServer({ port: 0, roomsPerMinute: 1000, maxQueued: 1, log: () => {} });
+    const a = new TestClient(s2.port);
+    await a.opened;
+    a.send(hello('A'));
+    a.send({ type: 'queue', winsToWin: 5 });
+    await a.expect('queued');
+    a.send({ type: 'queue', winsToWin: 5 });
+    expect((await a.expect('queued')).waiting).toBe(1);
+    const health = await fetch(`http://127.0.0.1:${s2.port}/health`).then((r) => r.json());
+    expect(health.queued).toBe(1);
+    // A second queuer joins the open room rather than opening another, so fill it by link first.
+    const f = new TestClient(s2.port);
+    await f.opened;
+    f.send(hello('F'));
+    f.send({ type: 'join', room: (a.messages.find((m) => m.type === 'welcome') as { room: string }).room });
+    await f.expect('welcome');
+    const b = new TestClient(s2.port);
+    await b.opened;
+    b.send(hello('B'));
+    b.send({ type: 'queue', winsToWin: 5 });
+    await b.expect('queued');
+    const c = new TestClient(s2.port);
+    await c.opened;
+    c.send(hello('C'));
+    c.send({ type: 'queue', winsToWin: 5 });
+    // c pairs with b's open room; d finds the queue empty again but the cap counts open rooms only.
+    await c.expect('welcome');
+    for (const x of [a, f, b, c]) x.close();
+    await s2.close();
   });
 });
 

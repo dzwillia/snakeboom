@@ -92,6 +92,40 @@ describe('Screens lobby', () => {
   });
 });
 
+describe('Screens queue', () => {
+  it('shows the link, the player count and the AI offer once it is due', () => {
+    const root = fakeRoot();
+    const screens = new Screens(root);
+    screens.queue({ link: 'https://snakeboom.com/r/ABC234', online: 3, aiOffered: false });
+    expect(root.innerHTML).toContain('LOOKING FOR AN OPPONENT');
+    expect(root.innerHTML).toContain('2 OTHER PLAYERS');
+    expect(root.innerHTML).toContain('https://snakeboom.com/r/ABC234');
+    expect(root.innerHTML).not.toContain('PLAY THE AI');
+    screens.queue({ link: 'x', online: 1, aiOffered: true });
+    expect(root.innerHTML).toContain('0 OTHER PLAYERS');
+    expect(root.innerHTML).toContain('PLAY THE AI NOW');
+  });
+});
+
+describe('Screens match over', () => {
+  it('updates the rematch line without touching the title or scores', () => {
+    const root = fakeRoot();
+    const screens = new Screens(root);
+    screens.matchOver(1, [2, 3], ['Ada', 'Bob'], 'SPACE REMATCH · ESC LOBBY');
+    expect(root.innerHTML).toContain('Bob WINS');
+    expect(root.innerHTML).toContain('2 – 3');
+    screens.matchOverLine('BOB WANTS A REMATCH');
+    expect(root.innerHTML).toContain('BOB WANTS A REMATCH');
+    expect(root.innerHTML).toContain('Bob WINS');
+    expect(root.innerHTML).toContain('SPACE REMATCH · ESC LOBBY');
+    screens.matchOverLine('');
+    expect(root.innerHTML).not.toContain('WANTS');
+    screens.clear();
+    screens.matchOverLine('ignored');
+    expect(root.innerHTML).toBe('');
+  });
+});
+
 describe('Screens cover/uncover', () => {
   it('restores the round banner the pause panel covered', () => {
     const root = fakeRoot();

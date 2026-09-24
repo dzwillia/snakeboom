@@ -3,11 +3,15 @@ import type { PlayerInput } from '../sim';
 import {
   decodeInput,
   decodeRelayed,
+  decodeReplay,
   encodeInput,
   encodeRelayed,
+  encodeReplay,
   FRAME_INPUT,
   FRAME_RELAYED,
+  FRAME_REPLAY,
   packInput,
+  relayedTick,
   unpackInput,
 } from './codec';
 
@@ -79,5 +83,34 @@ describe('relayed frames', () => {
     expect(decodeRelayed(badFrame)).toBeNull();
     expect(decodeRelayed(good.subarray(1))).toBeNull();
     expect(() => encodeRelayed(2, 7, { turn: 0, boost: false, use: false })).toThrow(RangeError);
+  });
+});
+
+describe('replay blobs', () => {
+  const frame = (player: number, tick: number) => encodeRelayed(player, tick, { turn: 1, boost: false, use: tick % 2 === 0 });
+
+  it('round-trips 0, 1 and 1000 frames', () => {
+    for (const n of [0, 1, 1000]) {
+      const frames = Array.from({ length: n }, (_, i) => frame(i % 2, i + 1));
+      const blob = encodeReplay(frames);
+      expect(blob[0]).toBe(FRAME_REPLAY);
+      expect(blob).toHaveLength(1 + 7 * n);
+      const decoded = decodeReplay(blob);
+      expect(decoded).toHaveLength(n);
+      expect(decoded?.map((d) => d.tick)).toEqual(frames.map((f) => relayedTick(f)));
+      if (n > 0) expect(decoded?.[n - 1]?.input.use).toBe(n % 2 === 0);
+    }
+  });
+
+  it('rejects a short blob, the wrong frame byte and a bad entry', () => {
+    const good = encodeReplay([frame(0, 1), frame(1, 1)]);
+    expect(decodeReplay(good.subarray(0, good.length - 1))).toBeNull();
+    const badByte = Uint8Array.from(good);
+    badByte[0] = FRAME_RELAYED;
+    expect(decodeReplay(badByte)).toBeNull();
+    const badEntry = Uint8Array.from(good);
+    badEntry[7] = 3;
+    expect(decodeReplay(badEntry)).toBeNull();
+    expect(decodeReplay(new Uint8Array(0))).toBeNull();
   });
 });
