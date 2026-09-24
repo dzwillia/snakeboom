@@ -149,6 +149,8 @@ export interface SessionOptions {
   maxRollback?: number;
   /** Outgoing local inputs, to be sent to the relay. */
   send: (tick: number, input: PlayerInput) => void;
+  /** Called after every confirmed tick; where hashes are taken (a burst of arrivals can confirm several ticks at once). */
+  onConfirmed?: (tick: number, state: MatchState, events: readonly SimEvent[]) => void;
 }
 export interface TaggedEvent { tick: number; event: SimEvent; confirmed: boolean }
 export interface SessionStats { rollbacks: number; maxRollbackDepth: number; stalledTicks: number }
@@ -220,7 +222,7 @@ The link is built around the sessions' `send` callbacks, so construct the sessio
 - [ ] **Step 1: Write the failing tests** (`session.test.ts`)
   - **Agreement:** at latency 40 ms / jitter 20 ms, D = 2, 4000 frames: both sides' hash records match tick for tick, `stalledTicks` is 0, and at least one rollback happened (bots change direction).
   - **Order scramble:** at latency 100 ms / jitter 60 ms, D = 3: still identical hashes; `maxRollbackDepth ≤ 10`.
-  - **Zero latency, D = 1:** identical hashes and zero rollbacks when the link delivers instantly (each frame's inputs arrive before the next).
+  - **Zero latency, D = 2:** identical hashes and zero rollbacks when the link delivers instantly (each frame's inputs arrive before the tick that needs them).
   - **Stall and resume:** pause side 1 for 3 s at frame 600; side 0 stalls within 10 ticks, `stalled` is true; unpause; both catch up and hashes match through frame 2000; every local tick sent exactly once (count `send` calls = distinct ticks).
   - **Events:** during the agreement run, feed each side's tagged events through an `EventGate`; every `roundOver` fires exactly once per round and only with `confirmed: true`; no cosmetic key repeats.
   - **`lead`:** with `remoteTickSeen = 100`, `inputDelay = 2`, predicted tick 102 and one-way 2 ticks, `lead(2)` is 2.
