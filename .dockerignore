@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-server
+.git
+docs
+.superpowers
+*.log
+.DS_Store
+infra
+.github
