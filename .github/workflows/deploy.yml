@@ -1,0 +1,137 @@
+name: deploy
+
+# A v* tag builds both images, pushes them to GHCR and deploys them to the Happy Path box.
+# Dispatch with a tag to redeploy (or roll back to) an existing release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to deploy (e.g. v1.0.0)'
+        required: true
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  API_IMAGE: ghcr.io/${{ github.repository_owner }}/snakeboom-api
+  WEB_IMAGE: ghcr.io/${{ github.repository_owner }}/snakeboom-web
+  SITE_URL: https://snakeboom.com
+  API_URL: https://api.snakeboom.com
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - id: tag
+        run: echo "tag=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push the relay image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.api
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.API_IMAGE }}:${{ steps.tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build and push the site image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.web
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            VITE_API_URL=${{ env.API_URL }}
+          tags: ${{ env.WEB_IMAGE }}:${{ steps.tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - name: Copy the compose file and the Caddy fragment to the host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: infra/snakeboom/docker-compose.yml,infra/caddy.d/snakeboom.caddy
+          target: /tmp/snakeboom-deploy
+          strip_components: 0
+      - name: Deploy on the host
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          API_URL: ${{ env.API_URL }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: TAG,GHCR_USER,GHCR_TOKEN,API_URL
+          script: |
+            set -euo pipefail
+            APP_DIR=/opt/happypathsoft/snakeboom
+            CONF_DIR=/opt/happypathsoft/caddy/conf.d
+            STAGED=/tmp/snakeboom-deploy
+            cd "$APP_DIR"
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+            # Point .env at the new images (keeping a backup), and take the compose file only if it parses.
+            cp .env .env.bak
+            for key in API_IMAGE_TAG WEB_IMAGE_TAG; do
+              if grep -q "^$key=" .env; then sed -i "s/^$key=.*/$key=$TAG/" .env; else echo "$key=$TAG" >> .env; fi
+            done
+            docker compose -f "$STAGED/infra/snakeboom/docker-compose.yml" --env-file .env config -q
+            cp "$STAGED/infra/snakeboom/docker-compose.yml" docker-compose.yml
+            docker compose pull
+            docker compose up -d
+
+            # Install the Caddy fragment only if the whole config still validates; otherwise put the old one back.
+            NEW="$STAGED/infra/caddy.d/snakeboom.caddy"
+            CUR="$CONF_DIR/snakeboom.caddy"
+            if [ -f "$CUR" ]; then cp "$CUR" /tmp/snakeboom.caddy.bak; else rm -f /tmp/snakeboom.caddy.bak; fi
+            cp "$NEW" "$CUR"
+            if ! docker exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile; then
+              echo "Caddy fragment failed validation; restoring the previous one"
+              if [ -f /tmp/snakeboom.caddy.bak ]; then cp /tmp/snakeboom.caddy.bak "$CUR"; else rm -f "$CUR"; fi
+              exit 1
+            fi
+            docker exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+
+            # Smoke: the public relay reports the new version.
+            for i in $(seq 1 30); do
+              if curl -sf "$API_URL/health" | grep -q "\"version\":\"$TAG\""; then echo "deployed $TAG"; exit 0; fi
+              sleep 2
+            done
+            echo "smoke test failed"; docker logs --tail 50 snakeboom-api; exit 1
