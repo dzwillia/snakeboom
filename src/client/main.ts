@@ -218,8 +218,23 @@ async function boot(): Promise<void> {
         tuning.refresh();
         persist();
         return;
+      case 'KeyH':
+      case 'Slash':
+        // The Powers page is reachable whenever the game isn't running: from the title or from pause.
+        if (screens.showing === 'powers') {
+          if (paused) screens.paused();
+          else showTitle();
+        } else if (!state) {
+          screens.powers(cfg, 'title');
+        } else if (paused) {
+          screens.powers(cfg, 'pause');
+        }
+        return;
       case 'Escape':
-        if (state?.phase === 'matchOver') {
+        if (screens.showing === 'powers') {
+          if (paused) screens.paused();
+          else showTitle();
+        } else if (state?.phase === 'matchOver') {
           state = null;
           fx.clear();
           showTitle();
@@ -250,6 +265,7 @@ async function boot(): Promise<void> {
         }
         return;
       case 'Space':
+        if (screens.showing === 'powers') return;
         if (!state) {
           state = createMatch(cfg, newSeed());
           seatOpponent();

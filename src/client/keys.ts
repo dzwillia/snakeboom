@@ -18,6 +18,7 @@ export const GAME_KEYS: ReadonlySet<string> = new Set([
   ...BINDINGS.flatMap((b) => [b.left, b.right, b.boost, b.use]),
   'Space',
   'Backquote',
+  'Slash',
 ]);
 
 export function inputFromKeys(down: ReadonlySet<string>, b: Binding, usePressed: boolean): PlayerInput {
