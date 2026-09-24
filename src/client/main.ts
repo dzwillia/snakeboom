@@ -33,7 +33,7 @@ import { createTuningPanel } from './tuning';
 
 declare global {
   interface Window {
-    /** Dev-only handle for browser tests. */
+    /** Read-only handle for browser checks and console debugging. */
     __snakeboom?: { readonly state: MatchState | null; readonly online: OnlineMatch | null };
   }
 }
@@ -322,16 +322,15 @@ async function boot(): Promise<void> {
     if (document.hidden && !online) setPaused(true);
   });
 
-  if (import.meta.env.DEV) {
-    window.__snakeboom = {
-      get state() {
-        return activeState();
-      },
-      get online() {
-        return online;
-      },
-    };
-  }
+  // A read-only debug handle (browser checks, and a console peek in production).
+  window.__snakeboom = {
+    get state() {
+      return activeState();
+    },
+    get online() {
+      return online;
+    },
+  };
 
   if (rejoin && early) startOnline({ kind: 'rejoin', ...rejoin }, early);
   else if (joinCode && isRoomCode(joinCode)) beginOnline({ kind: 'join', room: joinCode });

@@ -58,7 +58,9 @@ Since v0.8.0 two people can play from different computers. On the title screen p
 - **Quick match** pairs you with whoever else is waiting. While you wait you get an invite link too, and after ten seconds an offer to play the Hard AI instead (<kbd>A</kbd>).
 - **Rematch:** after a match, <kbd>Space</kbd> asks for another and <kbd>Esc</kbd> goes back to the lobby. A line under the banner shows who's in.
 - **Refresh to rejoin:** if your tab drops or you reload, the other player sees a 15 s countdown and the game waits. Come back in time and your browser rebuilds the match from the relay's input log in a moment; miss it and they win by forfeit.
-- The public server at `snakeboom.com` comes with the next milestone.
+- **Phones** get a page that keeps the link: SnakeBoom needs a keyboard.
+
+Play at **[snakeboom.com](https://snakeboom.com)**.
 
 Under the hood: `src/net` holds the protocol, the rollback session and the room state machine (pure, tested through an in-memory relay with latency and jitter), and `src/server` is the Node relay. It never runs the game; it pairs players, forwards inputs and compares both clients' state hashes every second.
 
@@ -70,6 +72,10 @@ pnpm build:server && pnpm start:server
 ```
 
 To play across a LAN, run the relay on one machine and point the other at it: `VITE_API_URL=http://<lan-ip>:3001 pnpm dev:web --host`. The client reads `VITE_API_URL` at build time and defaults to `http://localhost:3001`.
+
+## Hosting
+
+The site and the relay ship as two Docker images (`Dockerfile.web`, `Dockerfile.api`) and run behind the shared Caddy on the Happy Path box. A `v*` tag builds, pushes and deploys them through `.github/workflows/deploy.yml`. The runbook, including the one-time setup, is in [`infra/README.md`](infra/README.md).
 
 ## Develop
 
