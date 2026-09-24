@@ -92,7 +92,7 @@ async function boot(): Promise<void> {
     cfg: activeCfg,
     names: () => names,
     now,
-    matchOverHint: () => (online ? 'SPACE OR ESC · MENU' : 'SPACE REMATCH · ESC MENU'),
+    matchOverHint: () => (online ? 'SPACE REMATCH · ESC LOBBY' : 'SPACE REMATCH · ESC MENU'),
   });
 
   const showTitle = () => screens.title({ row: menuRow, winsToWin: cfg.winsToWin, hearts: cfg.hearts, opponent: settings.opponent });

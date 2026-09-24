@@ -159,9 +159,15 @@ export class OnlineMatch {
   /** Space and Escape. Returns true when the key was used. */
   key(code: string): boolean {
     const matchOver = this.phase === 'playing' && this.session?.state.phase === 'matchOver';
-    if (matchOver && (code === 'Space' || code === 'Escape')) {
-      this.conn.send({ type: 'leave' });
-      this.exit();
+    if (matchOver && code === 'Space') {
+      // Request (or withdraw) a rematch; the lobby message updates the line under the banner.
+      const mine = this.lobby?.players[this.me];
+      this.conn.send({ type: 'ready', ready: !(mine?.ready ?? false) });
+      return true;
+    }
+    if (matchOver && code === 'Escape') {
+      this.conn.send({ type: 'ready', ready: false });
+      this.toLobby();
       return true;
     }
     if (code === 'Space') {
@@ -170,7 +176,11 @@ export class OnlineMatch {
         this.conn.send({ type: 'ready', ready: !(mine?.ready ?? false) });
         return true;
       }
-      if (this.phase === 'over' || this.phase === 'error') {
+      if (this.phase === 'over') {
+        this.toLobby();
+        return true;
+      }
+      if (this.phase === 'error') {
         this.exit();
         return true;
       }
@@ -227,7 +237,8 @@ export class OnlineMatch {
         this.names = m.players.map((p, i) => displayName(p?.name ?? '', i));
         this.deps.hud.setNames(this.names);
         this.deps.onNames(this.names);
-        if (this.phase === 'lobby' || this.phase === 'over') this.showLobby();
+        if (this.phase === 'lobby') this.showLobby();
+        else if (this.phase === 'playing' && this.session?.state.phase === 'matchOver') this.showRematchLine();
         return;
       case 'ping':
         this.clock.onPing(m.t, performance.now(), this.rttMs);
@@ -252,6 +263,7 @@ export class OnlineMatch {
         this.end('over', 'OUT OF SYNC', 'MATCH VOIDED', 'var(--red)');
         return;
       case 'peerLeft':
+        if (this.session?.state.phase === 'matchOver') return; // the lobby message updates the line
         if (this.phase === 'playing' || this.phase === 'starting') this.end('over', 'OPPONENT LEFT', '', 'var(--text)');
         return;
       case 'closed':
@@ -266,6 +278,31 @@ export class OnlineMatch {
         else this.end('error', 'SOMETHING WENT WRONG', m.message.toUpperCase(), 'var(--text)');
         return;
     }
+  }
+
+  /** Back to the lobby view after a match, staying in the room. */
+  private toLobby(): void {
+    this.phase = 'lobby';
+    this.session = null;
+    this.peerAwayDeadline = null;
+    this.deps.setTimeScale(1);
+    this.deps.hud.setPing(this.lobby?.pingMs ?? null, false);
+    this.deps.fx.clear();
+    this.deps.sink.beat = null;
+    this.showLobby();
+  }
+
+  private showRematchLine(): void {
+    if (!this.lobby) return;
+    const mine = this.lobby.players[this.me]?.ready ?? false;
+    const peer = this.lobby.players[1 - this.me];
+    const peerName = this.names[1 - this.me];
+    let line = '';
+    if (!peer) line = `${peerName} LEFT · SPACE FOR THE LOBBY`;
+    else if (mine && peer.ready) line = 'REMATCH!';
+    else if (mine) line = `REMATCH REQUESTED · WAITING FOR ${peerName}`;
+    else if (peer.ready) line = `${peerName} WANTS A REMATCH · SPACE TO ACCEPT`;
+    this.deps.screens.matchOverLine(line);
   }
 
   private roomFromMode(): string {
@@ -335,6 +372,6 @@ export class OnlineMatch {
     this.peerAwayDeadline = null;
     this.deps.setTimeScale(1);
     this.deps.hud.setPing(null, false);
-    this.deps.screens.notice(title, detail, 'SPACE OR ESC · MENU', colorCss);
+    this.deps.screens.notice(title, detail, phase === 'over' ? 'SPACE LOBBY · ESC MENU' : 'SPACE OR ESC · MENU', colorCss);
   }
 }

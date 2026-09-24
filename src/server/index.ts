@@ -146,7 +146,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
 
   const joinEntry = (conn: Connection, entry: RoomEntry) => {
     // Attach first so the room's welcome and lobby messages reach this socket.
-    const reserved = entry.room.status === 'waiting' || entry.room.status === 'lobby' || entry.room.status === 'over';
+    const reserved = entry.room.status === 'waiting' || entry.room.status === 'lobby';
     if (!reserved) return send(conn.socket, { type: 'closed', reason: 'full' });
     const probe = entry.room.playerCount;
     const player = probe === 0 ? 0 : 1;

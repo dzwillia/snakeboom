@@ -188,16 +188,23 @@ export class Screens {
     );
   }
 
+  private matchOverTemplate = '';
+
   matchOver(winner: number, scores: readonly number[], names: readonly string[] = PLAYER_NAMES, hint = 'SPACE REMATCH · ESC MENU'): void {
-    this.show(
-      `
+    this.matchOverTemplate = `
       <div class="panel">
         <div class="banner-title" style="color:${PLAYER_CSS[winner]}">${escapeHtml(names[winner])} WINS</div>
         <div class="banner-detail">${scores.join(' – ')}</div>
+        <div class="small rematch-line">{{line}}</div>
         <div class="hint">${hint}</div>
-      </div>`,
-      'matchOver',
-    );
+      </div>`;
+    this.show(this.matchOverTemplate.replace('{{line}}', ''), 'matchOver');
+  }
+
+  /** Updates the rematch status line under the match-over banner, if that screen is showing. */
+  matchOverLine(text: string): void {
+    if (this.kind !== 'matchOver' || !this.matchOverTemplate) return;
+    this.show(this.matchOverTemplate.replace('{{line}}', escapeHtml(text)), 'matchOver');
   }
 
   /** Shows the pause panel, remembering what it covers. */

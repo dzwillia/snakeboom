@@ -26,7 +26,11 @@ export interface RoomOptions {
   emptyMs?: number;
 }
 
-export type RoomStatus = 'waiting' | 'lobby' | 'playing' | 'over' | 'closed';
+/**
+ * waiting: one seat filled · lobby: both seated, not playing · playing: a match is on · closed: gone.
+ * After a match (result, forfeit or desync) the room goes back to lobby or waiting for a rematch.
+ */
+export type RoomStatus = 'waiting' | 'lobby' | 'playing' | 'closed';
 
 export const DEFAULT_GRACE_MS = 15_000;
 export const DEFAULT_IDLE_MS = 600_000;
@@ -85,6 +89,8 @@ export class Room {
   private seed = 0;
   /** The current match's parameters, for rejoins. */
   private match: { seed: number; winsToWin: number; inputDelay: number; rttMs: number[] } | null = null;
+  /** Input frames are forwarded from start until a seat empties, including the round-over play-out after a result. */
+  private relaying = false;
 
   constructor(
     private readonly host: RoomHost,
@@ -120,7 +126,7 @@ export class Room {
   }
 
   join(name: string): { player: number; session: string } | 'full' {
-    if (this.statusNow === 'closed' || this.statusNow === 'playing') return 'full';
+    if (this.statusNow !== 'waiting') return 'full';
     const player = this.seats.findIndex((s) => s === null);
     if (player < 0) return 'full';
     const session = this.token();
@@ -164,7 +170,7 @@ export class Room {
     this.clearEmpty();
     this.ensurePing();
     this.host.send(player, { type: 'welcome', player, room: this.code, session, name: seat.name });
-    if (this.match && (this.statusNow === 'playing' || this.statusNow === 'over')) {
+    if (this.match && this.statusNow === 'playing') {
       const frames = this.inputLog.filter((f) => relayedTick(f) >= fromTick);
       this.host.send(player, { type: 'resume', ...this.match, frames: frames.length });
       this.host.send(player, encodeReplay(frames));
@@ -227,9 +233,9 @@ export class Room {
 
   onInput(player: number, frame: Uint8Array): void {
     const seat = this.seats[player];
-    // Frames keep flowing after the result, so both clients can play out the round-over banner
-    // and reach the match-over screen together.
-    if (!seat || (this.statusNow !== 'playing' && this.statusNow !== 'over') || !seat.connected) return;
+    // Frames keep flowing after the result (the room is back in the lobby by then), so both
+    // clients can play out the round-over banner and reach the match-over screen together.
+    if (!seat || !this.relaying || !seat.connected) return;
     const decoded = decodeInput(frame);
     if (!decoded) return;
     const other = this.seats[1 - player];
@@ -270,7 +276,7 @@ export class Room {
   }
 
   private maybeStart(): void {
-    if (this.statusNow !== 'lobby' && this.statusNow !== 'over') return;
+    if (this.statusNow !== 'lobby') return;
     const [a, b] = this.seats;
     if (!a || !b || !a.ready || !b.ready || !a.connected || !b.connected) return;
     this.seed = Math.floor(this.host.random() * 2147483648);
@@ -284,6 +290,7 @@ export class Room {
     }
     this.inputLog = [];
     this.hashes.clear();
+    this.relaying = true;
     this.setStatus('playing');
     this.match = { seed: this.seed, winsToWin: this.winsToWin, inputDelay, rttMs };
     const message: ServerMessage = { type: 'start', ...this.match, startAt };
@@ -306,17 +313,32 @@ export class Room {
     this.hashes.delete(tick);
     if (a !== b) {
       this.host.log({ event: 'desync', tick, hashes: [a, b], seed: this.seed, frames: this.inputLog.length });
-      this.setStatus('over');
       this.broadcast({ type: 'desync', tick });
+      this.backToLobby();
       return;
     }
     const other = this.seats[1 - player];
     const r0 = this.seats[0]?.result;
     const r1 = this.seats[1]?.result;
     if (result && other?.result && r0 && r1 && r0.round === r1.round && r0.matchWinner !== null && r0.matchWinner === r1.matchWinner) {
-      this.setStatus('over');
       this.host.log({ event: 'match', winner: r0.matchWinner, scores: r0.scores, rounds: r0.round, seed: this.seed });
+      this.backToLobby();
     }
+  }
+
+  /** The match is finished: clear the ready flags so both must opt into a rematch. */
+  private backToLobby(): void {
+    this.match = null;
+    for (const seat of this.seats) {
+      if (!seat) continue;
+      seat.ready = false;
+      if (seat.cancelGrace) {
+        seat.cancelGrace();
+        seat.cancelGrace = null;
+      }
+    }
+    this.setStatus(this.seats.every((s) => s !== null) ? 'lobby' : 'waiting');
+    this.broadcastLobby();
   }
 
   private startGrace(player: number, seat: Seat): void {
@@ -339,17 +361,18 @@ export class Room {
       seat.cancelGrace = null;
     }
     this.seats[player] = null;
+    this.relaying = false;
     const other = this.seats[1 - player];
     if (this.statusNow === 'playing') {
-      this.setStatus('over');
       this.host.log({ event: 'forfeit', loser: player, reason, seed: this.seed });
       if (other?.connected) this.host.send(1 - player, { type: 'forfeit', winner: 1 - player, reason });
-    } else {
-      this.setStatus('waiting');
-      if (other) other.ready = false;
-      if (other?.connected) this.host.send(1 - player, { type: 'peerLeft' });
-      this.broadcastLobby();
+      this.match = null;
+    } else if (other?.connected) {
+      this.host.send(1 - player, { type: 'peerLeft' });
     }
+    if (other) other.ready = false;
+    this.setStatus('waiting');
+    this.broadcastLobby();
     if (this.playerCount === 0) this.scheduleEmpty();
   }
 

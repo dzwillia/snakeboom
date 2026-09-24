@@ -203,7 +203,7 @@ describe('Room refereeing', () => {
     room.onMessage(0, { type: 'hash', tick: 120, hash: 333 });
     expect(host.last(0, 'desync')).toEqual({ type: 'desync', tick: 120 });
     expect(host.last(1, 'desync')).toEqual({ type: 'desync', tick: 120 });
-    expect(room.status).toBe('over');
+    expect(room.status).toBe('lobby');
     expect(host.logs.find((l) => l.event === 'desync')).toMatchObject({ tick: 120, hashes: [333, 222] });
   });
 
@@ -214,10 +214,48 @@ describe('Room refereeing', () => {
     room.onMessage(0, { type: 'hash', tick: 900, hash: 5, result });
     expect(room.status).toBe('playing');
     room.onMessage(1, { type: 'hash', tick: 900, hash: 5, result });
-    expect(room.status).toBe('over');
+    expect(room.status).toBe('lobby');
     expect(host.logs.find((l) => l.event === 'match')).toMatchObject({ winner: 1, scores: [3, 5] });
     room.onInput(0, encodeInput(1, NO_INPUT));
     expect(host.frames(1)).toHaveLength(1);
+  });
+
+  // Review Focus 3: rematches.
+  it('returns to the lobby after a match and starts a rematch with a fresh seed and log', () => {
+    const host = new FakeHost();
+    const room = started(host);
+    const firstStart = host.last(0, 'start') as Extract<ServerMessage, { type: 'start' }>;
+    room.onInput(0, encodeInput(1, NO_INPUT));
+    const result = { round: 3, winner: 0, scores: [2, 1], matchWinner: 0 };
+    room.onMessage(0, { type: 'hash', tick: 500, hash: 9, result });
+    room.onMessage(1, { type: 'hash', tick: 500, hash: 9, result });
+    expect(room.status).toBe('lobby');
+    expect(host.last(0, 'lobby')).toMatchObject({ players: [{ ready: false }, { ready: false }] });
+    room.onMessage(1, { type: 'ready', ready: true });
+    expect(room.status).toBe('lobby');
+    expect(host.messages(0, 'start')).toHaveLength(1);
+    room.onMessage(0, { type: 'ready', ready: true });
+    expect(room.status).toBe('playing');
+    const second = host.last(0, 'start') as Extract<ServerMessage, { type: 'start' }>;
+    expect(host.messages(0, 'start')).toHaveLength(2);
+    expect(second.seed).not.toBe(firstStart.seed);
+    expect(room.log).toHaveLength(0);
+    const session = (host.last(1, 'welcome') as { session: string }).session;
+    room.onDisconnect(1);
+    expect(room.rejoin(session)).toBe(1);
+  });
+
+  it('after a forfeit the winner waits alone and the loser’s token is gone', () => {
+    const host = new FakeHost();
+    const room = started(host);
+    const session = (host.last(1, 'welcome') as { session: string }).session;
+    room.onMessage(1, { type: 'leave' });
+    expect(room.status).toBe('waiting');
+    room.onMessage(0, { type: 'ready', ready: true });
+    expect(room.status).toBe('waiting');
+    expect(room.rejoin(session)).toBeNull();
+    expect(room.join('Cy')).toEqual({ player: 1, session: expect.any(String) });
+    expect(room.status).toBe('lobby');
   });
 });
 
@@ -233,7 +271,7 @@ describe('Room disconnects', () => {
     host.tick(14_000);
     expect(room.status).toBe('playing');
     host.tick(1_000);
-    expect(room.status).toBe('over');
+    expect(room.status).toBe('waiting');
     expect(host.last(0, 'forfeit')).toEqual({ type: 'forfeit', winner: 0, reason: 'timeout' });
   });
 
@@ -331,7 +369,7 @@ describe('Room disconnects', () => {
     const host = new FakeHost();
     const room = started(host);
     room.onMessage(1, { type: 'leave' });
-    expect(room.status).toBe('over');
+    expect(room.status).toBe('waiting');
     expect(host.last(0, 'forfeit')).toEqual({ type: 'forfeit', winner: 0, reason: 'left' });
     expect(host.closed[1]).toBe(true);
   });

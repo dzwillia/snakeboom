@@ -92,6 +92,25 @@ describe('Screens lobby', () => {
   });
 });
 
+describe('Screens match over', () => {
+  it('updates the rematch line without touching the title or scores', () => {
+    const root = fakeRoot();
+    const screens = new Screens(root);
+    screens.matchOver(1, [2, 3], ['Ada', 'Bob'], 'SPACE REMATCH · ESC LOBBY');
+    expect(root.innerHTML).toContain('Bob WINS');
+    expect(root.innerHTML).toContain('2 – 3');
+    screens.matchOverLine('BOB WANTS A REMATCH');
+    expect(root.innerHTML).toContain('BOB WANTS A REMATCH');
+    expect(root.innerHTML).toContain('Bob WINS');
+    expect(root.innerHTML).toContain('SPACE REMATCH · ESC LOBBY');
+    screens.matchOverLine('');
+    expect(root.innerHTML).not.toContain('WANTS');
+    screens.clear();
+    screens.matchOverLine('ignored');
+    expect(root.innerHTML).toBe('');
+  });
+});
+
 describe('Screens cover/uncover', () => {
   it('restores the round banner the pause panel covered', () => {
     const root = fakeRoot();
