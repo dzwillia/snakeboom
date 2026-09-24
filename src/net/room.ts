@@ -1,4 +1,4 @@
-import { decodeInput, encodeRelayed } from './codec';
+import { decodeInput, encodeRelayed, encodeReplay, relayedTick } from './codec';
 import { ROOM_ALPHABET } from './names';
 import type { ClientMessage, CloseReason, LobbyPlayer, RoundResult, ServerMessage } from './protocol';
 
@@ -83,6 +83,8 @@ export class Room {
   private readonly hashes = new Map<number, (number | undefined)[]>();
   private lastPingShown: number | null = null;
   private seed = 0;
+  /** The current match's parameters, for rejoins. */
+  private match: { seed: number; winsToWin: number; inputDelay: number; rttMs: number[] } | null = null;
 
   constructor(
     private readonly host: RoomHost,
@@ -148,8 +150,11 @@ export class Room {
     return player < 0 || this.statusNow === 'closed' ? null : player;
   }
 
-  /** A returning socket with its session token. */
-  rejoin(session: string): number | null {
+  /**
+   * A returning socket with its session token. Mid-match it gets the match parameters and the
+   * input log from `fromTick` on, so it can rebuild the match before it sends anything.
+   */
+  rejoin(session: string, fromTick = 0): number | null {
     const player = this.seats.findIndex((s) => s !== null && s.session === session);
     if (player < 0 || this.statusNow === 'closed') return null;
     const seat = this.seats[player]!;
@@ -159,6 +164,11 @@ export class Room {
     this.clearEmpty();
     this.ensurePing();
     this.host.send(player, { type: 'welcome', player, room: this.code, session, name: seat.name });
+    if (this.match && (this.statusNow === 'playing' || this.statusNow === 'over')) {
+      const frames = this.inputLog.filter((f) => relayedTick(f) >= fromTick);
+      this.host.send(player, { type: 'resume', ...this.match, frames: frames.length });
+      this.host.send(player, encodeReplay(frames));
+    }
     if (seat.cancelGrace) {
       seat.cancelGrace();
       seat.cancelGrace = null;
@@ -275,7 +285,8 @@ export class Room {
     this.inputLog = [];
     this.hashes.clear();
     this.setStatus('playing');
-    const message: ServerMessage = { type: 'start', seed: this.seed, winsToWin: this.winsToWin, inputDelay, startAt, rttMs };
+    this.match = { seed: this.seed, winsToWin: this.winsToWin, inputDelay, rttMs };
+    const message: ServerMessage = { type: 'start', ...this.match, startAt };
     this.host.send(0, message);
     this.host.send(1, message);
     this.host.log({ event: 'start', seed: this.seed, inputDelay, rttMs, names: [a.name, b.name] });

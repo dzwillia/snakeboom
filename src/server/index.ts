@@ -170,7 +170,8 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     if (!entry || player === null) return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });
     // Attach first so rejoin()'s welcome reaches this socket.
     entry.host.attach(player, conn.socket);
-    if (entry.room.rejoin(session) === null) {
+    const fromTick = typeof message.fromTick === 'number' && message.fromTick >= 0 ? Math.floor(message.fromTick) : 0;
+    if (entry.room.rejoin(session, fromTick) === null) {
       entry.host.detach(player, conn.socket);
       return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });
     }

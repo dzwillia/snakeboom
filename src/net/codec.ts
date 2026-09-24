@@ -4,6 +4,8 @@ import type { PlayerInput } from '../sim';
 export const FRAME_INPUT = 1;
 /** relay → client: [FRAME_RELAYED, player u8, tick u32 LE, input u8] */
 export const FRAME_RELAYED = 2;
+/** relay → client on rejoin: [FRAME_REPLAY, relayed frames...] */
+export const FRAME_REPLAY = 3;
 export const INPUT_FRAME_BYTES = 6;
 export const RELAYED_FRAME_BYTES = 7;
 
@@ -67,4 +69,27 @@ export function decodeRelayed(bytes: Uint8Array): { player: number; tick: number
   if (bytes.length !== RELAYED_FRAME_BYTES || bytes[0] !== FRAME_RELAYED || bytes[1] > 1) return null;
   const input = unpackInput(bytes[6]);
   return input ? { player: bytes[1], tick: readTick(bytes, 2), input } : null;
+}
+
+/** The tick of a relayed frame, without decoding the rest. */
+export function relayedTick(frame: Uint8Array): number {
+  return readTick(frame, 2);
+}
+
+export function encodeReplay(frames: readonly Uint8Array[]): Uint8Array {
+  const out = new Uint8Array(1 + frames.length * RELAYED_FRAME_BYTES);
+  out[0] = FRAME_REPLAY;
+  frames.forEach((f, i) => out.set(f, 1 + i * RELAYED_FRAME_BYTES));
+  return out;
+}
+
+export function decodeReplay(bytes: Uint8Array): { player: number; tick: number; input: PlayerInput }[] | null {
+  if (bytes.length < 1 || bytes[0] !== FRAME_REPLAY || (bytes.length - 1) % RELAYED_FRAME_BYTES !== 0) return null;
+  const out: { player: number; tick: number; input: PlayerInput }[] = [];
+  for (let at = 1; at < bytes.length; at += RELAYED_FRAME_BYTES) {
+    const entry = decodeRelayed(bytes.subarray(at, at + RELAYED_FRAME_BYTES));
+    if (!entry) return null;
+    out.push(entry);
+  }
+  return out;
 }

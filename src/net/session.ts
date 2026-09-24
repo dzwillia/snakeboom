@@ -115,6 +115,40 @@ export class NetSession {
     return this.latestRemoteTick;
   }
 
+  /** A local input taken from the relay's log after a refresh. Stored without sending. */
+  restoreLocal(tick: number, input: PlayerInput): void {
+    if (!Number.isInteger(tick) || tick <= this.confirmed.tick || this.localInputs.has(tick)) return;
+    this.localInputs.set(tick, copyInput(input));
+  }
+
+  /**
+   * Rebuilds from a log: steps the confirmed state through up to `maxTicks` fully-known ticks and
+   * mirrors it into the predicted state. Nothing is sent or predicted. Returns the ticks stepped.
+   */
+  catchUp(maxTicks: number): number {
+    let stepped = 0;
+    while (stepped < maxTicks) {
+      const tick = this.confirmed.tick + 1;
+      const remote = this.remoteInputs.get(tick);
+      const local = this.localInputs.get(tick);
+      if (!remote || !local) break;
+      const events = step(this.confirmed, this.seatInputs(tick, remote), this.cfg);
+      this.onConfirmed?.(tick, this.confirmed, events);
+      stepped++;
+    }
+    if (stepped > 0) {
+      this.predicted = cloneState(this.confirmed);
+      this.predictedRemote.clear();
+      this.needRollback = false;
+    }
+    return stepped;
+  }
+
+  /** True while the newest known remote tick is further ahead than the input delay explains. */
+  get behind(): boolean {
+    return this.latestRemoteTick - this.predicted.tick > this.inputDelay;
+  }
+
   /** A remote input for a tick. Any order is fine; duplicates and already-confirmed ticks are ignored. */
   receive(tick: number, input: PlayerInput): void {
     if (!Number.isInteger(tick) || tick <= this.confirmed.tick || this.remoteInputs.has(tick)) return;
@@ -136,11 +170,14 @@ export class NetSession {
    * maxRollback ticks ahead of the confirmed one.
    */
   advance(localInput: PlayerInput): TaggedEvent[] {
+    // Normally only the scheduled tick is new. After a rejoin the ticks between the log's last
+    // local input and the schedule are missing too, and nothing else would ever fill them.
     const target = this.predicted.tick + this.inputDelay;
-    if (!this.localInputs.has(target)) {
+    for (let tick = this.predicted.tick + 1; tick <= target; tick++) {
+      if (this.localInputs.has(tick)) continue;
       const stored = copyInput(localInput);
-      this.localInputs.set(target, stored);
-      this.send(target, stored);
+      this.localInputs.set(tick, stored);
+      this.send(tick, stored);
     }
     const events = this.reconcile();
     if (this.predicted.tick - this.confirmed.tick >= this.maxRollback) {

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import { NO_INPUT } from '../sim';
-import { decodeRelayed, encodeInput } from '../net/codec';
+import { decodeRelayed, decodeReplay, encodeInput } from '../net/codec';
 import { PROTOCOL, type ClientMessage, type ServerMessage } from '../net/protocol';
 import { startServer, type RunningServer } from './index';
 
@@ -202,12 +202,20 @@ describe('relay server', () => {
     await a.expect('start');
     b.close();
     await a.expect('peerAway');
+    a.sendFrame(encodeInput(1, NO_INPUT));
+    a.sendFrame(encodeInput(2, NO_INPUT));
+    await new Promise((r) => setTimeout(r, 50));
     const b2 = new TestClient(server.port);
     await b2.opened;
-    b2.send({ ...hello('B'), session: wb.session });
+    b2.send({ ...hello('B'), session: wb.session, fromTick: 0 });
     expect((await b2.expect('welcome')).player).toBe(1);
+    const resume = await b2.expect('resume');
+    expect(resume).toMatchObject({ winsToWin: 1, frames: 2 });
+    const replay = decodeReplay((await b2.waitFrames(1))[0]);
+    expect(replay?.map((f) => f.tick)).toEqual([1, 2]);
+    b2.frames.length = 0;
     await a.expect('peerBack');
-    a.sendFrame(encodeInput(1, NO_INPUT));
+    a.sendFrame(encodeInput(3, NO_INPUT));
     expect(await b2.waitFrames(1)).toHaveLength(1);
     a.close();
     b2.close();

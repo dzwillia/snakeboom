@@ -28,6 +28,8 @@ export class FakeLink {
   private readonly paused = [false, false];
   private readonly rng: RngState;
   private seq = 0;
+  /** Every input ever sent through the link, in send order: the relay's log. */
+  readonly sent: { from: number; tick: number; input: PlayerInput }[] = [];
 
   constructor(private readonly opts: FakeLinkOptions) {
     this.rng = createRng(opts.seed);
@@ -40,6 +42,7 @@ export class FakeLink {
   /** Called by a session's `send`: side `from` sends its input for `tick`. */
   enqueue(from: number, tick: number, input: PlayerInput): void {
     const packet: Packet = { due: 0, seq: this.seq++, to: 1 - from, tick, input };
+    this.sent.push({ from, tick, input });
     if (this.paused[from]) this.held[from].push(packet);
     else this.post(packet);
   }

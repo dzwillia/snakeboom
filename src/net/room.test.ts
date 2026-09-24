@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NO_INPUT } from '../sim';
-import { decodeRelayed, encodeInput } from './codec';
+import { decodeRelayed, decodeReplay, encodeInput } from './codec';
 import type { ServerMessage } from './protocol';
 import { DEFAULT_EMPTY_MS, DEFAULT_GRACE_MS, DEFAULT_IDLE_MS, inputDelayFor, Room, type RoomHost } from './room';
 
@@ -249,6 +249,57 @@ describe('Room disconnects', () => {
     expect(room.status).toBe('playing');
     expect(host.messages(0, 'forfeit')).toHaveLength(0);
     expect(room.rejoin('nope')).toBeNull();
+  });
+
+  // Review Focus 1: the rejoin hands over everything needed to rebuild the match.
+  it('replays the match parameters and the input log to a rejoining player', () => {
+    const host = new FakeHost();
+    const room = started(host, [60, 80]);
+    const session = (host.last(1, 'welcome') as { session: string }).session;
+    room.onInput(0, encodeInput(1, NO_INPUT));
+    room.onInput(1, encodeInput(1, { turn: 1, boost: false, use: false }));
+    room.onInput(0, encodeInput(2, NO_INPUT));
+    room.onInput(1, encodeInput(2, NO_INPUT));
+    room.onInput(0, encodeInput(3, { turn: -1, boost: true, use: true }));
+    room.onDisconnect(1);
+    host.sent[1].length = 0;
+    expect(room.rejoin(session, 0)).toBe(1);
+    const types = host.sent[1].map((m) => (m instanceof Uint8Array ? 'binary' : m.type));
+    expect(types.slice(0, 4)).toEqual(['welcome', 'resume', 'binary', 'lobby']);
+    const start = host.last(0, 'start') as Extract<ServerMessage, { type: 'start' }>;
+    expect(host.last(1, 'resume')).toEqual({
+      type: 'resume',
+      seed: start.seed,
+      winsToWin: 5,
+      inputDelay: start.inputDelay,
+      rttMs: [60, 80],
+      frames: 5,
+    });
+    const replay = decodeReplay(host.frames(1)[0]);
+    expect(replay?.map((f) => [f.player, f.tick])).toEqual([
+      [0, 1],
+      [1, 1],
+      [0, 2],
+      [1, 2],
+      [0, 3],
+    ]);
+    expect(replay?.[4].input).toEqual({ turn: -1, boost: true, use: true });
+    expect(host.last(0, 'peerBack')).toEqual({ type: 'peerBack' });
+
+    room.onDisconnect(1);
+    host.sent[1].length = 0;
+    room.rejoin(session, 3);
+    expect(host.last(1, 'resume')).toMatchObject({ frames: 1 });
+    expect(decodeReplay(host.frames(1)[0])?.map((f) => f.tick)).toEqual([3]);
+  });
+
+  it('sends no replay to a player who rejoins the lobby', () => {
+    const host = new FakeHost();
+    const room = lobbyWith(host);
+    const session = (host.last(1, 'welcome') as { session: string }).session;
+    room.onDisconnect(1);
+    expect(room.status).toBe('waiting');
+    expect(room.rejoin(session)).toBeNull();
   });
 
   it('treats a hidden tab like a disconnect and a shown tab like a rejoin', () => {

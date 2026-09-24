@@ -42,6 +42,8 @@ export type ServerMessage =
   /** Sent to every waiting quick-match player whenever the queue or the player count changes. */
   | { type: 'queued'; waiting: number; online: number }
   | { type: 'start'; seed: number; winsToWin: number; inputDelay: number; startAt: number; rttMs: number[] }
+  /** A rejoin mid-match: the match's parameters, followed by one binary replay frame with `frames` entries. */
+  | { type: 'resume'; seed: number; winsToWin: number; inputDelay: number; rttMs: number[]; frames: number }
   | { type: 'ping'; t: number }
   | { type: 'desync'; tick: number }
   | { type: 'peerAway'; deadline: number }
