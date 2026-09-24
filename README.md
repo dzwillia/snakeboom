@@ -59,6 +59,7 @@ Since v0.8.0 two people can play from different computers. On the title screen p
 - **Rematch:** after a match, <kbd>Space</kbd> asks for another and <kbd>Esc</kbd> goes back to the lobby. A line under the banner shows who's in.
 - **Refresh to rejoin:** if your tab drops or you reload, the other player sees a 15 s countdown and the game waits. Come back in time and your browser rebuilds the match from the relay's input log in a moment; miss it and they win by forfeit.
 - **Phones** get a page that keeps the link: SnakeBoom needs a keyboard.
+- <kbd>N</kbd> during an online match shows the netcode readout under the ping: input delay, rollbacks and stalls per minute, how far ahead of the other player you're running, and the speed nudge that keeps you level. `pnpm netsim --profile hotspot` runs the same netcode headlessly through a simulated bad connection.
 
 Play at **[snakeboom.com](https://snakeboom.com)**.
 

@@ -1,7 +1,7 @@
 {
   "name": "snakeboom",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -n web,relay -c cyan,magenta \"vite --open\" \"tsx watch src/server/main.ts\"",
