@@ -1,22 +1,67 @@
 import { describe, expect, it } from 'vitest';
 import { Screens } from './screens';
 
-const fakeRoot = () => ({ innerHTML: '' }) as unknown as HTMLElement;
+const fakeRoot = () => ({ innerHTML: '', querySelector: () => null }) as unknown as HTMLElement;
 
 describe('Screens title', () => {
-  it('shows PINK’s keys for a human and the AI level otherwise', () => {
+  it('renders the four rows with the active one marked', () => {
     const root = fakeRoot();
     const screens = new Screens(root);
-    screens.title(5, 3, 'human');
+    screens.title({ row: 'create', winsToWin: 5, hearts: 3, opponent: 'human' });
+    expect(root.innerHTML.match(/class="row/g)).toHaveLength(4);
+    expect(root.innerHTML).toContain('class="row active" data-row="create"');
     expect(root.innerHTML).toContain('HUMAN');
     expect(root.innerHTML).toContain('use item</p></div>\n          <div class="p2">');
-    screens.title(5, 3, 'hard');
+  });
+
+  it("shows PINK's seat as the AI when an AI level is chosen", () => {
+    const root = fakeRoot();
+    new Screens(root).title({ row: 'local', winsToWin: 5, hearts: 3, opponent: 'hard' });
     expect(root.innerHTML).toContain('AI · HARD');
     expect(root.innerHTML).toContain('plays this seat');
   });
 });
 
-describe('Screens pause/resume', () => {
+describe('Screens lobby', () => {
+  it('shows the code, the link, both seats and the ping', () => {
+    const root = fakeRoot();
+    new Screens(root).lobby({
+      code: 'ABC234',
+      link: 'https://snakeboom.com/r/ABC234',
+      players: [
+        { name: 'Ada', ready: true, connected: true },
+        { name: '', ready: false, connected: true },
+      ],
+      winsToWin: 5,
+      pingMs: 48,
+      me: 0,
+    });
+    expect(root.innerHTML).toContain('ABC234');
+    expect(root.innerHTML).toContain('https://snakeboom.com/r/ABC234');
+    expect(root.innerHTML).toContain('Ada');
+    expect(root.innerHTML).toContain('(YOU)');
+    expect(root.innerHTML).toContain('READY');
+    expect(root.innerHTML).toContain('PINK');
+    expect(root.innerHTML).toContain('PING 48 ms');
+  });
+
+  it('shows an empty seat and escapes names', () => {
+    const root = fakeRoot();
+    new Screens(root).lobby({
+      code: 'ABC234',
+      link: 'x',
+      players: [{ name: '<b>x</b>', ready: false, connected: true }, null],
+      winsToWin: 3,
+      pingMs: null,
+      me: 0,
+    });
+    expect(root.innerHTML).toContain('waiting for a player');
+    expect(root.innerHTML).toContain('&lt;b&gt;x&lt;/b&gt;');
+    expect(root.innerHTML).not.toContain('PING');
+  });
+});
+
+describe('Screens cover/uncover', () => {
   it('restores the round banner the pause panel covered', () => {
     const root = fakeRoot();
     const screens = new Screens(root);
@@ -35,5 +80,19 @@ describe('Screens pause/resume', () => {
     screens.paused();
     screens.resume();
     expect(root.innerHTML).toBe('');
+  });
+
+  it('keeps the original screen through a replaced cover', () => {
+    const root = fakeRoot();
+    const screens = new Screens(root);
+    screens.roundOver('DRAW', 'Time ran out', null);
+    const banner = root.innerHTML;
+    screens.reconnecting('PINK', 15);
+    screens.reconnecting('PINK', 14);
+    expect(root.innerHTML).toContain('14');
+    expect(screens.isCovered).toBe(true);
+    screens.uncover();
+    expect(root.innerHTML).toBe(banner);
+    expect(screens.isCovered).toBe(false);
   });
 });

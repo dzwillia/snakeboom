@@ -29,8 +29,12 @@ interface Side {
 export class Hud {
   private readonly sides: Side[];
   private readonly clock: HTMLElement;
+  private readonly ping: HTMLElement;
+  private readonly names: string[] = [...PLAYER_NAMES];
+  private readonly tags: string[] = ['', ''];
   private lastPips = '';
   private lastClock = '';
+  private lastPing = '';
 
   constructor(private readonly root: HTMLElement) {
     const side = (i: number) =>
@@ -38,7 +42,7 @@ export class Hud {
       `<div class="row"><span class="name">${PLAYER_NAMES[i]}</span><span class="hearts"></span><span class="pips"></span></div>` +
       `<div class="row"><span class="boost"><span class="fill" style="display:block"></span></span>` +
       `<span class="effects"></span><span class="slots"></span></div></div>`;
-    root.innerHTML = `${side(0)}<div class="clock">0:00</div>${side(1)}`;
+    root.innerHTML = `${side(0)}<div class="center"><div class="clock">0:00</div><div class="ping"></div></div>${side(1)}`;
     this.sides = [...root.querySelectorAll<HTMLElement>('.side')].map((el) => ({
       hearts: el.querySelector<HTMLElement>('.hearts')!,
       pips: el.querySelector<HTMLElement>('.pips')!,
@@ -50,12 +54,39 @@ export class Hud {
       lastSlots: '-',
     }));
     this.clock = root.querySelector<HTMLElement>('.clock')!;
+    this.ping = root.querySelector<HTMLElement>('.ping')!;
   }
 
   /** Adds a tag after a player's name (like AI) or clears it with an empty string. */
   setTag(player: number, tag: string): void {
-    const name = this.root.querySelectorAll<HTMLElement>('.name')[player];
-    if (name) name.textContent = tag ? `${PLAYER_NAMES[player]} · ${tag}` : PLAYER_NAMES[player];
+    this.tags[player] = tag;
+    this.renderName(player);
+  }
+
+  /** Replaces CYAN and PINK with the players' chosen names (online). */
+  setNames(names: readonly string[]): void {
+    names.forEach((name, i) => {
+      this.names[i] = name || PLAYER_NAMES[i];
+      this.renderName(i);
+    });
+  }
+
+  /** The ping readout under the clock: hidden when null, amber above 120 ms, red while stalled. */
+  setPing(ms: number | null, stalled: boolean): void {
+    const text = stalled ? 'WAITING' : ms === null ? '' : `${Math.round(ms)} ms`;
+    const cls = stalled ? 'stalled' : ms !== null && ms > 120 ? 'slow' : '';
+    const key = `${text}|${cls}`;
+    if (key === this.lastPing) return;
+    this.lastPing = key;
+    this.ping.textContent = text;
+    this.ping.className = `ping ${cls}`.trim();
+  }
+
+  private renderName(player: number): void {
+    const el = this.root.querySelectorAll<HTMLElement>('.name')[player];
+    if (!el) return;
+    const tag = this.tags[player];
+    el.textContent = tag ? `${this.names[player]} · ${tag}` : this.names[player];
   }
 
   update(state: MatchState | null, cfg: Config, t = 0): void {
