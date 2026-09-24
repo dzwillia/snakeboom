@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { botInput, createBot, DEFAULT_CONFIG, hashState, NO_INPUT, type BotState, type PlayerInput } from '../sim';
 import { EventGate } from './events';
-import { createLinkedSessions, type FakeLink } from './fakeRelay';
+import { createLinkedSessions, type FakeLink, type FakeLinkOptions } from './fakeRelay';
 import { emptyStats, NetSession, statsDelta } from './session';
 
 const FRAME_MS = 1000 / 60;
@@ -60,9 +60,9 @@ function expectAgreement(run: Run, minShared: number): void {
   for (const t of shared) expect(run.hashes[0].get(t)?.toString(16)).toBe(run.hashes[1].get(t)?.toString(16));
 }
 
-function setup(latencyMs: number, jitterMs: number, inputDelay: number, seed = 1) {
+function setup(latencyMs: number, jitterMs: number, inputDelay: number, seed = 1, extra: Partial<FakeLinkOptions> = {}) {
   const run = makeRun();
-  const { link, sessions } = createLinkedSessions({ latencyMs, jitterMs, seed }, { seed: 4242, cfg, inputDelay }, (side, tick, state, events) => {
+  const { link, sessions } = createLinkedSessions({ latencyMs, jitterMs, seed, ...extra }, { seed: 4242, cfg, inputDelay }, (side, tick, state, events) => {
     if (tick % 60 === 0 || events.some((e) => e.type === 'roundOver')) run.hashes[side].set(tick, hashState(state));
   });
   const wrapSend = (s: NetSession, side: number) => {
@@ -99,6 +99,25 @@ describe('NetSession through a fake relay', () => {
 
   it('still agrees when packets overtake each other at 100 ms ± 60 ms', () => {
     const { run, link, sessions, bots, gates } = setup(100, 60, 3, 9);
+    runFrames(link, sessions, bots, 3000, run, gates);
+    expectAgreement(run, 30);
+    for (const s of sessions) expect(s.stats.maxRollbackDepth).toBeLessThanOrEqual(s.maxRollback);
+  });
+
+  // M8 Review Focus 1: a hotspot (150 ± 60 ms one-way with 300 ms spikes) must not stall.
+  it('rides out hotspot jitter spikes without stalling, within the rollback window', () => {
+    const { run, link, sessions, bots, gates } = setup(150, 60, 2, 11, { spikeMs: 300, spikeEveryMs: 7000 });
+    runFrames(link, sessions, bots, 3000, run, gates);
+    expectAgreement(run, 30);
+    for (const s of sessions) {
+      expect(s.stats.stalledTicks).toBe(0);
+      expect(s.stats.maxRollbackDepth).toBeLessThanOrEqual(s.maxRollback);
+      expect(s.stats.maxRollbackDepth).toBeGreaterThan(12);
+    }
+  });
+
+  it('survives TCP-style holds (packets bunched and released in order) with agreeing hashes', () => {
+    const { run, link, sessions, bots, gates } = setup(80, 20, 2, 12, { holdMs: 250, holdEveryMs: 4000 });
     runFrames(link, sessions, bots, 3000, run, gates);
     expectAgreement(run, 30);
     for (const s of sessions) expect(s.stats.maxRollbackDepth).toBeLessThanOrEqual(s.maxRollback);

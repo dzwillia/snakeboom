@@ -38,7 +38,6 @@ export const DEFAULT_EMPTY_MS = 120_000;
 export const PING_EVERY_MS = 1_000;
 /** A seat may run at most this many ticks ahead of the other. */
 export const MAX_TICK_LEAD = 600;
-const TICK_MS = 1000 / 60;
 const UNKNOWN_RTT_MS = 100;
 const START_LEAD_MS = 1_500;
 
@@ -55,10 +54,16 @@ interface Seat {
   result: RoundResult | null;
 }
 
-/** Input delay in ticks from the players' round trips: the one-way latency between them, rounded up, clamped to 1–4. */
+/**
+ * Input delay in ticks from the players' round trips to the relay. Rollback absorbs the network,
+ * so the local delay stays small: 1 tick on a LAN, 2 normally, 3 only when the one-way latency
+ * between the players (about the mean of their round trips) is above 200 ms.
+ */
 export function inputDelayFor(rttA: number | null, rttB: number | null): number {
-  const oneWay = ((rttA ?? UNKNOWN_RTT_MS) + (rttB ?? UNKNOWN_RTT_MS)) / 2 / 2;
-  return Math.min(4, Math.max(1, Math.ceil(oneWay / TICK_MS)));
+  const oneWayBetween = ((rttA ?? UNKNOWN_RTT_MS) + (rttB ?? UNKNOWN_RTT_MS)) / 2;
+  if (oneWayBetween <= 20) return 1;
+  if (oneWayBetween > 200) return 3;
+  return 2;
 }
 
 /**

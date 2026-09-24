@@ -67,7 +67,13 @@ Not in M8: a WebRTC unreliable channel (the fix for TCP head-of-line blocking on
 **`scripts/netsim.ts`:** runs two bot sessions through the fake relay for `--seconds` (default 300) at a named profile or explicit `--rtt --jitter --spike --spike-every --hold`, then prints stalls per minute, stalled ticks, rollbacks per minute, max and mean depth, and the tick difference between the sides at the end. Profiles `good`, `hotspot`, `far` as in Global Constraints.
 
 - [ ] **Step 1: Write the failing tests.** `session.test.ts`: at the hotspot profile (150 ± 60 with 300 ms spikes every 7 s), D = 2, 3000 frames: hashes agree, `stalledTicks === 0`, `maxRollbackDepth ≤ 20`. `room.test.ts`: `inputDelayFor(60, 80)` is 2, `(20, 20)` is 1, `(320, 320)` is 3.
-- [ ] **Step 2: Implement, run `pnpm netsim` at all three profiles, paste the table into this plan as a comment.**
+- [x] **Step 2: Implement, run `pnpm netsim` at all three profiles, paste the table into this plan as a comment.**
+  <!-- 2026-09-24, window 30, 120 s of simple-bot play (bots twitch far more than people, so rollback counts are a ceiling):
+       good    rtt 40±10                  delay 2: stalls 0 · rollbacks ~310/min · depth mean 0.7 max 1
+       hotspot rtt 150±60 +300 ms spikes  delay 2: stalls 0 · rollbacks ~410/min · depth mean 10 max 29
+       far     rtt 250±40                 delay 3: stalls 0 · rollbacks ~425/min · depth mean 13 max 15
+       lossy   rtt 120±40, 300 ms holds   delay 2: stalls 0 · rollbacks ~325/min · depth mean 6 max 24
+       All hash checkpoints agreed; tick difference 0 at the end. Window 20 would have stalled on the hotspot spikes (29 > 20). -->
 - [ ] **Step 3: Update the spec (5.2, 5.3) and commit** `feat(net): 20-tick rollback window, 1–2 tick input delay, netsim with spikes and holds`.
 
 ---

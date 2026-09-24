@@ -50,7 +50,12 @@ export function statsDelta(later: SessionStats, earlier: SessionStats): SessionS
   };
 }
 
-export const DEFAULT_MAX_ROLLBACK = 10;
+/**
+ * Ticks the predicted state may run ahead of the confirmed one before the game waits. 30 ticks is
+ * 500 ms: enough for a hotspot's jitter spikes on top of a 150 ms one-way latency, and a 30-tick
+ * rollback costs under 10 ms (pnpm bench:rollback).
+ */
+export const DEFAULT_MAX_ROLLBACK = 30;
 /** How far behind the confirmed tick input history is kept, for late duplicates and rejoins. */
 const KEEP_TICKS = 600;
 const PRUNE_EVERY = 60;
