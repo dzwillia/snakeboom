@@ -15,7 +15,7 @@ Both containers join the external `happypathsoft-net` network so Caddy reaches t
 ## One-time setup
 
 1. **GitHub secrets** on this repo, the same three the other apps use: `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`. The deploy job logs the box into GHCR with the workflow's own token, so the packages can stay private.
-2. **The host directory**, as `ec2-user` on the box:
+2. **The host directory**, over SSH on the box:
    ```bash
    sudo mkdir -p /opt/happypathsoft/snakeboom
    sudo chown "$USER" /opt/happypathsoft/snakeboom

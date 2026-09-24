@@ -7,9 +7,9 @@ from where those came from: the box's address and SSH key from your infra notes,
 
 | Secret | What it is | Example value (placeholder) |
 |---|---|---|
-| `EC2_HOST` | The box's public address: the Elastic IP, or a DNS name that resolves to it | `203.0.113.10` |
-| `EC2_USER` | The SSH login on the box | `ec2-user` |
-| `EC2_SSH_KEY` | The **private** key that logs in as that user, the whole file including the BEGIN/END lines | contents of `~/.ssh/happypathsoft-prod.pem` |
+| `EC2_HOST` | The box's public address: the Elastic IP, or a DNS name that resolves to it | `<elastic-ip>` |
+| `EC2_USER` | The SSH login on the box | `<ssh-user>` |
+| `EC2_SSH_KEY` | The **private** key that logs in as that user, the whole file including the BEGIN/END lines | contents of `<path-to-key>.pem` |
 
 No other secrets are needed:
 
@@ -21,13 +21,13 @@ No other secrets are needed:
 
 ```bash
 cd ~/src/dzwillia/snakeboom
-gh secret set EC2_HOST --body "203.0.113.10"
-gh secret set EC2_USER --body "ec2-user"
-gh secret set EC2_SSH_KEY < ~/.ssh/happypathsoft-prod.pem
+gh secret set EC2_HOST --body "<elastic-ip>"
+gh secret set EC2_USER --body "<ssh-user>"
+gh secret set EC2_SSH_KEY < <path-to-key>.pem
 gh secret list
 ```
 
-Replace the address and the key path with your real ones. `gh secret set NAME < file` reads the value from
+Fill in the three placeholders from your infra notes; none of the real values belong in this repo. `gh secret set NAME < file` reads the value from
 the file, so the key's newlines survive intact; pasting a multi-line key into the web form works too.
 
 ## Checking they work
