@@ -1,0 +1,226 @@
+import { serve, type ServerType } from '@hono/node-server';
+import { Hono } from 'hono';
+import type { IncomingMessage } from 'node:http';
+import type { Duplex } from 'node:stream';
+import { WebSocketServer, type RawData, type WebSocket } from 'ws';
+import { sanitizeName, isRoomCode } from '../net/names';
+import { isClientMessage, PROTOCOL, type ClientMessage, type ServerMessage } from '../net/protocol';
+import { logLine } from './log';
+import { Registry, type RoomEntry } from './registry';
+
+export interface ServerOptions {
+  port: number;
+  hostname?: string;
+  /** Exact origin to accept; unset accepts localhost origins only. */
+  allowedOrigin?: string;
+  version?: string;
+  maxRooms?: number;
+  log?: (entry: Record<string, unknown>) => void;
+}
+
+export interface RunningServer {
+  port: number;
+  registry: Registry;
+  close(): Promise<void>;
+}
+
+export const MAX_MESSAGE_BYTES = 1024;
+const DEFAULT_MAX_ROOMS = 200;
+const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+interface Connection {
+  socket: WebSocket;
+  name: string;
+  entry: RoomEntry | null;
+  player: number;
+  helloed: boolean;
+}
+
+function originAllowed(origin: string | undefined, allowed: string | undefined): boolean {
+  if (allowed) return origin === allowed;
+  return origin === undefined || LOCAL_ORIGIN.test(origin);
+}
+
+function clampWins(value: unknown): number {
+  const n = typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : 5;
+  return Math.min(10, Math.max(1, n));
+}
+
+export async function startServer(opts: ServerOptions): Promise<RunningServer> {
+  const log = opts.log ?? logLine;
+  const version = opts.version ?? 'dev';
+  const registry = new Registry(opts.maxRooms ?? DEFAULT_MAX_ROOMS, log);
+  const app = new Hono();
+  app.get('/health', (c) =>
+    c.json({
+      status: 'ok',
+      version,
+      timestamp: new Date().toISOString(),
+      rooms: registry.count,
+      players: registry.players,
+      queued: 0,
+    }),
+  );
+
+  const wss = new WebSocketServer({ noServer: true });
+  const connections = new Set<Connection>();
+
+  const send = (socket: WebSocket, message: ServerMessage) => {
+    if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(message));
+  };
+  const refuse = (socket: WebSocket, code: 'version' | 'badMessage', message: string) => {
+    send(socket, { type: 'error', code, message });
+    socket.close(1002, code);
+  };
+
+  const seat = (conn: Connection, entry: RoomEntry, player: number, session: string) => {
+    conn.entry = entry;
+    conn.player = player;
+    entry.host.attach(player, conn.socket);
+    registry.remember(session, entry.room.code);
+  };
+
+  const onLobbyMessage = (conn: Connection, message: ClientMessage) => {
+    switch (message.type) {
+      case 'create': {
+        const entry = registry.create(clampWins(message.winsToWin));
+        if (!entry) return send(conn.socket, { type: 'error', code: 'busy', message: 'The server is full right now.' });
+        joinEntry(conn, entry);
+        return;
+      }
+      case 'join': {
+        const entry = isRoomCode(message.room) ? registry.get(message.room) : undefined;
+        if (!entry) return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });
+        joinEntry(conn, entry);
+        return;
+      }
+      case 'hello':
+        return refuse(conn.socket, 'badMessage', 'hello was already sent');
+      default:
+        return send(conn.socket, { type: 'error', code: 'notInRoom', message: 'Create or join a room first.' });
+    }
+  };
+
+  const joinEntry = (conn: Connection, entry: RoomEntry) => {
+    // Attach first so the room's welcome and lobby messages reach this socket.
+    const reserved = entry.room.status === 'waiting' || entry.room.status === 'lobby' || entry.room.status === 'over';
+    if (!reserved) return send(conn.socket, { type: 'closed', reason: 'full' });
+    const probe = entry.room.playerCount;
+    const player = probe === 0 ? 0 : 1;
+    entry.host.attach(player, conn.socket);
+    const result = entry.room.join(conn.name);
+    if (result === 'full') {
+      entry.host.detach(player, conn.socket);
+      return send(conn.socket, { type: 'closed', reason: 'full' });
+    }
+    if (result.player !== player) {
+      entry.host.detach(player, conn.socket);
+      entry.host.attach(result.player, conn.socket);
+    }
+    seat(conn, entry, result.player, result.session);
+  };
+
+  const onRejoin = (conn: Connection, message: Extract<ClientMessage, { type: 'hello' }>) => {
+    const session = message.session as string;
+    const entry = registry.bySession(session);
+    const player = entry?.room.seatForSession(session) ?? null;
+    if (!entry || player === null) return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });
+    // Attach first so rejoin()'s welcome reaches this socket.
+    entry.host.attach(player, conn.socket);
+    if (entry.room.rejoin(session) === null) {
+      entry.host.detach(player, conn.socket);
+      return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });
+    }
+    seat(conn, entry, player, session);
+  };
+
+  const onMessage = (conn: Connection, data: RawData, isBinary: boolean) => {
+    const bytes = Array.isArray(data) ? Buffer.concat(data) : data instanceof ArrayBuffer ? Buffer.from(new Uint8Array(data)) : data;
+    if (bytes.byteLength > MAX_MESSAGE_BYTES) return conn.socket.close(1009, 'too big');
+    if (!conn.helloed) {
+      if (isBinary) return refuse(conn.socket, 'badMessage', 'Say hello first.');
+      const parsed = parse(bytes);
+      if (!parsed || parsed.type !== 'hello') return refuse(conn.socket, 'badMessage', 'Say hello first.');
+      if (parsed.protocol !== PROTOCOL) return refuse(conn.socket, 'version', 'Please refresh the game.');
+      conn.helloed = true;
+      conn.name = sanitizeName(parsed.name);
+      if (typeof parsed.session === 'string') onRejoin(conn, parsed);
+      return;
+    }
+    if (isBinary) {
+      if (conn.entry) conn.entry.room.onInput(conn.player, new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength));
+      return;
+    }
+    const parsed = parse(bytes);
+    if (!parsed) return refuse(conn.socket, 'badMessage', 'Unreadable message.');
+    if (!conn.entry) return onLobbyMessage(conn, parsed);
+    if (parsed.type === 'hello' || parsed.type === 'create' || parsed.type === 'join') return;
+    conn.entry.room.onMessage(conn.player, parsed);
+  };
+
+  wss.on('connection', (socket: WebSocket) => {
+    const conn: Connection = { socket, name: '', entry: null, player: -1, helloed: false };
+    connections.add(conn);
+    socket.on('message', (data, isBinary) => {
+      try {
+        onMessage(conn, data, isBinary);
+      } catch (err) {
+        log({ event: 'error', message: err instanceof Error ? err.message : String(err) });
+        socket.close(1011, 'error');
+      }
+    });
+    socket.on('close', () => {
+      connections.delete(conn);
+      if (conn.entry) {
+        conn.entry.host.detach(conn.player, socket);
+        conn.entry.room.onDisconnect(conn.player);
+      }
+    });
+    socket.on('error', () => socket.close());
+  });
+
+  let listening: ServerType;
+  const server = await new Promise<ServerType>((resolve) => {
+    listening = serve({ fetch: app.fetch, port: opts.port, hostname: opts.hostname ?? '0.0.0.0' }, () => resolve(listening));
+  });
+  server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    if (url.pathname !== '/ws') {
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    if (!originAllowed(req.headers.origin, opts.allowedOrigin)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+  });
+
+  const address = server.address();
+  const port = typeof address === 'object' && address ? address.port : opts.port;
+  log({ event: 'listening', port, version });
+
+  return {
+    port,
+    registry,
+    close: () =>
+      new Promise<void>((resolve) => {
+        registry.closeAll();
+        for (const conn of connections) conn.socket.close(1001, 'restart');
+        wss.close();
+        server.close(() => resolve());
+        setTimeout(resolve, 500).unref();
+      }),
+  };
+}
+
+function parse(bytes: Buffer): ClientMessage | null {
+  try {
+    const value: unknown = JSON.parse(bytes.toString('utf8'));
+    return isClientMessage(value) ? value : null;
+  } catch {
+    return null;
+  }
+}

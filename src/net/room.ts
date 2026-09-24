@@ -133,6 +133,12 @@ export class Room {
     return { player, session };
   }
 
+  /** Which seat a session token belongs to, so the host can attach the socket before rejoin(). */
+  seatForSession(session: string): number | null {
+    const player = this.seats.findIndex((s) => s !== null && s.session === session);
+    return player < 0 || this.statusNow === 'closed' ? null : player;
+  }
+
   /** A returning socket with its session token. */
   rejoin(session: string): number | null {
     const player = this.seats.findIndex((s) => s !== null && s.session === session);
