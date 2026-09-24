@@ -1,0 +1,16 @@
+# Installed by the deploy workflow as /opt/happypathsoft/caddy/conf.d/snakeboom.caddy
+snakeboom.com {
+	encode gzip zstd
+	reverse_proxy snakeboom-web:3000
+}
+
+www.snakeboom.com {
+	redir https://snakeboom.com{uri} permanent
+}
+
+api.snakeboom.com {
+	reverse_proxy snakeboom-api:3001 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+	}
+}

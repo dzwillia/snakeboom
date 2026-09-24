@@ -1,0 +1,30 @@
+# SnakeBoom on the Happy Path box: /opt/happypathsoft/snakeboom/docker-compose.yml
+# Both containers sit on the shared Caddy network. There is no database.
+services:
+  snakeboom-api:
+    image: ghcr.io/dzwillia/snakeboom-api:${API_IMAGE_TAG:-latest}
+    container_name: snakeboom-api
+    restart: unless-stopped
+    environment:
+      PORT: "3001"
+      APP_VERSION: ${API_IMAGE_TAG:-latest}
+      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:?set ALLOWED_ORIGIN in .env}
+    networks:
+      - happypathsoft-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  snakeboom-web:
+    image: ghcr.io/dzwillia/snakeboom-web:${WEB_IMAGE_TAG:-latest}
+    container_name: snakeboom-web
+    restart: unless-stopped
+    networks:
+      - happypathsoft-net
+
+networks:
+  happypathsoft-net:
+    external: true
