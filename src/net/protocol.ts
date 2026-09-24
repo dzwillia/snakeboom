@@ -4,13 +4,24 @@
  */
 
 /** Bumped on every incompatible change; the relay refuses other values. */
-export const PROTOCOL = 2;
+export const PROTOCOL = 3;
+
+/** Netcode counters for one round, as the client measured them (deltas since the previous round). */
+export interface NetStats {
+  ticks: number;
+  stalledTicks: number;
+  rollbacks: number;
+  maxRollbackDepth: number;
+  rollbackTicks: number;
+  receivedLate: number;
+}
 
 export interface RoundResult {
   round: number;
   winner: number | null;
   scores: number[];
   matchWinner: number | null;
+  net?: NetStats;
 }
 
 export type ClientMessage =

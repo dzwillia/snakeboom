@@ -207,6 +207,21 @@ describe('Room refereeing', () => {
     expect(host.logs.find((l) => l.event === 'desync')).toMatchObject({ tick: 120, hashes: [333, 222] });
   });
 
+  it('logs each round once both seats report it, with both sides’ net stats', () => {
+    const host = new FakeHost();
+    const room = started(host, [60, 80]);
+    const net0 = { ticks: 900, stalledTicks: 0, rollbacks: 4, maxRollbackDepth: 3, rollbackTicks: 7, receivedLate: 12 };
+    const net1 = { ...net0, stalledTicks: 30, rollbacks: 2 };
+    room.onMessage(0, { type: 'hash', tick: 900, hash: 5, result: { round: 1, winner: 0, scores: [1, 0], matchWinner: null, net: net0 } });
+    expect(host.logs.find((l) => l.event === 'round')).toBeUndefined();
+    room.onMessage(1, { type: 'hash', tick: 900, hash: 5, result: { round: 1, winner: 0, scores: [1, 0], matchWinner: null, net: net1 } });
+    const entry = host.logs.find((l) => l.event === 'round');
+    expect(entry).toMatchObject({ round: 1, winner: 0, scores: [1, 0], rttMs: [60, 80], net: [net0, net1] });
+    room.onMessage(0, { type: 'hash', tick: 960, hash: 6 });
+    room.onMessage(1, { type: 'hash', tick: 960, hash: 6 });
+    expect(host.logs.filter((l) => l.event === 'round')).toHaveLength(1);
+  });
+
   it('records the match result when both clients agree on a match winner, and keeps relaying inputs', () => {
     const host = new FakeHost();
     const room = started(host);

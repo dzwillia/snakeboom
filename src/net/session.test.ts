@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { botInput, createBot, DEFAULT_CONFIG, hashState, NO_INPUT, type BotState, type PlayerInput } from '../sim';
 import { EventGate } from './events';
 import { createLinkedSessions, type FakeLink } from './fakeRelay';
-import { NetSession } from './session';
+import { emptyStats, NetSession, statsDelta } from './session';
 
 const FRAME_MS = 1000 / 60;
 const cfg = { ...DEFAULT_CONFIG, winsToWin: 2 };
@@ -87,6 +87,14 @@ describe('NetSession through a fake relay', () => {
     expect(sessions[0].stats.stalledTicks + sessions[1].stats.stalledTicks).toBe(0);
     expect(sessions[0].stats.rollbacks + sessions[1].stats.rollbacks).toBeGreaterThan(0);
     expect(run.roundOvers[0]).toBeGreaterThan(0);
+    // Review Focus 4 (M8): the counters are consistent with each other.
+    for (const s of sessions) {
+      expect(s.stats.ticks).toBe(3000);
+      // A rollback can have depth 0 (the mismatched tick was confirmed in the same reconcile).
+      expect(s.stats.rollbackTicks).toBeLessThanOrEqual(s.stats.rollbacks * s.maxRollback);
+      expect(s.stats.receivedLate).toBeGreaterThanOrEqual(s.stats.rollbacks);
+      expect(s.stats.maxRollbackDepth).toBeGreaterThan(0);
+    }
   });
 
   it('still agrees when packets overtake each other at 100 ms ± 60 ms', () => {
@@ -182,5 +190,13 @@ describe('NetSession bookkeeping', () => {
   it('rejects a bad seat or delay', () => {
     expect(() => new NetSession({ seed: 1, cfg, local: 2, inputDelay: 1, send: () => {} })).toThrow(RangeError);
     expect(() => new NetSession({ seed: 1, cfg, local: 0, inputDelay: 0, send: () => {} })).toThrow(RangeError);
+  });
+});
+
+describe('statsDelta', () => {
+  it('subtracts counters and keeps the later max depth', () => {
+    const earlier = { ...emptyStats(), ticks: 100, rollbacks: 2, rollbackTicks: 5, stalledTicks: 3, receivedLate: 4, maxRollbackDepth: 3 };
+    const later = { ticks: 160, rollbacks: 5, rollbackTicks: 12, stalledTicks: 3, receivedLate: 9, maxRollbackDepth: 6 };
+    expect(statsDelta(later, earlier)).toEqual({ ticks: 60, rollbacks: 3, rollbackTicks: 7, stalledTicks: 0, receivedLate: 5, maxRollbackDepth: 6 });
   });
 });

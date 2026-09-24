@@ -23,9 +23,31 @@ export interface TaggedEvent {
 }
 
 export interface SessionStats {
+  /** Ticks the predicted state has advanced. */
+  ticks: number;
   rollbacks: number;
   maxRollbackDepth: number;
+  /** Sum of rollback depths: ticks re-simulated. */
+  rollbackTicks: number;
   stalledTicks: number;
+  /** Remote inputs that arrived after their tick had already been predicted. */
+  receivedLate: number;
+}
+
+export function emptyStats(): SessionStats {
+  return { ticks: 0, rollbacks: 0, maxRollbackDepth: 0, rollbackTicks: 0, stalledTicks: 0, receivedLate: 0 };
+}
+
+/** What happened between two snapshots of the stats (max depth is the later one's). */
+export function statsDelta(later: SessionStats, earlier: SessionStats): SessionStats {
+  return {
+    ticks: later.ticks - earlier.ticks,
+    rollbacks: later.rollbacks - earlier.rollbacks,
+    maxRollbackDepth: later.maxRollbackDepth,
+    rollbackTicks: later.rollbackTicks - earlier.rollbackTicks,
+    stalledTicks: later.stalledTicks - earlier.stalledTicks,
+    receivedLate: later.receivedLate - earlier.receivedLate,
+  };
 }
 
 export const DEFAULT_MAX_ROLLBACK = 10;
@@ -52,7 +74,7 @@ export class NetSession {
   readonly remote: number;
   readonly inputDelay: number;
   readonly maxRollback: number;
-  readonly stats: SessionStats = { rollbacks: 0, maxRollbackDepth: 0, stalledTicks: 0 };
+  readonly stats: SessionStats = emptyStats();
 
   private confirmed: MatchState;
   private predicted: MatchState;
@@ -159,6 +181,7 @@ export class NetSession {
       this.latestRemote = stored;
     }
     if (tick <= this.predicted.tick) {
+      this.stats.receivedLate++;
       const guessed = this.predictedRemote.get(tick);
       if (!guessed || !sameInput(guessed, stored)) this.needRollback = true;
     }
@@ -186,6 +209,7 @@ export class NetSession {
       return events;
     }
     this.stalledNow = false;
+    this.stats.ticks++;
     events.push(...this.stepPredicted());
     if (this.predicted.tick % PRUNE_EVERY === 0) this.prune();
     return events;
@@ -237,6 +261,7 @@ export class NetSession {
       this.needRollback = false;
       const depth = predictedTick - this.confirmed.tick;
       this.stats.rollbacks++;
+      this.stats.rollbackTicks += depth;
       if (depth > this.stats.maxRollbackDepth) this.stats.maxRollbackDepth = depth;
       this.predicted = cloneState(this.confirmed);
       this.predictedRemote.clear();

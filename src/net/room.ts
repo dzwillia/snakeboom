@@ -86,6 +86,7 @@ export class Room {
   private inputLog: Uint8Array[] = [];
   private readonly hashes = new Map<number, (number | undefined)[]>();
   private lastPingShown: number | null = null;
+  private loggedRound = 0;
   private seed = 0;
   /** The current match's parameters, for rejoins. */
   private match: { seed: number; winsToWin: number; inputDelay: number; rttMs: number[] } | null = null;
@@ -290,6 +291,7 @@ export class Room {
     }
     this.inputLog = [];
     this.hashes.clear();
+    this.loggedRound = 0;
     this.relaying = true;
     this.setStatus('playing');
     this.match = { seed: this.seed, winsToWin: this.winsToWin, inputDelay, rttMs };
@@ -310,6 +312,7 @@ export class Room {
     }
     pair[player] = hash;
     if (result) seat.result = result;
+    this.logRoundIfComplete();
     const [a, b] = pair;
     if (a === undefined || b === undefined) return;
     this.hashes.delete(tick);
@@ -326,6 +329,23 @@ export class Room {
       this.host.log({ event: 'match', winner: r0.matchWinner, scores: r0.scores, rounds: r0.round, seed: this.seed });
       this.backToLobby();
     }
+  }
+
+  /** Once both seats have reported the same round, log its result with both sides' netcode stats. */
+  private logRoundIfComplete(): void {
+    const r0 = this.seats[0]?.result;
+    const r1 = this.seats[1]?.result;
+    if (!r0 || !r1 || r0.round !== r1.round || r0.round === this.loggedRound) return;
+    this.loggedRound = r0.round;
+    const [a, b] = this.seats;
+    this.host.log({
+      event: 'round',
+      round: r0.round,
+      winner: r0.winner,
+      scores: r0.scores,
+      rttMs: [a?.rttMs ?? null, b?.rttMs ?? null],
+      net: [r0.net ?? null, r1.net ?? null],
+    });
   }
 
   /** The match is finished: clear the ready flags so both must opt into a rematch. */

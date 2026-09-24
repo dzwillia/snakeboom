@@ -3,7 +3,7 @@ import { decodeRelayed, decodeReplay, encodeInput, FRAME_REPLAY } from '../../ne
 import { EventGate } from '../../net/events';
 import { displayName } from '../../net/names';
 import { PROTOCOL, type ClientMessage, type RoundResult, type ServerMessage } from '../../net/protocol';
-import { NetSession } from '../../net/session';
+import { emptyStats, NetSession, statsDelta, type SessionStats } from '../../net/session';
 import { PLAYER_CSS } from '../colors';
 import { describeRound } from '../text';
 import type { EventSink } from '../events';
@@ -104,6 +104,12 @@ export class OnlineMatch {
   private queueOnline = 1;
   private queueShown = '';
   private replayFrames = 0;
+  private showNet = false;
+  private roundStatsBase: SessionStats = emptyStats();
+  /** For the per-minute rates: stats and time at the last readout sample. */
+  private rateSample: { at: number; stats: SessionStats } | null = null;
+  private rates = { rollbacksPerMin: 0, stallsPerMin: 0 };
+  private timeScale = 1;
   private readonly onVisibility = () => {
     if (this.phase !== 'playing' && this.phase !== 'starting') return;
     this.conn.send({ type: document.hidden ? 'away' : 'back' });
@@ -185,8 +191,10 @@ export class OnlineMatch {
     }
     const session = this.session;
     const stalled = this.phase === 'playing' && !!session?.stalled;
-    this.deps.setTimeScale(session && this.phase === 'playing' && session.lead(this.oneWayTicks) > 1 ? SLOW_SCALE : 1);
+    this.timeScale = session && this.phase === 'playing' && session.lead(this.oneWayTicks) > 1 ? SLOW_SCALE : 1;
+    this.deps.setTimeScale(this.timeScale);
     this.deps.hud.setPing(this.lobby?.pingMs ?? null, stalled);
+    this.updateNetReadout(nowMs);
 
     if (this.peerAwayDeadline !== null && (this.phase === 'playing' || this.phase === 'starting')) {
       const seconds = Math.max(0, Math.ceil((this.peerAwayDeadline - nowMs) / 1000));
@@ -217,8 +225,39 @@ export class OnlineMatch {
     }
   }
 
-  /** Space and Escape. Returns true when the key was used. */
+  /** The net readout: rates over the last second, refreshed once a second. */
+  private updateNetReadout(nowMs: number): void {
+    const session = this.session;
+    if (!this.showNet || !session || this.phase !== 'playing') {
+      this.deps.hud.setNet(null);
+      this.rateSample = null;
+      return;
+    }
+    const stats = { ...session.stats };
+    if (!this.rateSample) this.rateSample = { at: nowMs, stats };
+    const elapsed = nowMs - this.rateSample.at;
+    if (elapsed >= 1000) {
+      const d = statsDelta(stats, this.rateSample.stats);
+      const perMin = 60000 / elapsed;
+      this.rates = { rollbacksPerMin: d.rollbacks * perMin, stallsPerMin: d.stalledTicks * perMin };
+      this.rateSample = { at: nowMs, stats };
+    }
+    this.deps.hud.setNet({
+      inputDelay: session.inputDelay,
+      rollbacksPerMin: this.rates.rollbacksPerMin,
+      maxRollbackDepth: stats.maxRollbackDepth,
+      stallsPerMin: this.rates.stallsPerMin,
+      lead: session.lead(this.oneWayTicks),
+      timeScale: this.timeScale,
+    });
+  }
+
+  /** Space and Escape (and N for the net readout). Returns true when the key was used. */
   key(code: string): boolean {
+    if (code === 'KeyN') {
+      this.showNet = !this.showNet;
+      return true;
+    }
     const matchOver = this.phase === 'playing' && this.session?.state.phase === 'matchOver';
     if (matchOver && code === 'Space') {
       // Request (or withdraw) a rematch; the lobby message updates the line under the banner.
@@ -400,6 +439,8 @@ export class OnlineMatch {
       onConfirmed: (tick, state, events) => this.onConfirmed(tick, state, events),
     });
     this.gate = new EventGate();
+    this.roundStatsBase = emptyStats();
+    this.rateSample = null;
     this.deps.sink.beat = null;
     this.deps.fx.clear();
     this.deps.input.clearLatches();
@@ -505,6 +546,8 @@ export class OnlineMatch {
       onConfirmed: (tick, state, events) => this.onConfirmed(tick, state, events),
     });
     this.gate = new EventGate();
+    this.roundStatsBase = emptyStats();
+    this.rateSample = null;
     this.startAtLocal = this.clock.synced ? this.clock.toLocal(m.startAt) : performance.now() + 1500;
     this.peerAwayDeadline = null;
     this.stalledSince = null;
@@ -520,9 +563,12 @@ export class OnlineMatch {
   private onConfirmed(tick: number, state: MatchState, events: readonly { type: string }[]): void {
     const roundOver = events.find((e) => e.type === 'roundOver') as { winner: number | null } | undefined;
     if (tick % HASH_EVERY !== 0 && !roundOver) return;
-    const result: RoundResult | undefined = roundOver
-      ? { round: state.round, winner: roundOver.winner, scores: state.scores.slice(), matchWinner: state.matchWinner }
-      : undefined;
+    let result: RoundResult | undefined;
+    if (roundOver && this.session) {
+      const net = statsDelta({ ...this.session.stats }, this.roundStatsBase);
+      this.roundStatsBase = { ...this.session.stats };
+      result = { round: state.round, winner: roundOver.winner, scores: state.scores.slice(), matchWinner: state.matchWinner, net };
+    }
     this.conn.send({ type: 'hash', tick, hash: hashState(state), ...(result ? { result } : {}) });
   }
 

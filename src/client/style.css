@@ -153,6 +153,14 @@ body {
   color: var(--dim);
 }
 
+.net {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
 .ping.slow {
   color: var(--dozer);
 }
