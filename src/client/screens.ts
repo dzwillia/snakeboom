@@ -1,9 +1,11 @@
+import type { Config } from '../sim';
 import { PLAYER_CSS } from './colors';
+import { glyphSvg } from './glyphs';
 import type { MenuRow } from './menu';
 import type { OpponentMode } from './settings';
-import { describeOpponent, PLAYER_NAMES } from './text';
+import { describeOpponent, describePower, PLAYER_NAMES, POWER_ORDER } from './text';
 
-type ScreenKind = 'none' | 'title' | 'countdown' | 'banner' | 'matchOver' | 'paused' | 'lobby' | 'form' | 'notice';
+type ScreenKind = 'none' | 'title' | 'countdown' | 'banner' | 'matchOver' | 'paused' | 'lobby' | 'form' | 'notice' | 'powers';
 
 export interface TitleOptions {
   row: MenuRow;
@@ -63,10 +65,36 @@ export class Screens {
         </div>
         <div class="hint">SPACE TO GO</div>
         <div class="small"><kbd>▲</kbd> <kbd>▼</kbd> CHOOSE · <kbd>◀</kbd> <kbd>▶</kbd> ADJUST · ${opts.hearts} ${opts.hearts === 1 ? 'HEART' : 'HEARTS'} PER ROUND</div>
-        <div class="small"><kbd>ESC</kbd> PAUSE · <kbd>M</kbd> MUTE · <kbd>\`</kbd> TUNING</div>
+        <div class="small"><kbd>H</kbd> POWERS · <kbd>ESC</kbd> PAUSE · <kbd>M</kbd> MUTE · <kbd>\`</kbd> TUNING</div>
       </div>`,
       'title',
     );
+  }
+
+  /** The Powers page: every pickup, what it does, and the numbers it currently runs on. */
+  powers(cfg: Config, back: 'title' | 'pause' = 'title'): void {
+    const cards = POWER_ORDER.map((kind) => {
+      const info = describePower(kind, cfg);
+      return (
+        `<div class="power" data-kind="${kind}"><div class="glyph">${glyphSvg(kind)}</div>` +
+        `<h3>${info.name}</h3><div class="stats">${info.stats}</div><p>${info.detail}</p></div>`
+      );
+    });
+    const slots = cfg.itemSlots === 1 ? 'one item' : `up to ${cfg.itemSlots} items`;
+    this.show(
+      `
+      <div class="panel powers">
+        <h2>POWERS</h2>
+        <p class="lead">PICKUPS SPAWN ALL ROUND · YOU CARRY ${slots.toUpperCase()} · USE FIRES THE OLDEST · TIMED POWERS FLASH FOR THEIR LAST ${cfg.effectWarning} S</p>
+        <div class="grid">${cards.join('')}</div>
+        <div class="small footer"><kbd>H</kbd> OR <kbd>ESC</kbd> BACK TO ${back === 'title' ? 'TITLE' : 'PAUSE'}</div>
+      </div>`,
+      'powers',
+    );
+  }
+
+  get showing(): ScreenKind {
+    return this.kind;
   }
 
   /** Asks for a display name. Enter submits (possibly empty), Escape cancels with null. */
@@ -182,9 +210,12 @@ export class Screens {
     this.uncover();
   }
 
-  /** Lays `html` over the current screen, remembering it for uncover(). A second cover replaces the first. */
+  /**
+   * Lays `html` over the current screen, remembering it for uncover(). A second cover replaces the
+   * first, and coming back from the Powers page keeps the memory.
+   */
   cover(html: string): void {
-    if (!this.covered) this.covered = { kind: this.kind, html: this.root.innerHTML };
+    if (!this.covered && this.kind !== 'powers') this.covered = { kind: this.kind, html: this.root.innerHTML };
     this.show(html, 'paused');
   }
 
@@ -219,7 +250,7 @@ export class Screens {
 
   private show(html: string, kind: ScreenKind): number {
     this.token++;
-    if (kind !== 'paused') this.covered = null;
+    if (kind !== 'paused' && kind !== 'powers') this.covered = null;
     this.kind = kind;
     this.root.innerHTML = html;
     return this.token;

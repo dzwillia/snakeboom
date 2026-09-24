@@ -14,11 +14,13 @@ pnpm dev        # opens the game in your browser (http://localhost:5199)
 | **CYAN** | A / D | W | S |
 | **PINK** | ← / → | ↑ | ↓ |
 
-On the title screen, ← / → picks the match length (first to 1–10) and ↑ / ↓ picks who plays PINK: a second human, or the local AI at easy, normal or hard. <kbd>Space</kbd> starts or rematches, <kbd>Esc</kbd> pauses, <kbd>M</kbd> mutes, and <kbd>`</kbd> opens the tuning panel, where every gameplay number is a live slider.
+The title screen is a short menu: ↑ / ↓ moves between **LOCAL** (← / → picks who plays PINK: a second human, or the local AI at easy, normal or hard), **FIRST TO N** (← / → picks the match length, 1–10), **CREATE LINK** and **QUICK MATCH**, and <kbd>Space</kbd> goes. In a match, <kbd>Space</kbd> rematches, <kbd>Esc</kbd> pauses, <kbd>M</kbd> mutes, <kbd>H</kbd> (or <kbd>?</kbd>) opens the Powers page, and <kbd>`</kbd> opens the tuning panel, where every gameplay number is a live slider.
+
+The Powers page lists every pickup with its icon, what it does and the numbers it currently runs on (durations, charges, blast radius, spawn share), read live from the tuning config. It opens from the title screen or from pause, so you can check a power mid-match.
 
 ### Playing solo against the AI
 
-Pick an AI level on the title screen (or in the tuning panel under **Opponent**) and PINK steers itself; you play CYAN on WASD. The choice is remembered, and changing it during a match takes effect at the next match.
+Pick an AI level on the title screen's LOCAL row (or in the tuning panel under **Opponent**) and PINK steers itself; you play CYAN on WASD. The choice is remembered, and changing it during a match takes effect at the next match.
 
 | Level | How it plays |
 |---|---|

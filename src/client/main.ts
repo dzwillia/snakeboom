@@ -236,8 +236,23 @@ async function boot(): Promise<void> {
         if (tuningOpen) tuning.show();
         else tuning.hide();
         return;
+      case 'KeyH':
+      case 'Slash':
+        // The Powers page is reachable whenever the game isn't running: from the title or from pause.
+        if (screens.showing === 'powers') {
+          if (paused) screens.paused();
+          else showTitle();
+        } else if (!state) {
+          screens.powers(cfg, 'title');
+        } else if (paused) {
+          screens.powers(cfg, 'pause');
+        }
+        return;
       case 'Escape':
-        if (state?.phase === 'matchOver') {
+        if (screens.showing === 'powers') {
+          if (paused) screens.paused();
+          else showTitle();
+        } else if (state?.phase === 'matchOver') {
           state = null;
           fx.clear();
           showTitle();
@@ -249,7 +264,7 @@ async function boot(): Promise<void> {
       case 'KeyA':
       case 'ArrowRight':
       case 'KeyD': {
-        if (state) return;
+        if (state || screens.showing === 'powers') return;
         const delta = code === 'ArrowLeft' || code === 'KeyA' ? -1 : 1;
         if (menuRow === 'local') settings.opponent = nextOpponent(settings.opponent, delta);
         else if (menuRow === 'wins') cfg.winsToWin = nextWins(cfg.winsToWin, delta);
@@ -263,12 +278,13 @@ async function boot(): Promise<void> {
       case 'KeyW':
       case 'ArrowDown':
       case 'KeyS':
-        if (!state) {
+        if (!state && screens.showing !== 'powers') {
           menuRow = nextRow(menuRow, code === 'ArrowUp' || code === 'KeyW' ? -1 : 1);
           showTitle();
         }
         return;
       case 'Space':
+        if (screens.showing === 'powers') return;
         if (!state) {
           if (menuRow === 'create') beginOnline({ kind: 'create', winsToWin: cfg.winsToWin });
           else if (menuRow === 'quick') {
