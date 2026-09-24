@@ -440,6 +440,11 @@ describe('Room cleanup', () => {
     expect(host.last(0, 'lobby')).toMatchObject({ pingMs: 30 });
     room.onMessage(0, { type: 'pong', t });
     expect(host.messages(0, 'lobby')).toHaveLength(lobbiesBefore + 1);
+    // During play the lobby isn't re-sent, so the ping itself carries the estimate.
+    room.onMessage(0, { type: 'ready', ready: true });
+    room.onMessage(1, { type: 'ready', ready: true });
+    host.tick(1_000);
+    expect(host.last(0, 'ping')).toMatchObject({ pingMs: 30 });
   });
 
   it('close() cancels every timer and fires nothing afterward', () => {

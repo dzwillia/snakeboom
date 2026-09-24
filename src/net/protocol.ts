@@ -55,7 +55,8 @@ export type ServerMessage =
   | { type: 'start'; seed: number; winsToWin: number; inputDelay: number; startAt: number; rttMs: number[] }
   /** A rejoin mid-match: the match's parameters, followed by one binary replay frame with `frames` entries. */
   | { type: 'resume'; seed: number; winsToWin: number; inputDelay: number; rttMs: number[]; frames: number }
-  | { type: 'ping'; t: number }
+  /** Every second; `pingMs` is the relay's current estimate of the latency between the players (null until both have answered). */
+  | { type: 'ping'; t: number; pingMs: number | null }
   | { type: 'desync'; tick: number }
   | { type: 'peerAway'; deadline: number }
   | { type: 'peerBack' }

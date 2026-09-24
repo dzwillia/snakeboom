@@ -115,6 +115,11 @@ jobs:
             docker compose -f "$STAGED/infra/snakeboom/docker-compose.yml" --env-file .env config -q
             cp "$STAGED/infra/snakeboom/docker-compose.yml" docker-compose.yml
             docker compose pull
+
+            # Recreating the relay container drops its log, and the log is where playtest numbers live.
+            mkdir -p logs
+            docker logs snakeboom-api > "logs/relay-$(date +%Y%m%dT%H%M%S).log" 2>&1 || true
+            find logs -name 'relay-*.log' -mtime +30 -delete || true
             docker compose up -d
 
             # Install the Caddy fragment only if the whole config still validates; otherwise put the old one back.

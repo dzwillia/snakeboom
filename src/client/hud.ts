@@ -94,9 +94,10 @@ export class Hud {
     });
   }
 
-  /** The ping readout under the clock: hidden when null, amber above 120 ms, red while stalled. */
+  /** The ping readout under the clock: hidden when null, amber above 120 ms, red with WAITING during a lasting stall. */
   setPing(ms: number | null, stalled: boolean): void {
-    const text = stalled ? 'WAITING' : ms === null ? '' : `${Math.round(ms)} ms`;
+    const base = ms === null ? '' : `${Math.round(ms)} ms`;
+    const text = stalled ? (base ? `${base} · WAITING` : 'WAITING') : base;
     const cls = stalled ? 'stalled' : ms !== null && ms > 120 ? 'slow' : '';
     const key = `${text}|${cls}`;
     if (key === this.lastPing) return;

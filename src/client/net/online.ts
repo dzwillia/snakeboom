@@ -72,6 +72,8 @@ type Phase = 'connecting' | 'queue' | 'lobby' | 'starting' | 'rejoining' | 'play
 
 const TICK_MS = 1000 / 60;
 const STALL_CAPTION_MS = 500;
+/** A stall shorter than this stays out of the ping readout (the N readout still counts it). */
+const STALL_SHOW_MS = 300;
 const LEAVE_PROMPT_MS = 3000;
 const HASH_EVERY = 60;
 const AI_OFFER_MS = 10_000;
@@ -96,6 +98,9 @@ export class OnlineMatch {
   private startAtLocal = 0;
   private oneWayTicks = 2;
   private rttMs: number | null = null;
+  /** The relay's latest estimate of the latency between the players. */
+  private pingMs: number | null = null;
+  private stalledSinceMs: number | null = null;
   private peerAwayDeadline: number | null = null;
   private reconnectShown = -1;
   private stalledSince: number | null = null;
@@ -199,13 +204,17 @@ export class OnlineMatch {
     }
     const session = this.session;
     const stalled = this.phase === 'playing' && !!session?.stalled;
+    // Only a stall that lasts (not a single late frame) is worth showing next to the ping.
+    if (stalled) this.stalledSinceMs ??= nowMs;
+    else this.stalledSinceMs = null;
+    const stalledVisibly = this.stalledSinceMs !== null && nowMs - this.stalledSinceMs >= STALL_SHOW_MS;
     this.smoothing.frame();
     session?.state.snakes.forEach((sn, i) => {
       if (!sn.alive) this.smoothing.reset(i);
     });
     this.timeScale = session && this.phase === 'playing' ? timeScaleFor(session.smoothedLead) : 1;
     this.deps.setTimeScale(this.timeScale);
-    this.deps.hud.setPing(this.lobby?.pingMs ?? null, stalled);
+    this.deps.hud.setPing(this.pingMs, stalledVisibly);
     this.updateNetReadout(nowMs);
 
     if (this.peerAwayDeadline !== null && (this.phase === 'playing' || this.phase === 'starting')) {
@@ -375,6 +384,7 @@ export class OnlineMatch {
         return;
       case 'lobby':
         this.lobby = m;
+        this.pingMs = m.pingMs;
         // An empty seat keeps its last name, so "Ada left" reads right after Ada leaves.
         this.names = m.players.map((p, i) => (p ? displayName(p.name, i) : (this.names[i] ?? displayName('', i))));
         this.deps.hud.setNames(this.names);
@@ -386,6 +396,7 @@ export class OnlineMatch {
         return;
       case 'ping':
         this.clock.onPing(m.t, performance.now(), this.rttMs);
+        if (m.pingMs !== null && m.pingMs !== undefined) this.pingMs = m.pingMs;
         this.conn.send({ type: 'pong', t: m.t });
         return;
       case 'start':
@@ -512,7 +523,7 @@ export class OnlineMatch {
     this.session = null;
     this.peerAwayDeadline = null;
     this.deps.setTimeScale(1);
-    this.deps.hud.setPing(this.lobby?.pingMs ?? null, false);
+    this.deps.hud.setPing(this.pingMs, false);
     this.deps.fx.clear();
     this.deps.sink.beat = null;
     this.showLobby();
