@@ -25,7 +25,7 @@ export class Renderer {
     this.bombs = new BombView(world.glow);
   }
 
-  draw(state: MatchState | null, alpha: number, cfg: Config, timeSeconds = 0): void {
+  draw(state: MatchState | null, alpha: number, cfg: Config, timeSeconds = 0, offsets?: readonly { x: number; y: number }[]): void {
     if (!state) {
       if (this.lastTiles) {
         this.arena.drawTiles([]);
@@ -53,7 +53,7 @@ export class Renderer {
     state.snakes.forEach((s, i) => {
       const view = this.snakes[i];
       if (!view) return;
-      if (s.alive) view.update(s, state.phase === 'playing' ? alpha : 1, cfg, timeSeconds);
+      if (s.alive) view.update(s, state.phase === 'playing' ? alpha : 1, cfg, timeSeconds, offsets?.[i]);
       else view.hide();
     });
     this.bombs.draw(state.bombs, cfg, timeSeconds);

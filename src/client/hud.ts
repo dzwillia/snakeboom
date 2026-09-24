@@ -11,6 +11,16 @@ const EFFECT_LABELS: Record<EffectName, string> = {
   reverse: 'REVERSED',
 };
 
+/** Numbers for the net readout, computed by the online match from the session's stats. */
+export interface NetReadout {
+  inputDelay: number;
+  rollbacksPerMin: number;
+  maxRollbackDepth: number;
+  stallsPerMin: number;
+  lead: number;
+  timeScale: number;
+}
+
 interface Side {
   hearts: HTMLElement;
   pips: HTMLElement;
@@ -30,11 +40,13 @@ export class Hud {
   private readonly sides: Side[];
   private readonly clock: HTMLElement;
   private readonly ping: HTMLElement;
+  private readonly net: HTMLElement;
   private readonly names: string[] = [...PLAYER_NAMES];
   private readonly tags: string[] = ['', ''];
   private lastPips = '';
   private lastClock = '';
   private lastPing = '';
+  private lastNet = '';
 
   constructor(private readonly root: HTMLElement) {
     const side = (i: number) =>
@@ -42,7 +54,7 @@ export class Hud {
       `<div class="row"><span class="name">${PLAYER_NAMES[i]}</span><span class="hearts"></span><span class="pips"></span></div>` +
       `<div class="row"><span class="boost"><span class="fill" style="display:block"></span></span>` +
       `<span class="effects"></span><span class="slots"></span></div></div>`;
-    root.innerHTML = `${side(0)}<div class="center"><div class="clock">0:00</div><div class="ping"></div></div>${side(1)}`;
+    root.innerHTML = `${side(0)}<div class="center"><div class="clock">0:00</div><div class="ping"></div><div class="net"></div></div>${side(1)}`;
     this.sides = [...root.querySelectorAll<HTMLElement>('.side')].map((el) => ({
       hearts: el.querySelector<HTMLElement>('.hearts')!,
       pips: el.querySelector<HTMLElement>('.pips')!,
@@ -55,6 +67,17 @@ export class Hud {
     }));
     this.clock = root.querySelector<HTMLElement>('.clock')!;
     this.ping = root.querySelector<HTMLElement>('.ping')!;
+    this.net = root.querySelector<HTMLElement>('.net')!;
+  }
+
+  /** The netcode readout under the ping (the N key online); null hides it. */
+  setNet(net: NetReadout | null): void {
+    const text = net
+      ? `delay ${net.inputDelay} · rb ${net.rollbacksPerMin.toFixed(1)}/min (max ${net.maxRollbackDepth}) · stall ${net.stallsPerMin.toFixed(1)}/min · lead ${net.lead >= 0 ? '+' : ''}${net.lead.toFixed(1)} · ×${net.timeScale.toFixed(3)}`
+      : '';
+    if (text === this.lastNet) return;
+    this.lastNet = text;
+    this.net.textContent = text;
   }
 
   /** Adds a tag after a player's name (like AI) or clears it with an empty string. */

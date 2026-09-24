@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { botInput, createBot, DEFAULT_CONFIG, hashState, NO_INPUT, type BotState, type PlayerInput } from '../sim';
 import { EventGate } from './events';
-import { createLinkedSessions, type FakeLink } from './fakeRelay';
-import { NetSession } from './session';
+import { createLinkedSessions, type FakeLink, type FakeLinkOptions } from './fakeRelay';
+import { emptyStats, NetSession, statsDelta } from './session';
 
 const FRAME_MS = 1000 / 60;
 const cfg = { ...DEFAULT_CONFIG, winsToWin: 2 };
@@ -60,9 +60,9 @@ function expectAgreement(run: Run, minShared: number): void {
   for (const t of shared) expect(run.hashes[0].get(t)?.toString(16)).toBe(run.hashes[1].get(t)?.toString(16));
 }
 
-function setup(latencyMs: number, jitterMs: number, inputDelay: number, seed = 1) {
+function setup(latencyMs: number, jitterMs: number, inputDelay: number, seed = 1, extra: Partial<FakeLinkOptions> = {}) {
   const run = makeRun();
-  const { link, sessions } = createLinkedSessions({ latencyMs, jitterMs, seed }, { seed: 4242, cfg, inputDelay }, (side, tick, state, events) => {
+  const { link, sessions } = createLinkedSessions({ latencyMs, jitterMs, seed, ...extra }, { seed: 4242, cfg, inputDelay }, (side, tick, state, events) => {
     if (tick % 60 === 0 || events.some((e) => e.type === 'roundOver')) run.hashes[side].set(tick, hashState(state));
   });
   const wrapSend = (s: NetSession, side: number) => {
@@ -87,10 +87,37 @@ describe('NetSession through a fake relay', () => {
     expect(sessions[0].stats.stalledTicks + sessions[1].stats.stalledTicks).toBe(0);
     expect(sessions[0].stats.rollbacks + sessions[1].stats.rollbacks).toBeGreaterThan(0);
     expect(run.roundOvers[0]).toBeGreaterThan(0);
+    // Review Focus 4 (M8): the counters are consistent with each other.
+    for (const s of sessions) {
+      expect(s.stats.ticks).toBe(3000);
+      // A rollback can have depth 0 (the mismatched tick was confirmed in the same reconcile).
+      expect(s.stats.rollbackTicks).toBeLessThanOrEqual(s.stats.rollbacks * s.maxRollback);
+      expect(s.stats.receivedLate).toBeGreaterThanOrEqual(s.stats.rollbacks);
+      expect(s.stats.maxRollbackDepth).toBeGreaterThan(0);
+    }
   });
 
   it('still agrees when packets overtake each other at 100 ms ± 60 ms', () => {
     const { run, link, sessions, bots, gates } = setup(100, 60, 3, 9);
+    runFrames(link, sessions, bots, 3000, run, gates);
+    expectAgreement(run, 30);
+    for (const s of sessions) expect(s.stats.maxRollbackDepth).toBeLessThanOrEqual(s.maxRollback);
+  });
+
+  // M8 Review Focus 1: a hotspot (150 ± 60 ms one-way with 300 ms spikes) must not stall.
+  it('rides out hotspot jitter spikes without stalling, within the rollback window', () => {
+    const { run, link, sessions, bots, gates } = setup(150, 60, 2, 11, { spikeMs: 300, spikeEveryMs: 7000 });
+    runFrames(link, sessions, bots, 3000, run, gates);
+    expectAgreement(run, 30);
+    for (const s of sessions) {
+      expect(s.stats.stalledTicks).toBe(0);
+      expect(s.stats.maxRollbackDepth).toBeLessThanOrEqual(s.maxRollback);
+      expect(s.stats.maxRollbackDepth).toBeGreaterThan(12);
+    }
+  });
+
+  it('survives TCP-style holds (packets bunched and released in order) with agreeing hashes', () => {
+    const { run, link, sessions, bots, gates } = setup(80, 20, 2, 12, { holdMs: 250, holdEveryMs: 4000 });
     runFrames(link, sessions, bots, 3000, run, gates);
     expectAgreement(run, 30);
     for (const s of sessions) expect(s.stats.maxRollbackDepth).toBeLessThanOrEqual(s.maxRollback);
@@ -179,8 +206,32 @@ describe('NetSession bookkeeping', () => {
     expect(s.stats.rollbacks).toBe(0);
   });
 
+  // M8 Task 4: a wrong guess about the remote reports a head correction for that seat only.
+  it('reports a correction for the remote head after a misprediction, not the local one', () => {
+    const s = make(1);
+    for (let t = 1; t <= 240; t++) s.receive(t, NO_INPUT);
+    for (let i = 0; i < 250; i++) s.advance(NO_INPUT);
+    expect(s.confirmedTick).toBe(240);
+    expect(s.state.phase).toBe('playing');
+    expect(s.takeCorrections()).toEqual([]);
+    s.receive(245, { turn: 1, boost: true, use: false });
+    s.advance(NO_INPUT);
+    const corrections = s.takeCorrections();
+    expect(corrections.map((c) => c.player)).toEqual([1]);
+    expect(Math.hypot(corrections[0].dx, corrections[0].dy)).toBeGreaterThan(0.5);
+    expect(s.takeCorrections()).toEqual([]);
+  });
+
   it('rejects a bad seat or delay', () => {
     expect(() => new NetSession({ seed: 1, cfg, local: 2, inputDelay: 1, send: () => {} })).toThrow(RangeError);
     expect(() => new NetSession({ seed: 1, cfg, local: 0, inputDelay: 0, send: () => {} })).toThrow(RangeError);
+  });
+});
+
+describe('statsDelta', () => {
+  it('subtracts counters and keeps the later max depth', () => {
+    const earlier = { ...emptyStats(), ticks: 100, rollbacks: 2, rollbackTicks: 5, stalledTicks: 3, receivedLate: 4, maxRollbackDepth: 3 };
+    const later = { ticks: 160, rollbacks: 5, rollbackTicks: 12, stalledTicks: 3, receivedLate: 9, maxRollbackDepth: 6 };
+    expect(statsDelta(later, earlier)).toEqual({ ticks: 60, rollbacks: 3, rollbackTicks: 7, stalledTicks: 0, receivedLate: 5, maxRollbackDepth: 6 });
   });
 });

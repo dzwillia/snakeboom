@@ -1,4 +1,5 @@
 import { cloneState, createMatch, NO_INPUT, step, type Config, type MatchState, type PlayerInput, type SimEvent } from '../sim';
+import { smoothLead } from './timeSync';
 
 export interface SessionOptions {
   seed: number;
@@ -9,6 +10,8 @@ export interface SessionOptions {
   inputDelay: number;
   /** Ticks the predicted state may run ahead of the confirmed state. */
   maxRollback?: number;
+  /** Estimated one-way latency to the peer in ticks, for the lead estimate. Can be set later. */
+  oneWayTicks?: number;
   /** Outgoing local inputs, to be sent to the relay. */
   send: (tick: number, input: PlayerInput) => void;
   /** Called after every confirmed tick with the confirmed state; the place to take hashes. */
@@ -22,13 +25,47 @@ export interface TaggedEvent {
   confirmed: boolean;
 }
 
-export interface SessionStats {
-  rollbacks: number;
-  maxRollbackDepth: number;
-  stalledTicks: number;
+/** A head that a rollback moved: old predicted position minus new, in world units. */
+export interface Correction {
+  player: number;
+  dx: number;
+  dy: number;
 }
 
-export const DEFAULT_MAX_ROLLBACK = 10;
+export interface SessionStats {
+  /** Ticks the predicted state has advanced. */
+  ticks: number;
+  rollbacks: number;
+  maxRollbackDepth: number;
+  /** Sum of rollback depths: ticks re-simulated. */
+  rollbackTicks: number;
+  stalledTicks: number;
+  /** Remote inputs that arrived after their tick had already been predicted. */
+  receivedLate: number;
+}
+
+export function emptyStats(): SessionStats {
+  return { ticks: 0, rollbacks: 0, maxRollbackDepth: 0, rollbackTicks: 0, stalledTicks: 0, receivedLate: 0 };
+}
+
+/** What happened between two snapshots of the stats (max depth is the later one's). */
+export function statsDelta(later: SessionStats, earlier: SessionStats): SessionStats {
+  return {
+    ticks: later.ticks - earlier.ticks,
+    rollbacks: later.rollbacks - earlier.rollbacks,
+    maxRollbackDepth: later.maxRollbackDepth,
+    rollbackTicks: later.rollbackTicks - earlier.rollbackTicks,
+    stalledTicks: later.stalledTicks - earlier.stalledTicks,
+    receivedLate: later.receivedLate - earlier.receivedLate,
+  };
+}
+
+/**
+ * Ticks the predicted state may run ahead of the confirmed one before the game waits. 30 ticks is
+ * 500 ms: enough for a hotspot's jitter spikes on top of a 150 ms one-way latency, and a 30-tick
+ * rollback costs under 10 ms (pnpm bench:rollback).
+ */
+export const DEFAULT_MAX_ROLLBACK = 30;
 /** How far behind the confirmed tick input history is kept, for late duplicates and rejoins. */
 const KEEP_TICKS = 600;
 const PRUNE_EVERY = 60;
@@ -52,7 +89,7 @@ export class NetSession {
   readonly remote: number;
   readonly inputDelay: number;
   readonly maxRollback: number;
-  readonly stats: SessionStats = { rollbacks: 0, maxRollbackDepth: 0, stalledTicks: 0 };
+  readonly stats: SessionStats = emptyStats();
 
   private confirmed: MatchState;
   private predicted: MatchState;
@@ -67,6 +104,9 @@ export class NetSession {
   private latestRemoteTick = -1;
   private needRollback = false;
   private stalledNow = false;
+  private oneWayTicks: number;
+  private leadEma: number | null = null;
+  private pendingCorrections: Correction[] = [];
 
   constructor(opts: SessionOptions) {
     if (opts.local !== 0 && opts.local !== 1) throw new RangeError(`local seat must be 0 or 1, got ${opts.local}`);
@@ -76,6 +116,7 @@ export class NetSession {
     this.inputDelay = opts.inputDelay;
     this.maxRollback = opts.maxRollback ?? DEFAULT_MAX_ROLLBACK;
     this.cfg = opts.cfg;
+    this.oneWayTicks = opts.oneWayTicks ?? 2;
     this.send = opts.send;
     this.onConfirmed = opts.onConfirmed;
     this.confirmed = createMatch(opts.cfg, opts.seed);
@@ -108,6 +149,22 @@ export class NetSession {
   /** True when the last advance() refused to step because the remote is too far behind. */
   get stalled(): boolean {
     return this.stalledNow;
+  }
+
+  setOneWayTicks(ticks: number): void {
+    this.oneWayTicks = ticks;
+  }
+
+  /** The lead estimate smoothed over recent ticks; what time sync acts on. 0 before any remote input. */
+  get smoothedLead(): number {
+    return this.leadEma ?? 0;
+  }
+
+  /** Head jumps caused by rollbacks since the last call, for visual smoothing. Clears them. */
+  takeCorrections(): Correction[] {
+    const out = this.pendingCorrections;
+    this.pendingCorrections = [];
+    return out;
   }
 
   /** Highest remote tick received, or −1 before any. */
@@ -159,6 +216,7 @@ export class NetSession {
       this.latestRemote = stored;
     }
     if (tick <= this.predicted.tick) {
+      this.stats.receivedLate++;
       const guessed = this.predictedRemote.get(tick);
       if (!guessed || !sameInput(guessed, stored)) this.needRollback = true;
     }
@@ -186,7 +244,9 @@ export class NetSession {
       return events;
     }
     this.stalledNow = false;
+    this.stats.ticks++;
     events.push(...this.stepPredicted());
+    if (this.latestRemoteTick >= 0) this.leadEma = smoothLead(this.leadEma, this.lead(this.oneWayTicks));
     if (this.predicted.tick % PRUNE_EVERY === 0) this.prune();
     return events;
   }
@@ -237,10 +297,19 @@ export class NetSession {
       this.needRollback = false;
       const depth = predictedTick - this.confirmed.tick;
       this.stats.rollbacks++;
+      this.stats.rollbackTicks += depth;
       if (depth > this.stats.maxRollbackDepth) this.stats.maxRollbackDepth = depth;
+      const before = this.predicted.snakes.map((sn) => ({ x: sn.x, y: sn.y, alive: sn.alive }));
       this.predicted = cloneState(this.confirmed);
       this.predictedRemote.clear();
       while (this.predicted.tick < predictedTick) out.push(...this.stepPredicted());
+      this.predicted.snakes.forEach((sn, player) => {
+        const was = before[player];
+        if (!was || !was.alive || !sn.alive) return;
+        const dx = was.x - sn.x;
+        const dy = was.y - sn.y;
+        if (dx * dx + dy * dy > 0.25) this.pendingCorrections.push({ player, dx, dy });
+      });
     }
     return out;
   }

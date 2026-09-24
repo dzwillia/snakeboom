@@ -88,12 +88,14 @@ function started(host: FakeHost, rtts: [number, number] = [60, 80]): Room {
 }
 
 describe('inputDelayFor', () => {
-  it('rounds the one-way latency between the players up to ticks, within 1–4', () => {
-    expect(inputDelayFor(60, 80)).toBe(3);
+  it('keeps the local delay at 1–2 ticks and only goes to 3 on a very far link', () => {
+    expect(inputDelayFor(60, 80)).toBe(2);
     expect(inputDelayFor(20, 20)).toBe(1);
-    expect(inputDelayFor(200, 250)).toBe(4);
-    expect(inputDelayFor(null, null)).toBe(3);
     expect(inputDelayFor(0, 0)).toBe(1);
+    expect(inputDelayFor(176, 134)).toBe(2);
+    expect(inputDelayFor(200, 250)).toBe(3);
+    expect(inputDelayFor(320, 320)).toBe(3);
+    expect(inputDelayFor(null, null)).toBe(2);
   });
 });
 
@@ -139,7 +141,7 @@ describe('Room ready-up and start', () => {
     const s1 = host.last(1, 'start') as Extract<ServerMessage, { type: 'start' }>;
     expect(s0).toEqual(s1);
     expect(s0.winsToWin).toBe(5);
-    expect(s0.inputDelay).toBe(3);
+    expect(s0.inputDelay).toBe(2);
     expect(s0.startAt).toBe(6500);
     expect(s0.rttMs).toEqual([100, 100]);
   });
@@ -148,11 +150,11 @@ describe('Room ready-up and start', () => {
     const host = new FakeHost();
     const room = started(host, [60, 80]);
     const start = host.last(0, 'start') as Extract<ServerMessage, { type: 'start' }>;
-    expect(start.inputDelay).toBe(3);
+    expect(start.inputDelay).toBe(2);
     expect(start.rttMs).toEqual([60, 80]);
     const host2 = new FakeHost();
     started(host2, [200, 250]);
-    expect((host2.last(0, 'start') as { inputDelay: number }).inputDelay).toBe(4);
+    expect((host2.last(0, 'start') as { inputDelay: number }).inputDelay).toBe(3);
     expect(host2.last(0, 'lobby')).toMatchObject({ pingMs: 225 });
     expect(room.status).toBe('playing');
   });
@@ -205,6 +207,21 @@ describe('Room refereeing', () => {
     expect(host.last(1, 'desync')).toEqual({ type: 'desync', tick: 120 });
     expect(room.status).toBe('lobby');
     expect(host.logs.find((l) => l.event === 'desync')).toMatchObject({ tick: 120, hashes: [333, 222] });
+  });
+
+  it('logs each round once both seats report it, with both sides’ net stats', () => {
+    const host = new FakeHost();
+    const room = started(host, [60, 80]);
+    const net0 = { ticks: 900, stalledTicks: 0, rollbacks: 4, maxRollbackDepth: 3, rollbackTicks: 7, receivedLate: 12 };
+    const net1 = { ...net0, stalledTicks: 30, rollbacks: 2 };
+    room.onMessage(0, { type: 'hash', tick: 900, hash: 5, result: { round: 1, winner: 0, scores: [1, 0], matchWinner: null, net: net0 } });
+    expect(host.logs.find((l) => l.event === 'round')).toBeUndefined();
+    room.onMessage(1, { type: 'hash', tick: 900, hash: 5, result: { round: 1, winner: 0, scores: [1, 0], matchWinner: null, net: net1 } });
+    const entry = host.logs.find((l) => l.event === 'round');
+    expect(entry).toMatchObject({ round: 1, winner: 0, scores: [1, 0], rttMs: [60, 80], net: [net0, net1] });
+    room.onMessage(0, { type: 'hash', tick: 960, hash: 6 });
+    room.onMessage(1, { type: 'hash', tick: 960, hash: 6 });
+    expect(host.logs.filter((l) => l.event === 'round')).toHaveLength(1);
   });
 
   it('records the match result when both clients agree on a match winner, and keeps relaying inputs', () => {

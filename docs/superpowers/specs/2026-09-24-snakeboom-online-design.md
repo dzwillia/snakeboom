@@ -151,7 +151,7 @@ The relay never runs the sim. It picks the seed, sets the input delay from the m
 
 - Each client keeps its own **local tick** counter, starting at 0 when the match starts, and steps the sim once per local tick.
 - The input a player presses during local tick `T` is applied at tick `T + D`, on both machines. `D` is the **input delay** in ticks. Both machines apply both players' inputs at the same ticks, so the game is symmetric.
-- The relay chooses `D` at match start from the players' pings to the relay: `D = clamp(ceil((rttA + rttB) / 2 / 2 / 16.67 ms), 1, 4)`. That's the estimated one-way latency between the players, rounded up to ticks, between 1 and 4. At 80 ms round trip it's 2 ticks (33 ms), which is below the threshold most players notice. `D` stays fixed for the match.
+- The relay chooses `D` at match start from the players' round trips to the relay. Rollback absorbs the network, so the local delay stays small: `D` is 1 tick when the one-way latency between the players (about the mean of their round trips) is at most 20 ms, 3 ticks when it is above 200 ms, and 2 ticks (33 ms) otherwise. `D` stays fixed for the match. *(M8 change: M5 scaled `D` up to 4 ticks with latency, which put 67 ms on every turn at hotspot latencies; the first playtest showed that as lag.)*
 - Each input message carries its tick, so inputs can be applied in order no matter when they arrive.
 
 ### 5.3 Rollback
@@ -170,7 +170,7 @@ Each animation frame:
 
 Mispredictions are rare in a snake game: a turn input changes a few times a second. When they happen, the correction is at most a few ticks of a snake's heading, which reads as a tiny twitch of the opponent's head.
 
-**Budget:** rollback re-simulates at most `maxRollback` = 10 ticks. `cloneState` of a late-round state plus 10 steps must fit in 12 ms on the developer's Mac, measured by `pnpm bench:rollback`. If `structuredClone` is too slow (the grid cache holds up to ~11k entries per round), `cloneState` gets a hand-written copy that skips the grid and rebuilds it.
+**Budget:** rollback re-simulates at most `maxRollback` = 30 ticks (500 ms). That covers a hotspot's jitter spikes on top of a 150 ms one-way latency without stalling. `cloneState` of a late-round state plus 30 steps must fit in 10 ms on the developer's Mac, measured by `pnpm bench:rollback` (a 10-tick rollback measured 2.8 ms at p95 in M6). *(M8 change: M5 used 10 ticks, which the first playtest's hotspot overran, and the game stalled.)*
 
 ### 5.4 Stalls and time sync
 
@@ -297,7 +297,7 @@ A deploy restarts the relay, which ends any live match with "The server restarte
 - **Purity:** the scan now covers `src/net`.
 - **Server:** start the relay on an ephemeral port, connect two `ws` clients, run a scripted match end to end, hit `/health`.
 - **Benchmark:** `pnpm bench:rollback` reports `cloneState` time and a 10-tick rollback on a late-round state.
-- **Manual:** two browser windows on localhost; then two machines over the internet before v1.0.0.
+- **Manual:** two browser windows on localhost; then two machines over the internet before v0.10.0.
 
 ## 10. Milestones
 
@@ -318,7 +318,7 @@ Each ends with a playable checkpoint. Version numbers continue from v0.7.0.
 - Abuse limits and result logging.
 - Playtest: two machines in different cities.
 
-**M7: Ship (v1.0.0)**
+**M7: Ship (v0.10.0)**
 - Dockerfiles, compose, Caddy fragment, workflows, host setup, DNS records.
 - "Play on a computer" page for touch devices.
 - README: online play, hosting and the deploy procedure.

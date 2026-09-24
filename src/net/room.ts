@@ -38,7 +38,6 @@ export const DEFAULT_EMPTY_MS = 120_000;
 export const PING_EVERY_MS = 1_000;
 /** A seat may run at most this many ticks ahead of the other. */
 export const MAX_TICK_LEAD = 600;
-const TICK_MS = 1000 / 60;
 const UNKNOWN_RTT_MS = 100;
 const START_LEAD_MS = 1_500;
 
@@ -55,10 +54,16 @@ interface Seat {
   result: RoundResult | null;
 }
 
-/** Input delay in ticks from the players' round trips: the one-way latency between them, rounded up, clamped to 1–4. */
+/**
+ * Input delay in ticks from the players' round trips to the relay. Rollback absorbs the network,
+ * so the local delay stays small: 1 tick on a LAN, 2 normally, 3 only when the one-way latency
+ * between the players (about the mean of their round trips) is above 200 ms.
+ */
 export function inputDelayFor(rttA: number | null, rttB: number | null): number {
-  const oneWay = ((rttA ?? UNKNOWN_RTT_MS) + (rttB ?? UNKNOWN_RTT_MS)) / 2 / 2;
-  return Math.min(4, Math.max(1, Math.ceil(oneWay / TICK_MS)));
+  const oneWayBetween = ((rttA ?? UNKNOWN_RTT_MS) + (rttB ?? UNKNOWN_RTT_MS)) / 2;
+  if (oneWayBetween <= 20) return 1;
+  if (oneWayBetween > 200) return 3;
+  return 2;
 }
 
 /**
@@ -86,6 +91,7 @@ export class Room {
   private inputLog: Uint8Array[] = [];
   private readonly hashes = new Map<number, (number | undefined)[]>();
   private lastPingShown: number | null = null;
+  private loggedRound = 0;
   private seed = 0;
   /** The current match's parameters, for rejoins. */
   private match: { seed: number; winsToWin: number; inputDelay: number; rttMs: number[] } | null = null;
@@ -290,6 +296,7 @@ export class Room {
     }
     this.inputLog = [];
     this.hashes.clear();
+    this.loggedRound = 0;
     this.relaying = true;
     this.setStatus('playing');
     this.match = { seed: this.seed, winsToWin: this.winsToWin, inputDelay, rttMs };
@@ -310,6 +317,7 @@ export class Room {
     }
     pair[player] = hash;
     if (result) seat.result = result;
+    this.logRoundIfComplete();
     const [a, b] = pair;
     if (a === undefined || b === undefined) return;
     this.hashes.delete(tick);
@@ -326,6 +334,23 @@ export class Room {
       this.host.log({ event: 'match', winner: r0.matchWinner, scores: r0.scores, rounds: r0.round, seed: this.seed });
       this.backToLobby();
     }
+  }
+
+  /** Once both seats have reported the same round, log its result with both sides' netcode stats. */
+  private logRoundIfComplete(): void {
+    const r0 = this.seats[0]?.result;
+    const r1 = this.seats[1]?.result;
+    if (!r0 || !r1 || r0.round !== r1.round || r0.round === this.loggedRound) return;
+    this.loggedRound = r0.round;
+    const [a, b] = this.seats;
+    this.host.log({
+      event: 'round',
+      round: r0.round,
+      winner: r0.winner,
+      scores: r0.scores,
+      rttMs: [a?.rttMs ?? null, b?.rttMs ?? null],
+      net: [r0.net ?? null, r1.net ?? null],
+    });
   }
 
   /** The match is finished: clear the ready flags so both must opt into a rematch. */

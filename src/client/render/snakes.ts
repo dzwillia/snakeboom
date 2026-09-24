@@ -41,7 +41,7 @@ export class SnakeView {
     this.setVisible(false);
   }
 
-  update(s: SnakeState, alpha: number, cfg: Config, t: number): void {
+  update(s: SnakeState, alpha: number, cfg: Config, t: number, offset?: { x: number; y: number }): void {
     this.setVisible(true);
     const radius = cfg.snakeRadius;
     const trail = s.trail;
@@ -60,8 +60,9 @@ export class SnakeView {
     // Blasts punch holes anywhere along the body, so a new hole redraws every chunk once.
     const holesChanged = s.holeVersion !== this.lastHoleVersion;
     this.lastHoleVersion = s.holeVersion;
-    const hx = s.prevX + (s.x - s.prevX) * alpha;
-    const hy = s.prevY + (s.y - s.prevY) * alpha;
+    // The offset is rollback smoothing (online): the drawn head lags a correction for a few frames.
+    const hx = s.prevX + (s.x - s.prevX) * alpha + (offset?.x ?? 0);
+    const hy = s.prevY + (s.y - s.prevY) * alpha + (offset?.y ?? 0);
     for (let k = firstChunk; k <= lastChunk; k++) {
       let chunk = this.chunks.get(k);
       const fresh = !chunk;

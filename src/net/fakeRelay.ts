@@ -3,10 +3,19 @@ import { createRng, rngNext, type RngState } from '../sim/rng';
 import { NetSession, type SessionOptions } from './session';
 
 export interface FakeLinkOptions {
+  /** One-way latency between the two players (through the relay). */
   latencyMs: number;
   jitterMs: number;
   seed: number;
+  /** Extra delay on every packet sent during a 200 ms burst, every `spikeEveryMs` ± 50%. Off when 0. */
+  spikeMs?: number;
+  spikeEveryMs?: number;
+  /** TCP-style head-of-line blocking: every `holdEveryMs` ± 50%, packets are held for `holdMs` and then delivered in order. */
+  holdMs?: number;
+  holdEveryMs?: number;
 }
+
+const SPIKE_WINDOW_MS = 200;
 
 interface Packet {
   due: number;
@@ -28,11 +37,34 @@ export class FakeLink {
   private readonly paused = [false, false];
   private readonly rng: RngState;
   private seq = 0;
+  private nextSpikeAt = Number.POSITIVE_INFINITY;
+  private spikeUntil = 0;
+  private nextHoldAt = Number.POSITIVE_INFINITY;
+  private holdUntil = 0;
   /** Every input ever sent through the link, in send order: the relay's log. */
   readonly sent: { from: number; tick: number; input: PlayerInput }[] = [];
 
   constructor(private readonly opts: FakeLinkOptions) {
     this.rng = createRng(opts.seed);
+    if (opts.spikeMs && opts.spikeEveryMs) this.nextSpikeAt = this.jittered(opts.spikeEveryMs);
+    if (opts.holdMs && opts.holdEveryMs) this.nextHoldAt = this.jittered(opts.holdEveryMs);
+  }
+
+  /** `base` ± 50%. */
+  private jittered(base: number): number {
+    return base * (0.5 + rngNext(this.rng));
+  }
+
+  /** Starts a spike or a hold when its time has come; called as the clock moves. */
+  private schedule(): void {
+    if (this.now >= this.nextSpikeAt) {
+      this.spikeUntil = this.now + SPIKE_WINDOW_MS;
+      this.nextSpikeAt = this.now + this.jittered(this.opts.spikeEveryMs ?? 0);
+    }
+    if (this.now >= this.nextHoldAt) {
+      this.holdUntil = this.now + (this.opts.holdMs ?? 0);
+      this.nextHoldAt = this.now + this.jittered(this.opts.holdEveryMs ?? 0);
+    }
   }
 
   attach(sessions: [NetSession, NetSession]): void {
@@ -59,6 +91,7 @@ export class FakeLink {
   /** Advances the clock and delivers everything that is due, in delivery order. */
   advance(ms: number): void {
     this.now += ms;
+    this.schedule();
     if (!this.sessions) throw new Error('attach sessions first');
     const due = this.queue.filter((p) => p.due <= this.now).sort((a, b) => a.due - b.due || a.seq - b.seq);
     this.queue = this.queue.filter((p) => p.due > this.now);
@@ -71,7 +104,10 @@ export class FakeLink {
 
   private post(packet: Packet): void {
     const jitter = (rngNext(this.rng) * 2 - 1) * this.opts.jitterMs;
-    packet.due = this.now + Math.max(0, this.opts.latencyMs + jitter);
+    let due = this.now + Math.max(0, this.opts.latencyMs + jitter);
+    if (this.now < this.spikeUntil) due += this.opts.spikeMs ?? 0;
+    if (this.now < this.holdUntil) due = Math.max(due, this.holdUntil + (this.opts.latencyMs ?? 0));
+    packet.due = due;
     this.queue.push(packet);
   }
 }

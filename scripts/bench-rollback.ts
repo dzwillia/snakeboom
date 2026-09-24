@@ -37,6 +37,10 @@ timed('rollback (clone + 10 steps)', () => {
   const s = cloneState(state);
   for (let i = 0; i < 10; i++) step(s, [NO_INPUT, NO_INPUT], cfg);
 });
+timed('rollback (clone + 30 steps)', () => {
+  const s = cloneState(state);
+  for (let i = 0; i < 30; i++) step(s, [NO_INPUT, NO_INPUT], cfg);
+});
 timed('hashState', () => void hashState(state));
 timed('catch-up slice (300 steps)', () => {
   const s = cloneState(state);
