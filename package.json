@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "soak": "tsx scripts/soak.ts"
+    "soak": "tsx scripts/soak.ts",
+    "bench:rollback": "tsx scripts/bench-rollback.ts"
   },
   "dependencies": {
     "@fontsource/orbitron": "5.3.0",

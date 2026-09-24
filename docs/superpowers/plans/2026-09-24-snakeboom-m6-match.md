@@ -140,7 +140,10 @@ get behind(): boolean;
 
 **Decision rule:** if a 10-tick rollback exceeds 12 ms at p95 on the developer's Mac, replace `cloneState` with a hand-written copy (typed arrays and objects copied field by field, grid cells sliced). Keep the `structuredClone` result as the oracle in `state.test.ts`: both copies must be deep-equal and independent. If it is under budget, leave `cloneState` alone and record the numbers in the plan.
 
-- [ ] **Step 1: Write the bench and run it.** Paste the numbers here as a comment.
+- [x] **Step 1: Write the bench and run it.** Paste the numbers here as a comment.
+  <!-- 2026-09-24, M2 MacBook, state at 57 s of round (447 KB JSON, 6.8k grid entries):
+       cloneState median 0.99 ms · p95 2.20 ms; rollback (clone + 10 steps) median 1.06 ms · p95 2.80 ms;
+       hashState median 2.65 ms; catch-up 300 steps median 1.94 ms. Under budget: cloneState unchanged. -->
 - [ ] **Step 2: If over budget, write the failing equality test, then the hand-written clone, and rerun the bench.**
 - [ ] **Step 3: Commit** `perf(sim): rollback benchmark` (and `cloneState` if changed).
 
