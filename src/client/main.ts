@@ -85,7 +85,15 @@ async function boot(): Promise<void> {
   };
   const activeCfg = () => (online ? online.cfg : cfg);
   const activeState = () => (online ? online.state : state);
-  const sink = new EventSink({ fx, sound, screens, cfg: activeCfg, names: () => names, now });
+  const sink = new EventSink({
+    fx,
+    sound,
+    screens,
+    cfg: activeCfg,
+    names: () => names,
+    now,
+    matchOverHint: () => (online ? 'SPACE OR ESC · MENU' : 'SPACE REMATCH · ESC MENU'),
+  });
 
   const showTitle = () => screens.title({ row: menuRow, winsToWin: cfg.winsToWin, hearts: cfg.hearts, opponent: settings.opponent });
   /** Seats the AI (or a human) for a new match, so a mid-match setting change waits for the next one. */

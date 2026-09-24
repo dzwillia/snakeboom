@@ -8,6 +8,8 @@ export class WsHost implements RoomHost {
   constructor(
     private readonly code: string,
     private readonly logSink: (entry: Record<string, unknown>) => void,
+    /** Artificial delay on every send, for testing rollback on a LAN. */
+    private readonly lagMs = 0,
   ) {}
 
   attach(player: number, socket: WebSocket): void {
@@ -25,9 +27,14 @@ export class WsHost implements RoomHost {
 
   send(player: number, message: Record<string, unknown> | Uint8Array): void {
     const socket = this.sockets[player];
-    if (!socket || socket.readyState !== socket.OPEN) return;
-    if (message instanceof Uint8Array) socket.send(message, { binary: true });
-    else socket.send(JSON.stringify(message));
+    if (!socket) return;
+    const deliver = () => {
+      if (socket.readyState !== socket.OPEN) return;
+      if (message instanceof Uint8Array) socket.send(message, { binary: true });
+      else socket.send(JSON.stringify(message));
+    };
+    if (this.lagMs > 0) setTimeout(deliver, this.lagMs);
+    else deliver();
   }
 
   close(player: number): void {

@@ -207,7 +207,7 @@ describe('Room refereeing', () => {
     expect(host.logs.find((l) => l.event === 'desync')).toMatchObject({ tick: 120, hashes: [333, 222] });
   });
 
-  it('records the match result when both clients agree on a match winner', () => {
+  it('records the match result when both clients agree on a match winner, and keeps relaying inputs', () => {
     const host = new FakeHost();
     const room = started(host);
     const result = { round: 7, winner: 1, scores: [3, 5], matchWinner: 1 };
@@ -216,6 +216,8 @@ describe('Room refereeing', () => {
     room.onMessage(1, { type: 'hash', tick: 900, hash: 5, result });
     expect(room.status).toBe('over');
     expect(host.logs.find((l) => l.event === 'match')).toMatchObject({ winner: 1, scores: [3, 5] });
+    room.onInput(0, encodeInput(1, NO_INPUT));
+    expect(host.frames(1)).toHaveLength(1);
   });
 });
 
@@ -317,12 +319,21 @@ describe('Room cleanup', () => {
     expect(host.messages(0, 'closed')).toHaveLength(1);
   });
 
-  it('keeps pinging connected players every second', () => {
+  it('keeps pinging connected players every second and refreshes the lobby ping', () => {
     const host = new FakeHost();
-    lobbyWith(host);
+    const room = lobbyWith(host);
     host.tick(3_500);
     expect(host.messages(0, 'ping')).toHaveLength(3);
     expect(host.messages(1, 'ping')).toHaveLength(3);
+    const lobbiesBefore = host.messages(0, 'lobby').length;
+    const t = (host.last(0, 'ping') as { t: number }).t;
+    host.t = t + 30;
+    room.onMessage(0, { type: 'pong', t });
+    room.onMessage(1, { type: 'pong', t });
+    expect(host.messages(0, 'lobby')).toHaveLength(lobbiesBefore + 1);
+    expect(host.last(0, 'lobby')).toMatchObject({ pingMs: 30 });
+    room.onMessage(0, { type: 'pong', t });
+    expect(host.messages(0, 'lobby')).toHaveLength(lobbiesBefore + 1);
   });
 
   it('close() cancels every timer and fires nothing afterward', () => {

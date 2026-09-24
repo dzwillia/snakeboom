@@ -79,6 +79,7 @@ export class Room {
   /** Relayed frames of the current match, in arrival order, for rejoins. */
   private inputLog: Uint8Array[] = [];
   private readonly hashes = new Map<number, (number | undefined)[]>();
+  private lastPingShown: number | null = null;
   private seed = 0;
 
   constructor(
@@ -170,9 +171,14 @@ export class Room {
         this.broadcastLobby();
         this.maybeStart();
         return;
-      case 'pong':
-        if (typeof message.t === 'number') seat.rttMs = Math.max(0, this.host.now() - message.t);
+      case 'pong': {
+        if (typeof message.t !== 'number') return;
+        seat.rttMs = Math.max(0, this.host.now() - message.t);
+        // Keep the lobby's ping readout fresh while people wait, without spamming during play.
+        const ping = this.pingMs();
+        if (this.statusNow !== 'playing' && ping !== this.lastPingShown) this.broadcastLobby();
         return;
+      }
       case 'hash':
         this.onHash(player, seat, message.tick, message.hash, message.result);
         return;
@@ -203,7 +209,9 @@ export class Room {
 
   onInput(player: number, frame: Uint8Array): void {
     const seat = this.seats[player];
-    if (!seat || this.statusNow !== 'playing' || !seat.connected) return;
+    // Frames keep flowing after the result, so both clients can play out the round-over banner
+    // and reach the match-over screen together.
+    if (!seat || (this.statusNow !== 'playing' && this.statusNow !== 'over') || !seat.connected) return;
     const decoded = decodeInput(frame);
     if (!decoded) return;
     const other = this.seats[1 - player];
@@ -330,9 +338,15 @@ export class Room {
     const players: (LobbyPlayer | null)[] = this.seats.map((s) =>
       s ? { name: s.name, ready: s.ready, connected: s.connected && !s.away } : null,
     );
-    const [a, b] = this.seats;
-    const pingMs = a?.rttMs != null && b?.rttMs != null ? Math.round((a.rttMs + b.rttMs) / 2) : null;
+    const pingMs = this.pingMs();
+    this.lastPingShown = pingMs;
     this.broadcast({ type: 'lobby', players, winsToWin: this.winsToWin, pingMs });
+  }
+
+  /** The relay's estimate of the latency between the players: the mean of their round trips. */
+  private pingMs(): number | null {
+    const [a, b] = this.seats;
+    return a?.rttMs != null && b?.rttMs != null ? Math.round((a.rttMs + b.rttMs) / 2) : null;
   }
 
   private broadcast(message: ServerMessage): void {

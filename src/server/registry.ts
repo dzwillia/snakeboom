@@ -15,6 +15,7 @@ export class Registry {
   constructor(
     private readonly maxRooms: number,
     private readonly log: (entry: Record<string, unknown>) => void,
+    private readonly lagMs = 0,
   ) {}
 
   get count(): number {
@@ -32,7 +33,7 @@ export class Registry {
     if (this.rooms.size >= this.maxRooms) return null;
     let code = roomCode(Math.random);
     while (this.rooms.has(code)) code = roomCode(Math.random);
-    const host = new WsHost(code, this.log);
+    const host = new WsHost(code, this.log, this.lagMs);
     const room = new Room(host, { code, winsToWin });
     const entry = { room, host };
     this.rooms.set(code, entry);

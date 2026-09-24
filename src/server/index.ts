@@ -15,6 +15,8 @@ export interface ServerOptions {
   allowedOrigin?: string;
   version?: string;
   maxRooms?: number;
+  /** Delay every message the relay sends, to test rollback without a real network. */
+  lagMs?: number;
   log?: (entry: Record<string, unknown>) => void;
 }
 
@@ -49,7 +51,7 @@ function clampWins(value: unknown): number {
 export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const log = opts.log ?? logLine;
   const version = opts.version ?? 'dev';
-  const registry = new Registry(opts.maxRooms ?? DEFAULT_MAX_ROOMS, log);
+  const registry = new Registry(opts.maxRooms ?? DEFAULT_MAX_ROOMS, log, opts.lagMs ?? 0);
   const app = new Hono();
   app.get('/health', (c) =>
     c.json({

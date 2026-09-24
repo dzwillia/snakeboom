@@ -91,6 +91,21 @@ export class OnlineMatch {
     return this.phase === 'playing';
   }
 
+  /** For dev tools and browser checks. */
+  get debug(): Record<string, unknown> {
+    const s = this.session;
+    return {
+      phase: this.phase,
+      me: this.me,
+      room: this.room,
+      tick: s?.tick ?? -1,
+      confirmedTick: s?.confirmedTick ?? -1,
+      stalled: s?.stalled ?? false,
+      stats: s ? { ...s.stats } : null,
+      sim: s ? { phase: s.state.phase, round: s.state.round, scores: s.state.scores.slice(), hearts: s.state.snakes.map((x) => x.hearts) } : null,
+    };
+  }
+
   /** One sim tick from the fixed-step loop. */
   tick(): void {
     if (this.phase === 'starting') {
@@ -143,6 +158,12 @@ export class OnlineMatch {
 
   /** Space and Escape. Returns true when the key was used. */
   key(code: string): boolean {
+    const matchOver = this.phase === 'playing' && this.session?.state.phase === 'matchOver';
+    if (matchOver && (code === 'Space' || code === 'Escape')) {
+      this.conn.send({ type: 'leave' });
+      this.exit();
+      return true;
+    }
     if (code === 'Space') {
       if (this.phase === 'lobby') {
         const mine = this.lobby?.players[this.me];

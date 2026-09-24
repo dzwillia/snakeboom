@@ -29,6 +29,8 @@ export interface EventSinkDeps {
   names: () => readonly string[];
   /** Seconds, for timing the death beat. */
   now: () => number;
+  /** The key hint under the match-over banner. */
+  matchOverHint: () => string;
 }
 
 /** Turns sim events into effects, sounds and screens. Shared by local and online play. */
@@ -75,7 +77,7 @@ export class EventSink {
           break;
         }
         case 'matchOver':
-          screens.matchOver(e.winner, state.scores, names);
+          screens.matchOver(e.winner, state.scores, names, this.deps.matchOverHint());
           sound.play('matchWin');
           break;
         case 'pickupSpawned':

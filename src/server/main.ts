@@ -5,6 +5,7 @@ const server = await startServer({
   port,
   allowedOrigin: process.env.ALLOWED_ORIGIN || undefined,
   version: process.env.APP_VERSION ?? 'dev',
+  lagMs: Number(process.env.RELAY_LAG_MS ?? 0) || 0,
 });
 
 const shutdown = () => {
