@@ -206,6 +206,22 @@ describe('NetSession bookkeeping', () => {
     expect(s.stats.rollbacks).toBe(0);
   });
 
+  // M8 Task 4: a wrong guess about the remote reports a head correction for that seat only.
+  it('reports a correction for the remote head after a misprediction, not the local one', () => {
+    const s = make(1);
+    for (let t = 1; t <= 240; t++) s.receive(t, NO_INPUT);
+    for (let i = 0; i < 250; i++) s.advance(NO_INPUT);
+    expect(s.confirmedTick).toBe(240);
+    expect(s.state.phase).toBe('playing');
+    expect(s.takeCorrections()).toEqual([]);
+    s.receive(245, { turn: 1, boost: true, use: false });
+    s.advance(NO_INPUT);
+    const corrections = s.takeCorrections();
+    expect(corrections.map((c) => c.player)).toEqual([1]);
+    expect(Math.hypot(corrections[0].dx, corrections[0].dy)).toBeGreaterThan(0.5);
+    expect(s.takeCorrections()).toEqual([]);
+  });
+
   it('rejects a bad seat or delay', () => {
     expect(() => new NetSession({ seed: 1, cfg, local: 2, inputDelay: 1, send: () => {} })).toThrow(RangeError);
     expect(() => new NetSession({ seed: 1, cfg, local: 0, inputDelay: 0, send: () => {} })).toThrow(RangeError);

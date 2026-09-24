@@ -25,6 +25,13 @@ export interface TaggedEvent {
   confirmed: boolean;
 }
 
+/** A head that a rollback moved: old predicted position minus new, in world units. */
+export interface Correction {
+  player: number;
+  dx: number;
+  dy: number;
+}
+
 export interface SessionStats {
   /** Ticks the predicted state has advanced. */
   ticks: number;
@@ -99,6 +106,7 @@ export class NetSession {
   private stalledNow = false;
   private oneWayTicks: number;
   private leadEma: number | null = null;
+  private pendingCorrections: Correction[] = [];
 
   constructor(opts: SessionOptions) {
     if (opts.local !== 0 && opts.local !== 1) throw new RangeError(`local seat must be 0 or 1, got ${opts.local}`);
@@ -150,6 +158,13 @@ export class NetSession {
   /** The lead estimate smoothed over recent ticks; what time sync acts on. 0 before any remote input. */
   get smoothedLead(): number {
     return this.leadEma ?? 0;
+  }
+
+  /** Head jumps caused by rollbacks since the last call, for visual smoothing. Clears them. */
+  takeCorrections(): Correction[] {
+    const out = this.pendingCorrections;
+    this.pendingCorrections = [];
+    return out;
   }
 
   /** Highest remote tick received, or −1 before any. */
@@ -284,9 +299,17 @@ export class NetSession {
       this.stats.rollbacks++;
       this.stats.rollbackTicks += depth;
       if (depth > this.stats.maxRollbackDepth) this.stats.maxRollbackDepth = depth;
+      const before = this.predicted.snakes.map((sn) => ({ x: sn.x, y: sn.y, alive: sn.alive }));
       this.predicted = cloneState(this.confirmed);
       this.predictedRemote.clear();
       while (this.predicted.tick < predictedTick) out.push(...this.stepPredicted());
+      this.predicted.snakes.forEach((sn, player) => {
+        const was = before[player];
+        if (!was || !was.alive || !sn.alive) return;
+        const dx = was.x - sn.x;
+        const dy = was.y - sn.y;
+        if (dx * dx + dy * dy > 0.25) this.pendingCorrections.push({ player, dx, dy });
+      });
     }
     return out;
   }

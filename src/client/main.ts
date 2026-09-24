@@ -163,7 +163,7 @@ async function boot(): Promise<void> {
       fx.setCamera(f ? f.zoom : 1, beat ? beat.x : 0, beat ? beat.y : 0);
       fx.setFlash(f ? f.flash : 0);
       const s = activeState();
-      renderer.draw(s, alpha, activeCfg(), performance.now() / 1000);
+      renderer.draw(s, alpha, activeCfg(), performance.now() / 1000, online?.offsets);
       fx.update(frameSeconds);
       hud.update(s, activeCfg(), performance.now() / 1000);
       tickFuses(s);

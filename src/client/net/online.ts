@@ -12,6 +12,7 @@ import type { Hud } from '../hud';
 import type { KeyboardInput } from '../input';
 import type { Fx } from '../render/fx';
 import type { Screens } from '../screens';
+import { HeadSmoothing } from '../smoothing';
 import { RelayClock } from './clock';
 import { RelayConnection } from './transport';
 
@@ -105,6 +106,7 @@ export class OnlineMatch {
   private queueShown = '';
   private replayFrames = 0;
   private showNet = false;
+  private readonly smoothing = new HeadSmoothing(2);
   private roundStatsBase: SessionStats = emptyStats();
   /** For the per-minute rates: stats and time at the last readout sample. */
   private rateSample: { at: number; stats: SessionStats } | null = null;
@@ -150,6 +152,11 @@ export class OnlineMatch {
     return this.phase === 'playing';
   }
 
+  /** Visual offsets for the drawn heads (rollback smoothing). */
+  get offsets(): readonly { x: number; y: number }[] {
+    return this.smoothing.offsets;
+  }
+
   /** For dev tools and browser checks. */
   get debug(): Record<string, unknown> {
     const s = this.session;
@@ -174,6 +181,7 @@ export class OnlineMatch {
     }
     if (this.phase !== 'playing' || !this.session) return;
     const events = this.session.advance(this.deps.input.sampleLocal());
+    for (const c of this.session.takeCorrections()) this.smoothing.correct(c.player, c.dx, c.dy);
     const play = this.gate.filter(events);
     if (play.length > 0) this.deps.sink.handle(play, this.session.state);
     if (this.session.tick % HASH_EVERY === 0) this.gate.prune(this.session.tick);
@@ -191,6 +199,10 @@ export class OnlineMatch {
     }
     const session = this.session;
     const stalled = this.phase === 'playing' && !!session?.stalled;
+    this.smoothing.frame();
+    session?.state.snakes.forEach((sn, i) => {
+      if (!sn.alive) this.smoothing.reset(i);
+    });
     this.timeScale = session && this.phase === 'playing' ? timeScaleFor(session.smoothedLead) : 1;
     this.deps.setTimeScale(this.timeScale);
     this.deps.hud.setPing(this.lobby?.pingMs ?? null, stalled);
@@ -440,6 +452,7 @@ export class OnlineMatch {
       onConfirmed: (tick, state, events) => this.onConfirmed(tick, state, events),
     });
     this.gate = new EventGate();
+    this.smoothing.reset();
     this.roundStatsBase = emptyStats();
     this.rateSample = null;
     this.deps.sink.beat = null;
@@ -548,6 +561,7 @@ export class OnlineMatch {
       onConfirmed: (tick, state, events) => this.onConfirmed(tick, state, events),
     });
     this.gate = new EventGate();
+    this.smoothing.reset();
     this.roundStatsBase = emptyStats();
     this.rateSample = null;
     this.startAtLocal = this.clock.synced ? this.clock.toLocal(m.startAt) : performance.now() + 1500;
