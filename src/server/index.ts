@@ -132,7 +132,10 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       }
       case 'join': {
         const entry = isRoomCode(message.room) ? registry.get(message.room) : undefined;
-        if (!entry) return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });
+        if (!entry) {
+          log({ event: 'joinFailed', room: message.room });
+          return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });
+        }
         joinEntry(conn, entry);
         return;
       }
@@ -192,7 +195,10 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     const session = message.session as string;
     const entry = registry.bySession(session);
     const player = entry?.room.seatForSession(session) ?? null;
-    if (!entry || player === null) return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });
+    if (!entry || player === null) {
+      log({ event: 'rejoinFailed', known: !!entry, room: entry?.room.code ?? null, status: entry?.room.status ?? null });
+      return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });
+    }
     // Attach first so rejoin()'s welcome reaches this socket.
     entry.host.attach(player, conn.socket);
     const fromTick = typeof message.fromTick === 'number' && message.fromTick >= 0 ? Math.floor(message.fromTick) : 0;

@@ -305,6 +305,8 @@ export class Room {
     if (!pair) {
       pair = [undefined, undefined];
       this.hashes.set(tick, pair);
+      // A rejoining client re-sends hashes for ticks already settled; drop old half-pairs.
+      for (const t of this.hashes.keys()) if (t < tick - 1200) this.hashes.delete(t);
     }
     pair[player] = hash;
     if (result) seat.result = result;

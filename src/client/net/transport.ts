@@ -10,12 +10,18 @@ export function relayUrl(base: string): string {
   return url.toString();
 }
 
-/** One WebSocket to the relay: JSON control messages and binary input frames, queued until open. */
+/**
+ * One WebSocket to the relay: JSON control messages and binary input frames, queued until open.
+ * Incoming traffic is buffered until `attach` names the handlers, so a connection can be opened
+ * (and a rejoin hello sent) before the rest of the client has finished starting up.
+ */
 export class RelayConnection {
   onOpen: () => void = () => {};
-  onMessage: (message: ServerMessage) => void = () => {};
-  onFrame: (frame: Uint8Array) => void = () => {};
-  onClose: (code: number, reason: string) => void = () => {};
+
+  private onMessage: ((message: ServerMessage) => void) | null = null;
+  private onFrame: ((frame: Uint8Array) => void) | null = null;
+  private onClose: ((code: number, reason: string) => void) | null = null;
+  private readonly inbox: ({ message: ServerMessage } | { frame: Uint8Array } | { closed: [number, string] })[] = [];
 
   private readonly socket: WebSocket;
   private readonly queue: (string | Uint8Array<ArrayBuffer>)[] = [];
@@ -33,19 +39,19 @@ export class RelayConnection {
     };
     this.socket.onmessage = (ev: MessageEvent<string | ArrayBuffer>) => {
       if (ev.data instanceof ArrayBuffer) {
-        this.onFrame(new Uint8Array(ev.data));
+        this.deliver({ frame: new Uint8Array(ev.data) });
         return;
       }
       try {
         const parsed = JSON.parse(ev.data) as ServerMessage;
-        if (parsed && typeof parsed.type === 'string') this.onMessage(parsed);
+        if (parsed && typeof parsed.type === 'string') this.deliver({ message: parsed });
       } catch {
         // Ignore anything unreadable; the relay never sends it.
       }
     };
     this.socket.onclose = (ev) => {
       this.isOpen = false;
-      if (!this.closedByUs) this.onClose(ev.code, ev.reason);
+      if (!this.closedByUs) this.deliver({ closed: [ev.code, ev.reason] });
     };
     this.socket.onerror = () => {
       // onclose follows with the code.
@@ -54,6 +60,29 @@ export class RelayConnection {
 
   get open(): boolean {
     return this.isOpen;
+  }
+
+  /** Names the handlers and replays anything that arrived before they existed. */
+  attach(handlers: {
+    onMessage: (message: ServerMessage) => void;
+    onFrame: (frame: Uint8Array) => void;
+    onClose: (code: number, reason: string) => void;
+  }): void {
+    this.onMessage = handlers.onMessage;
+    this.onFrame = handlers.onFrame;
+    this.onClose = handlers.onClose;
+    const pending = this.inbox.splice(0);
+    for (const item of pending) this.deliver(item);
+  }
+
+  private deliver(item: { message: ServerMessage } | { frame: Uint8Array } | { closed: [number, string] }): void {
+    if (!this.onMessage || !this.onFrame || !this.onClose) {
+      this.inbox.push(item);
+      return;
+    }
+    if ('message' in item) this.onMessage(item.message);
+    else if ('frame' in item) this.onFrame(item.frame);
+    else this.onClose(...item.closed);
   }
 
   send(message: ClientMessage): void {

@@ -1,10 +1,11 @@
 import { DEFAULT_CONFIG, hashState, type Config, type MatchState } from '../../sim';
-import { decodeRelayed, encodeInput } from '../../net/codec';
+import { decodeRelayed, decodeReplay, encodeInput, FRAME_REPLAY } from '../../net/codec';
 import { EventGate } from '../../net/events';
 import { displayName } from '../../net/names';
-import { PROTOCOL, type RoundResult, type ServerMessage } from '../../net/protocol';
+import { PROTOCOL, type ClientMessage, type RoundResult, type ServerMessage } from '../../net/protocol';
 import { NetSession } from '../../net/session';
 import { PLAYER_CSS } from '../colors';
+import { describeRound } from '../text';
 import type { EventSink } from '../events';
 import type { Hud } from '../hud';
 import type { KeyboardInput } from '../input';
@@ -13,7 +14,39 @@ import type { Screens } from '../screens';
 import { RelayClock } from './clock';
 import { RelayConnection } from './transport';
 
-export type OnlineMode = { kind: 'create'; winsToWin: number } | { kind: 'join'; room: string };
+export type OnlineMode =
+  | { kind: 'create'; winsToWin: number }
+  | { kind: 'join'; room: string }
+  | { kind: 'quick'; winsToWin: number }
+  /** A refreshed tab coming back to its room with its session token. */
+  | { kind: 'rejoin'; room: string; session: string };
+
+export const SESSION_KEY = 'snakeboom.session';
+
+/** The first message of a refreshed tab: identify the seat and ask for the whole log. */
+export function rejoinHello(name: string, session: string): ClientMessage {
+  return { type: 'hello', protocol: PROTOCOL, version: __APP_VERSION__, name, session, fromTick: 0 };
+}
+
+/** The room and token of the tab's current visit, so a refresh can rejoin. */
+export function storedSession(): { room: string; session: string } | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    const parsed = raw ? (JSON.parse(raw) as { room?: unknown; session?: unknown }) : null;
+    return parsed && typeof parsed.room === 'string' && typeof parsed.session === 'string' ? { room: parsed.room, session: parsed.session } : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeSession(value: { room: string; session: string } | null): void {
+  try {
+    if (value) sessionStorage.setItem(SESSION_KEY, JSON.stringify(value));
+    else sessionStorage.removeItem(SESSION_KEY);
+  } catch {
+    // Private mode or blocked storage: refreshing just won't rejoin.
+  }
+}
 
 export interface OnlineDeps {
   screens: Screens;
@@ -23,19 +56,25 @@ export interface OnlineDeps {
   input: KeyboardInput;
   /** Back to the title screen. */
   onExit: () => void;
+  /** The player took the AI offer while waiting in the queue: start a local match at this length. */
+  onAi: (winsToWin: number) => void;
   /** Called with the names to use on banners whenever they change. */
   onNames: (names: string[]) => void;
   /** The loop's time scale, for time sync. */
   setTimeScale: (scale: number) => void;
+  /** A connection opened early (a rejoin hello already sent), so the countdown stops before the renderer is up. */
+  connection?: RelayConnection;
 }
 
-type Phase = 'connecting' | 'lobby' | 'starting' | 'playing' | 'over' | 'error';
+type Phase = 'connecting' | 'queue' | 'lobby' | 'starting' | 'rejoining' | 'playing' | 'over' | 'error';
 
 const TICK_MS = 1000 / 60;
 const STALL_CAPTION_MS = 500;
 const LEAVE_PROMPT_MS = 3000;
 const HASH_EVERY = 60;
 const SLOW_SCALE = 0.97;
+const AI_OFFER_MS = 10_000;
+const CATCH_UP_PER_FRAME = 600;
 
 /** One visit to a room: connect, lobby, ready-up, a match through NetSession, and the ways it ends. */
 export class OnlineMatch {
@@ -44,7 +83,8 @@ export class OnlineMatch {
 
   private readonly conn: RelayConnection;
   private readonly clock = new RelayClock();
-  private readonly gate = new EventGate();
+  /** Replaced for every match, since tick numbers start over. */
+  private gate = new EventGate();
   private session: NetSession | null = null;
   private phase: Phase = 'connecting';
   private me = -1;
@@ -60,6 +100,10 @@ export class OnlineMatch {
   private stalledSince: number | null = null;
   private stallShown = false;
   private leavePromptUntil = 0;
+  private queuedSince = 0;
+  private queueOnline = 1;
+  private queueShown = '';
+  private replayFrames = 0;
   private readonly onVisibility = () => {
     if (this.phase !== 'playing' && this.phase !== 'starting') return;
     this.conn.send({ type: document.hidden ? 'away' : 'back' });
@@ -71,14 +115,23 @@ export class OnlineMatch {
     private readonly mode: OnlineMode,
     private readonly deps: OnlineDeps,
   ) {
-    this.conn = new RelayConnection(url);
-    this.conn.onMessage = (m) => this.onMessage(m);
-    this.conn.onFrame = (f) => this.onFrame(f);
-    this.conn.onClose = (code) => this.onSocketClosed(code);
-    this.conn.send({ type: 'hello', protocol: PROTOCOL, version: __APP_VERSION__, name });
-    if (mode.kind === 'create') this.conn.send({ type: 'create', winsToWin: mode.winsToWin });
-    else this.conn.send({ type: 'join', room: mode.room });
-    deps.screens.caption('CONNECTING…');
+    this.conn = deps.connection ?? new RelayConnection(url);
+    this.conn.attach({
+      onMessage: (m) => this.onMessage(m),
+      onFrame: (f) => this.onFrame(f),
+      onClose: (code) => this.onSocketClosed(code),
+    });
+    if (deps.connection) {
+      // The hello went out already; the replies are waiting in the connection's inbox.
+    } else if (mode.kind === 'rejoin') {
+      this.conn.send(rejoinHello(name, mode.session));
+    } else {
+      this.conn.send({ type: 'hello', protocol: PROTOCOL, version: __APP_VERSION__, name });
+      if (mode.kind === 'create') this.conn.send({ type: 'create', winsToWin: mode.winsToWin });
+      else if (mode.kind === 'join') this.conn.send({ type: 'join', room: mode.room });
+      else this.conn.send({ type: 'queue', winsToWin: mode.winsToWin });
+    }
+    deps.screens.caption(mode.kind === 'rejoin' ? 'REJOINING…' : 'CONNECTING…');
     document.addEventListener('visibilitychange', this.onVisibility);
   }
 
@@ -122,6 +175,14 @@ export class OnlineMatch {
 
   /** Once per rendered frame: time sync, the ping readout and the overlays that count down. */
   frame(nowMs: number): void {
+    if (this.phase === 'queue') {
+      this.showQueue(nowMs);
+      return;
+    }
+    if (this.phase === 'rejoining') {
+      this.catchUp();
+      return;
+    }
     const session = this.session;
     const stalled = this.phase === 'playing' && !!session?.stalled;
     this.deps.setTimeScale(session && this.phase === 'playing' && session.lead(this.oneWayTicks) > 1 ? SLOW_SCALE : 1);
@@ -169,6 +230,21 @@ export class OnlineMatch {
       this.conn.send({ type: 'ready', ready: false });
       this.toLobby();
       return true;
+    }
+    if (this.phase === 'queue') {
+      if (code === 'Escape') {
+        this.conn.send({ type: 'leaveQueue' });
+        this.exit();
+        return true;
+      }
+      if (code === 'KeyA' && this.aiOffered(performance.now())) {
+        this.conn.send({ type: 'leaveQueue' });
+        const winsToWin = this.mode.kind === 'quick' ? this.mode.winsToWin : this.cfg.winsToWin;
+        this.dispose();
+        this.deps.onAi(winsToWin);
+        return true;
+      }
+      return false;
     }
     if (code === 'Space') {
       if (this.phase === 'lobby') {
@@ -218,6 +294,7 @@ export class OnlineMatch {
   }
 
   private exit(): void {
+    storeSession(null);
     this.dispose();
     this.deps.onExit();
   }
@@ -229,14 +306,30 @@ export class OnlineMatch {
         this.me = m.player;
         this.room = m.room;
         this.link = `${location.origin}/r/${m.room}`;
+        storeSession({ room: m.room, session: m.session });
         if (location.pathname !== `/r/${m.room}`) history.replaceState(null, '', `/r/${m.room}`);
-        if (this.phase === 'connecting') this.phase = 'lobby';
+        if (this.phase === 'connecting' && this.mode.kind === 'quick') {
+          this.phase = 'queue';
+          this.queuedSince = performance.now();
+        } else if (this.phase === 'connecting' && this.mode.kind !== 'rejoin') {
+          this.phase = 'lobby';
+        }
+        return;
+      case 'queued':
+        this.queueOnline = m.online;
+        if (this.phase === 'queue') this.showQueue(performance.now());
+        return;
+      case 'resume':
+        this.resume(m);
         return;
       case 'lobby':
         this.lobby = m;
-        this.names = m.players.map((p, i) => displayName(p?.name ?? '', i));
+        // An empty seat keeps its last name, so "Ada left" reads right after Ada leaves.
+        this.names = m.players.map((p, i) => (p ? displayName(p.name, i) : (this.names[i] ?? displayName('', i))));
         this.deps.hud.setNames(this.names);
         this.deps.onNames(this.names);
+        if (this.phase === 'queue' && m.players.every((p) => p !== null)) this.phase = 'lobby';
+        if (this.phase === 'connecting' && this.mode.kind === 'rejoin') this.phase = 'lobby';
         if (this.phase === 'lobby') this.showLobby();
         else if (this.phase === 'playing' && this.session?.state.phase === 'matchOver') this.showRematchLine();
         return;
@@ -267,6 +360,7 @@ export class OnlineMatch {
         if (this.phase === 'playing' || this.phase === 'starting') this.end('over', 'OPPONENT LEFT', '', 'var(--text)');
         return;
       case 'closed':
+        storeSession(null);
         if (m.reason === 'full') this.end('error', 'ROOM IS FULL', `${this.room || this.roomFromMode()} ALREADY HAS TWO PLAYERS`, 'var(--text)');
         else if (m.reason === 'unknownRoom') this.end('error', 'NO SUCH ROOM', 'THE LINK MAY HAVE EXPIRED', 'var(--text)');
         else if (m.reason === 'restart') this.end('error', 'SERVER RESTARTED', 'THE MATCH ENDED', 'var(--text)');
@@ -277,6 +371,83 @@ export class OnlineMatch {
         else if (m.code === 'busy') this.end('error', 'SERVER FULL', 'TRY AGAIN IN A MINUTE', 'var(--text)');
         else this.end('error', 'SOMETHING WENT WRONG', m.message.toUpperCase(), 'var(--text)');
         return;
+    }
+  }
+
+  private aiOffered(nowMs: number): boolean {
+    return nowMs - this.queuedSince >= AI_OFFER_MS;
+  }
+
+  private showQueue(nowMs: number): void {
+    const key = `${this.link}|${this.queueOnline}|${this.aiOffered(nowMs)}`;
+    if (key === this.queueShown) return;
+    this.queueShown = key;
+    this.deps.screens.queue({ link: this.link, online: this.queueOnline, aiOffered: this.aiOffered(nowMs) });
+  }
+
+  /** A mid-match rejoin: build the session, then wait for the replay frame. */
+  private resume(m: Extract<ServerMessage, { type: 'resume' }>): void {
+    this.cfg.winsToWin = m.winsToWin;
+    this.rttMs = m.rttMs[this.me] ?? null;
+    this.oneWayTicks = (m.rttMs[0] + m.rttMs[1]) / 2 / 2 / TICK_MS;
+    this.replayFrames = m.frames;
+    this.session = new NetSession({
+      seed: m.seed,
+      cfg: this.cfg,
+      local: this.me,
+      inputDelay: m.inputDelay,
+      send: (tick, input) => this.conn.sendFrame(encodeInput(tick, input)),
+      onConfirmed: (tick, state, events) => this.onConfirmed(tick, state, events),
+    });
+    this.gate = new EventGate();
+    this.deps.sink.beat = null;
+    this.deps.fx.clear();
+    this.deps.input.clearLatches();
+    this.phase = 'rejoining';
+    this.deps.screens.caption('REJOINING…');
+    if (m.frames === 0) this.finishCatchUp();
+  }
+
+  private onReplay(frame: Uint8Array): void {
+    const entries = decodeReplay(frame);
+    if (!entries || !this.session) return;
+    for (const e of entries) {
+      if (e.player === this.me) this.session.restoreLocal(e.tick, e.input);
+      else this.session.receive(e.tick, e.input);
+    }
+    this.replayFrames = 0;
+  }
+
+  /** One slice of catch-up per frame, with a progress caption; nothing is sent until it's done. */
+  private catchUp(): void {
+    const session = this.session;
+    if (!session || this.replayFrames > 0) return;
+    // Done when there is nothing more to replay: the peer may sit a few ticks ahead (it stalled
+    // waiting for us), and only our live inputs can close that gap.
+    const stepped = session.catchUp(CATCH_UP_PER_FRAME);
+    const total = Math.max(1, session.remoteTickSeen);
+    if (stepped > 0 && session.behind) {
+      this.deps.screens.caption(`REJOINING… ${Math.min(99, Math.floor((100 * session.confirmedTick) / total))}%`);
+      return;
+    }
+    this.finishCatchUp();
+  }
+
+  private finishCatchUp(): void {
+    const session = this.session;
+    if (!session) return;
+    this.phase = 'playing';
+    this.stalledSince = null;
+    this.stallShown = false;
+    const state = session.state;
+    const { screens } = this.deps;
+    screens.clear();
+    if (state.phase === 'roundOver') {
+      const { title, detail } = describeRound(state.lastRoundWinner, state.deaths, this.names);
+      screens.roundOver(title, detail, state.lastRoundWinner);
+    } else if (state.phase === 'matchOver' && state.matchWinner !== null) {
+      screens.matchOver(state.matchWinner, state.scores, this.names, 'SPACE REMATCH · ESC LOBBY');
+      this.showRematchLine();
     }
   }
 
@@ -333,6 +504,7 @@ export class OnlineMatch {
       send: (tick, input) => this.conn.sendFrame(encodeInput(tick, input)),
       onConfirmed: (tick, state, events) => this.onConfirmed(tick, state, events),
     });
+    this.gate = new EventGate();
     this.startAtLocal = this.clock.synced ? this.clock.toLocal(m.startAt) : performance.now() + 1500;
     this.peerAwayDeadline = null;
     this.stalledSince = null;
@@ -355,6 +527,7 @@ export class OnlineMatch {
   }
 
   private onFrame(frame: Uint8Array): void {
+    if (frame[0] === FRAME_REPLAY) return this.onReplay(frame);
     const decoded = decodeRelayed(frame);
     if (!decoded || !this.session || decoded.player === this.me) return;
     this.session.receive(decoded.tick, decoded.input);

@@ -142,13 +142,35 @@ export class Screens {
       </div>`,
       'lobby',
     );
+    this.wireCopy(opts.link);
+  }
+
+  private wireCopy(link: string): void {
     const button = this.root.querySelector<HTMLButtonElement>('.copy');
     button?.addEventListener('click', () => {
-      void navigator.clipboard?.writeText(opts.link).then(
+      void navigator.clipboard?.writeText(link).then(
         () => (button.textContent = 'COPIED'),
         () => (button.textContent = 'COPY FAILED'),
       );
     });
+  }
+
+  /** Quick-match: waiting for a stranger, with the invite link and, after a while, the AI offer. */
+  queue(opts: { link: string; online: number; aiOffered: boolean }): void {
+    const others = Math.max(0, opts.online - 1);
+    const ai = opts.aiOffered ? `<div class="hint">OR PLAY THE AI NOW · <kbd>A</kbd></div>` : '';
+    this.show(
+      `
+      <div class="panel lobby">
+        <div class="caption">LOOKING FOR AN OPPONENT…</div>
+        <div class="small">${others === 1 ? '1 OTHER PLAYER' : `${others} OTHER PLAYERS`} ONLINE · OR SEND A FRIEND THIS LINK</div>
+        <div class="link"><span class="url">${escapeHtml(opts.link)}</span><button class="copy" type="button">COPY</button></div>
+        ${ai}
+        <div class="small"><kbd>ESC</kbd> CANCEL</div>
+      </div>`,
+      'lobby',
+    );
+    this.wireCopy(opts.link);
   }
 
   /** A short status line in the middle of the screen (Connecting…, Waiting for PINK…). */

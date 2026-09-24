@@ -8,6 +8,7 @@ import {
   opponentInput,
   rematch,
   step,
+  type Difficulty,
   type MatchState,
   type OpponentState,
 } from '../sim';
@@ -18,7 +19,8 @@ import { Hud } from './hud';
 import { KeyboardInput } from './input';
 import { FixedLoop } from './loop';
 import { nextRow, type MenuRow } from './menu';
-import { OnlineMatch, type OnlineMode } from './net/online';
+import { OnlineMatch, rejoinHello, storedSession, type OnlineMode } from './net/online';
+import { RelayConnection } from './net/transport';
 import { relayUrl } from './net/transport';
 import { Fx } from './render/fx';
 import { Renderer } from './render/renderer';
@@ -56,6 +58,13 @@ async function boot(): Promise<void> {
   const cfg = loadStored(storage, CONFIG_KEY, DEFAULT_CONFIG);
   const prefersCalm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const settings = loadSettings(storage, settingsDefaults(prefersCalm));
+
+  // A refreshed tab says hello before the renderer starts, so the relay's 15 s countdown stops at once.
+  const joinCode = location.pathname.match(/^\/r\/([A-Z2-9]{6})\/?$/)?.[1];
+  const stored = storedSession();
+  const rejoin = joinCode && isRoomCode(joinCode) && stored?.room === joinCode ? { room: joinCode, session: stored.session } : null;
+  const early = rejoin ? new RelayConnection(relayUrl(relayBase())) : null;
+  early?.send(rejoinHello(settings.name, rejoin!.session));
 
   const world = await createWorld(element('game'), settings);
   const renderer = new Renderer(world);
@@ -97,8 +106,9 @@ async function boot(): Promise<void> {
 
   const showTitle = () => screens.title({ row: menuRow, winsToWin: cfg.winsToWin, hearts: cfg.hearts, opponent: settings.opponent });
   /** Seats the AI (or a human) for a new match, so a mid-match setting change waits for the next one. */
-  const seatOpponent = () => {
-    ai = settings.opponent === 'human' ? null : createOpponent(settings.opponent, newSeed());
+  const seatOpponent = (force?: Difficulty) => {
+    const level = force ?? (settings.opponent === 'human' ? null : settings.opponent);
+    ai = level ? createOpponent(level, newSeed()) : null;
     hud.setTag(AI_SEAT, ai ? 'AI' : '');
   };
 
@@ -173,19 +183,26 @@ async function boot(): Promise<void> {
     showTitle();
   };
 
-  const startOnline = (mode: OnlineMode) => {
+  const startOnline = (mode: OnlineMode, connection?: RelayConnection) => {
     state = null;
     ai = null;
     hud.setTag(AI_SEAT, '');
     fx.clear();
     input.clearLatches();
     online = new OnlineMatch(relayUrl(relayBase()), settings.name, mode, {
+      connection,
       screens,
       hud,
       fx,
       sink,
       input,
       onExit: leaveOnline,
+      onAi: (winsToWin) => {
+        // Nobody came: play the Hard AI locally at the chosen length, leaving the saved opponent alone.
+        leaveOnline();
+        cfg.winsToWin = winsToWin;
+        startLocal('hard');
+      },
       onNames: (n) => (names = n),
       setTimeScale: (scale) => (loop.timeScale = scale),
     });
@@ -211,9 +228,9 @@ async function boot(): Promise<void> {
     });
   };
 
-  const startLocal = () => {
+  const startLocal = (forceAi?: Difficulty) => {
     state = createMatch(cfg, newSeed());
-    seatOpponent();
+    seatOpponent(forceAi);
     input.clearLatches();
     screens.clear();
   };
@@ -287,10 +304,8 @@ async function boot(): Promise<void> {
         if (screens.showing === 'powers') return;
         if (!state) {
           if (menuRow === 'create') beginOnline({ kind: 'create', winsToWin: cfg.winsToWin });
-          else if (menuRow === 'quick') {
-            screens.flash('QUICK MATCH ARRIVES IN THE NEXT UPDATE', 'var(--dim)', 1500);
-            setTimeout(showTitle, 1500);
-          } else startLocal();
+          else if (menuRow === 'quick') beginOnline({ kind: 'quick', winsToWin: cfg.winsToWin });
+          else startLocal();
         } else if (state.phase === 'matchOver') {
           rematch(state, cfg, newSeed());
           seatOpponent();
@@ -318,8 +333,8 @@ async function boot(): Promise<void> {
     };
   }
 
-  const joinCode = location.pathname.match(/^\/r\/([A-Z2-9]{6})\/?$/)?.[1];
-  if (joinCode && isRoomCode(joinCode)) beginOnline({ kind: 'join', room: joinCode });
+  if (rejoin && early) startOnline({ kind: 'rejoin', ...rejoin }, early);
+  else if (joinCode && isRoomCode(joinCode)) beginOnline({ kind: 'join', room: joinCode });
   else showTitle();
   loop.start();
 }
