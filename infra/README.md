@@ -32,7 +32,7 @@ Both containers join the external `happypathsoft-net` network so Caddy reaches t
    Wait until `dig +short api.snakeboom.com` answers before the first deploy; Caddy asks Let's Encrypt for certificates the moment the fragment loads, and that needs the names to resolve.
 4. **First deploy:** merge to `main`, then
    ```bash
-   git tag v1.0.0 && git push origin v1.0.0
+   git tag v0.10.0 && git push origin v0.10.0
    ```
    Watch the `deploy` run in Actions. It ends by polling `https://api.snakeboom.com/health` until it reports the tag. Then open `https://snakeboom.com` in two browsers.
 

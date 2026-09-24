@@ -2,7 +2,7 @@
 
 > **For agentic workers:** work task by task on the `online` branch, commit after each task. Steps use checkbox (`- [ ]`) syntax for tracking. Interfaces, file contents and checks are given; the implementer writes them.
 
-**Goal:** SnakeBoom at `https://snakeboom.com` (online spec milestone M7, v1.0.0):
+**Goal:** SnakeBoom at `https://snakeboom.com` (online spec milestone M7, v0.10.0):
 - Two Docker images (static site, relay), a compose file and a Caddy fragment in the Happy Path pattern.
 - A GitHub Actions workflow: a `v*` tag builds, pushes and deploys; a manual dispatch redeploys a tag.
 - A one-time setup runbook: DNS, host directory, `.env`, GitHub secrets.
@@ -158,20 +158,20 @@ api.snakeboom.com {
 
 ---
 
-### Task 5: Runbook, README, first deploy, v1.0.0
+### Task 5: Runbook, README, first deploy, v0.10.0
 
 **Files:**
-- Modify: `infra/README.md`, `README.md`, `package.json` (version `1.0.0`)
+- Modify: `infra/README.md`, `README.md`, `package.json` (version `0.10.0`)
 
 **Runbook (`infra/README.md`)**, in this order:
 1. **GitHub:** repo secrets `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY` (same values as the other apps). GHCR packages are created on first push; make them readable by the box (public, or a PAT in the box's docker login, whichever the other apps use).
 2. **Host:** `sudo mkdir -p /opt/happypathsoft/snakeboom && cd /opt/happypathsoft/snakeboom`, create `.env` from `infra/snakeboom/.env.example` with `ALLOWED_ORIGIN=https://snakeboom.com`, `chmod 600 .env`. No `provision-product.sh`, no backup cron, nothing in `backup-freshness.yml`.
 3. **DNS (Route 53 hosted zone for snakeboom.com):** A records for `snakeboom.com`, `www.snakeboom.com`, `api.snakeboom.com` → the box's Elastic IP, TTL 300. Wait for `dig +short api.snakeboom.com` to answer before the first deploy, or Caddy can't get certificates.
-4. **First deploy:** `git tag v1.0.0 && git push origin v1.0.0`, watch the Actions run, then `curl https://api.snakeboom.com/health`.
+4. **First deploy:** `git tag v0.10.0 && git push origin v0.10.0`, watch the Actions run, then `curl https://api.snakeboom.com/health`.
 5. **Rollback:** dispatch `deploy.yml` with an older tag.
 6. **Logs:** `docker logs -f snakeboom-api` (JSON lines: rooms, matches, forfeits, desyncs).
 
 - [ ] **Step 1: Write the runbook and the README's Hosting section** (what runs where, how a deploy happens, how to read the logs).
 - [ ] **Step 2: Developer does the one-time setup** (secrets, host dir, DNS). The agent waits for the go.
-- [ ] **Step 3: Tag `v1.0.0`** (bump `package.json` first, commit `chore: v1.0.0`), push, watch the workflow, and check `https://snakeboom.com` from two browsers on two networks: a full match, a rejoin, a rematch.
+- [ ] **Step 3: Tag `v0.10.0`** (bump `package.json` first, commit `chore: v0.10.0`), push, watch the workflow, and check `https://snakeboom.com` from two browsers on two networks: a full match, a rejoin, a rematch.
 - [ ] **Step 4: Playtest** with a friend in another city. The "one more match" test, remotely.

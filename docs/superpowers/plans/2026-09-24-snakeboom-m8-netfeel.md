@@ -2,7 +2,7 @@
 
 > **For agentic workers:** work task by task on the `netfeel` branch, test first, commit after each task. Steps use checkbox (`- [ ]`) syntax for tracking. Interfaces, algorithms and checks are given; the implementer writes the code.
 
-**Goal:** Online play feels like local play on an ordinary connection, and we can prove it with numbers (v1.1.0).
+**Goal:** Online play feels like local play on an ordinary connection, and we can prove it with numbers (v0.11.0).
 
 **What the first real playtest showed (2026-09-24, one player on a phone hotspot):** round trips to the relay of 120–176 ms per player, no desyncs or forfeits in twelve rounds, but "freezes or stutter" and "game speed wobbled". The relay had chosen an input delay of 4 ticks (67 ms of local steering lag) and the rollback window was 10 ticks (167 ms), which a hotspot's jitter overruns, so the game stalled; the time-sync slowdown ran the leading side at 97% speed, which reads as a wobble.
 
@@ -22,7 +22,7 @@ Not in M8: a WebRTC unreliable channel (the fix for TCP head-of-line blocking on
 - Everything from M5–M7 still applies. `src/sim` and `src/net` stay pure; both peers must agree on every tunable that affects the sim (input delay comes from the relay; the rollback window and time sync are client-side and may differ between peers without affecting determinism).
 - Protocol 3 (the round result gains net stats). The relay refuses older clients with "Please refresh".
 - Every tuning change is checked with the netsim at three profiles before it ships: **good** (RTT 40 ± 10 ms), **hotspot** (RTT 150 ± 60 ms with 300 ms spikes every 5–10 s), **far** (RTT 250 ± 40 ms).
-- Deploy as v1.1.0 through the existing workflow; then a second real playtest on the same hotspot, comparing the relay's logged stats with the first one.
+- Deploy as v0.11.0 through the existing workflow; then a second real playtest on the same hotspot, comparing the relay's logged stats with the first one.
 
 ## Review Focus
 
@@ -107,12 +107,12 @@ Not in M8: a WebRTC unreliable channel (the fix for TCP head-of-line blocking on
 
 ---
 
-### Task 5: Verify, deploy v1.1.0, second playtest
+### Task 5: Verify, deploy v0.11.0, second playtest
 
 - [ ] **Step 1:** `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm netsim` at all three profiles, `pnpm bench:rollback` (a 20-tick rollback under 8 ms at p95).
 - [ ] **Step 2:** Headless two-window checks at `RELAY_LAG_MS=80`: a full match, a rejoin, the overlay reading sensible numbers.
 - [ ] **Step 3:** Drop the redundant `X-Forwarded-For` line from the Caddy fragment (the warning in the deploy log). README: the `N` key.
-- [ ] **Step 4:** Bump to `1.1.0`, commit `feat: net feel — measured, wider window, lower delay, gentle sync, smoothing (v1.1.0)`, PR to `main`, merge, tag, deploy.
+- [ ] **Step 4:** Bump to `0.11.0`, commit `feat: net feel — measured, wider window, lower delay, gentle sync, smoothing (v0.11.0)`, PR to `main`, merge, tag, deploy.
 - [ ] **Step 5:** Playtest again with the same hotspot player. Compare the relay's `round` entries with the first playtest's `start` entries (RTT) and the new stall and rollback numbers. That comparison decides whether M10 needs WebRTC.
 
 ---

@@ -297,7 +297,7 @@ A deploy restarts the relay, which ends any live match with "The server restarte
 - **Purity:** the scan now covers `src/net`.
 - **Server:** start the relay on an ephemeral port, connect two `ws` clients, run a scripted match end to end, hit `/health`.
 - **Benchmark:** `pnpm bench:rollback` reports `cloneState` time and a 10-tick rollback on a late-round state.
-- **Manual:** two browser windows on localhost; then two machines over the internet before v1.0.0.
+- **Manual:** two browser windows on localhost; then two machines over the internet before v0.10.0.
 
 ## 10. Milestones
 
@@ -318,7 +318,7 @@ Each ends with a playable checkpoint. Version numbers continue from v0.7.0.
 - Abuse limits and result logging.
 - Playtest: two machines in different cities.
 
-**M7: Ship (v1.0.0)**
+**M7: Ship (v0.10.0)**
 - Dockerfiles, compose, Caddy fragment, workflows, host setup, DNS records.
 - "Play on a computer" page for touch devices.
 - README: online play, hosting and the deploy procedure.
