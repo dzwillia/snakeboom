@@ -434,7 +434,7 @@ export class Room {
     const tick = () => {
       this.cancelPing = null;
       if (this.statusNow === 'closed' || this.playerCount === 0) return;
-      const ping: ServerMessage = { type: 'ping', t: this.host.now() };
+      const ping: ServerMessage = { type: 'ping', t: this.host.now(), pingMs: this.pingMs() };
       this.broadcast(ping);
       this.cancelPing = this.after(PING_EVERY_MS, tick);
     };

@@ -39,7 +39,7 @@ Both containers join the external `happypathsoft-net` network so Caddy reaches t
 ## Day to day
 
 - **Deploy a release:** push a `v*` tag. **Roll back:** run the `deploy` workflow by hand with an older tag; the images are still in GHCR.
-- **Logs:** `docker logs -f snakeboom-api` prints one JSON line per event: rooms created and closed, matches with scores, forfeits, desyncs (with both hashes), failed rejoins.
+- **Logs:** `docker logs -f snakeboom-api` prints one JSON line per event: rooms created and closed, matches with scores, each round with both players' netcode stats, forfeits, desyncs (with both hashes), failed rejoins. A deploy recreates the container, so the workflow first saves the old log to `/opt/happypathsoft/snakeboom/logs/relay-<timestamp>.log` (kept 30 days).
 - **Is anyone playing?** `curl -s https://api.snakeboom.com/health` shows `rooms`, `players` and `queued`. A deploy restarts the relay and ends live matches with "The server restarted", so deploy when it's quiet.
 - **If the Caddy step fails:** the workflow restores the previous fragment and stops. Check the mount of `conf.d` inside the caddy container (`docker inspect caddy`) matches `/etc/caddy/conf.d`, which is what the base Caddyfile imports.
 
