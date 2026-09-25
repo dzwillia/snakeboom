@@ -61,7 +61,8 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
 
   const pickups = gui.addFolder('Pickups');
   pickups.add(cfg, 'maxPickups', 0, 20, 1).name('max on field');
-  pickups.add(cfg, 'itemSlots', 1, 5, 1).name('item slots');
+  pickups.add(cfg, 'slotLength', 30, 600, 10).name('body per item slot');
+  pickups.add(cfg, 'itemSlots', 1, 8, 1).name('item slots (max)');
   pickups.add(cfg, 'firstPickupDelay', 0, 20, 0.5).name('first spawn (s)');
   pickups.add(cfg, 'pickupInterval', 0.5, 30, 0.5).name('spawn every (s)');
   pickups.add(cfg, 'pickupLifetime', 3, 60, 1).name('lifetime (s)');

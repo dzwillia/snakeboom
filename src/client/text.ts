@@ -110,14 +110,15 @@ export function describePower(kind: PickupKind, cfg: Config): PowerInfo {
         stats: `${secs(cfg.scissorsDuration)} · ${share}`,
         detail:
           `Run your head across your opponent's body and it's cut: everything from there back to their tail falls off, ` +
-          `and you pass through instead of dying. They lose length, boost fuel and any loop they were drawing. Heads, walls, missiles and loops still kill you.`,
+          `and you pass through instead of dying. They lose length, boost fuel, any loop they were drawing and the weapons that no longer fit, ` +
+          `which drop where the body fell for anyone to take. Heads, walls, missiles and loops still kill you.`,
       };
     case 'flame':
       return {
         name: 'FLAMETHROWER',
         stats: `${secs(cfg.flameDuration)} · ${num(cfg.flameRange)} units of reach · ${share}`,
         detail:
-          `A cone of fire ahead of your head. Your opponent's body in it is cut like Scissors would, from a distance; ` +
+          `A cone of fire ahead of your head. Your opponent's body in it is cut like Scissors would, from a distance (their spare weapons drop there too); ` +
           `their head in it is torched (a Shield takes the hit, a Ghost doesn't help); their missiles burn up. It never hurts you.`,
       };
     case 'dozer':
