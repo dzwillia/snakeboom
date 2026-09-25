@@ -5,7 +5,7 @@ import { createTrail, trailPush, trailTrim } from './trail';
 import type { EffectTimers, Grid, PlayerInput, SnakeState } from './types';
 
 export function noEffects(): EffectTimers {
-  return { ghost: 0, dozer: 0, grace: 0 };
+  return { ghost: 0, scissors: 0, dozer: 0, grace: 0 };
 }
 
 export function createSnake(id: number, x: number, y: number, heading: number, cfg: Config): SnakeState {

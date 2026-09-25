@@ -1,6 +1,7 @@
 import { updateMissiles } from './missiles';
 import { detectHit } from './collision';
 import { detectEncirclements } from './encircle';
+import { applyScissors } from './scissors';
 import { DT, TICK_RATE, type Config } from './config';
 import { borderSpeedAt, maxInset } from './border';
 import { tickItemTimers, useItem } from './items';
@@ -79,6 +80,7 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   });
 
   collectPickups(state, cfg, events);
+  applyScissors(state, cfg, events);
   const missiled = updateMissiles(state, cfg, events);
 
   // Everyone alive at the start of the tick is judged before anyone moves or dies, so

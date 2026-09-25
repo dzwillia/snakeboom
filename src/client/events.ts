@@ -7,6 +7,7 @@ import { describeRound } from './text';
 
 const ITEM_SOUNDS: Partial<Record<PickupKind, SoundName>> = {
   ghost: 'ghost',
+  scissors: 'scissors',
   dozer: 'dozer',
 };
 
@@ -96,6 +97,10 @@ export class EventSink {
         case 'missileHit':
           fx.missileHit(e.x, e.y, PLAYER_COLORS[e.player]);
           sound.play('missileHit');
+          break;
+        case 'cut':
+          fx.cutBurst(e.segment, PLAYER_COLORS[e.player]);
+          sound.play('snip');
           break;
         case 'encircled':
           fx.loopSnap(e.loop, PLAYER_COLORS[e.by], e.player);

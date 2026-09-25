@@ -6,6 +6,7 @@
   --dim: #7d8db0;
   --red: #ff3b3b;
   --missile: #ff4d2e;
+  --scissors: #ff7ad9;
   --ghost: #e8f4ff;
   --shield: #3dff7a;
   --dozer: #ff9f1c;
@@ -542,6 +543,10 @@ kbd {
   color: var(--missile);
 }
 
+.power[data-kind='scissors'] {
+  color: var(--scissors);
+}
+
 .power[data-kind='ghost'] {
   color: var(--ghost);
 }
@@ -609,6 +614,10 @@ kbd {
 
 .slot[data-kind='missile'] {
   color: var(--missile);
+}
+
+.slot[data-kind='scissors'] {
+  color: var(--scissors);
 }
 
 .slot[data-kind='ghost'] {

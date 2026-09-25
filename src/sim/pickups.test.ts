@@ -24,7 +24,7 @@ function tick(s: MatchState, n: number, c: Config = cfg): SimEvent[] {
 describe('pickups', () => {
   it('picks kinds by weight and returns null when no weight is positive', () => {
     const rng = createRng(1);
-    const none = { missile: 0, ghost: 0, shield: 0, dozer: 0 };
+    const none = { missile: 0, scissors: 0, ghost: 0, shield: 0, dozer: 0 };
     expect(pickKind({ ...none, shield: 5 }, rng)).toBe('shield');
     expect(pickKind(none, rng)).toBeNull();
   });

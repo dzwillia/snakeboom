@@ -79,7 +79,7 @@ describe('text', () => {
   });
 
   it('turns pickup weights into spawn percentages', () => {
-    const cfg = { ...DEFAULT_CONFIG, pickupWeights: { missile: 50, ghost: 25, shield: 25, dozer: 0 } };
+    const cfg = { ...DEFAULT_CONFIG, pickupWeights: { missile: 50, scissors: 0, ghost: 25, shield: 25, dozer: 0 } };
     expect(spawnShare('missile', cfg)).toBe(50);
     expect(spawnShare('dozer', cfg)).toBe(0);
     const none = { ...cfg, pickupWeights: { ...cfg.pickupWeights, missile: 0, ghost: 0, shield: 0 } };

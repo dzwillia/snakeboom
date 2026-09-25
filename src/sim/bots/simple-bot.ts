@@ -60,6 +60,9 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
     case 'dozer':
       use = best < LOOK_STEPS / 2 || rngNext(bot.rng) < 0.005;
       break;
+    case 'scissors':
+      use = best < LOOK_STEPS / 2 || rngNext(bot.rng) < 0.01;
+      break;
   }
   return { turn, boost: bot.boostTicks > 0, use };
 }

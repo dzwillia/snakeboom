@@ -12,8 +12,9 @@
 4. **One life.** `hearts` defaults to 1: any hit kills unless a Shield takes it. (The hearts mechanism stays tunable.)
 5. **Boost burns tail.** There is no boost meter. Holding Boost doubles your speed and shrinks your body at `boostBurnPerSecond`; you can boost as long as your body is longer than `minLength`. Growth stays on a timer, so length is a resource you spend on chasing and earn back by surviving.
 6. **Missiles replace bombs.** A missile pickup holds 3. Use fires one from your head along your heading; it flies at `missileSpeed`, turns toward the nearest living opponent's head at up to `missileTurnRate`, and dies after `missileLife` seconds or on hitting a wall, a block or its target. Hitting a head kills that snake (Shield absorbs it, Ghost does not dodge it, grace ignores it). Missiles never hit their owner and never hit bodies. There are no blasts, no holes and no chain reactions any more.
-7. **Ghost, Shield and Bulldozer stay** as they are. Ghost is the answer to a closing loop and to a missile you can't outrun; Shield is one free hit; Bulldozer shoves blocks on block maps. **Reverse, Turbo, Slow and Bomb are gone.**
-8. **The closing border, 45 s rounds, first-to-N, maps, rematches and the online rules are unchanged.**
+7. **Scissors** (added the same day): a 3 s timed special. While it runs, your head crossing an opponent's body cuts it: everything from the newest touched point back to their tail is dropped, their target length becomes what is left, and you pass through instead of dying. The head itself can't be cut (touching it is a head-on), walls, missiles and loops still kill you, a Ghost's body is still cut, and a Shield doesn't stop it (nothing hit the head). A `cut` event carries the dropped path for the effect. Shorter snakes have less boost fuel and less body to loop with.
+8. **Ghost, Shield and Bulldozer stay** as they are. Ghost is the answer to a closing loop and to a missile you can't outrun; Shield is one free hit; Bulldozer shoves blocks on block maps. **Reverse, Turbo, Slow and Bomb are gone.**
+9. **The closing border, 45 s rounds, first-to-N, maps, rematches and the online rules are unchanged.**
 
 ## 2. Encirclement, precisely
 
@@ -33,7 +34,8 @@
 | `missileCharges` · `missileCooldown` | 3 · 0.4 s |
 | `missileSpeed` · `missileTurnRate` · `missileLife` · `missileRadius` | 420 units/s · 3.5 rad/s · 2.5 s · 10 |
 | `loopIgnore` | 3r = 24 units |
-| `pickupWeights` | missile 45 · ghost 20 · shield 20 · dozer 15 |
+| `pickupWeights` | missile 35 · scissors 20 · ghost 15 · shield 15 · dozer 15 |
+| `scissorsDuration` | 3 s |
 | removed | `neckLength`, `boostMeterSeconds`, `boostRefillSeconds`, everything `bomb*`, `blastRadius`, `chainDelay`, `reverseDuration` |
 
 The pace defaults from M9 (speed 280, growth 40, 45 s rounds, the border) stay.

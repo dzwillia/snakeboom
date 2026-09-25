@@ -47,6 +47,8 @@ export interface ItemState {
 /** Timed effects on a snake, in ticks remaining (0 = off). */
 export interface EffectTimers {
   ghost: number;
+  /** Scissors: crossing an opponent's body cuts it instead of killing you. */
+  scissors: number;
   /** Bulldozer: the plow shoves blocks and the head ignores them. */
   dozer: number;
   /** Shield grace: immune to everything except walls. */
@@ -54,7 +56,7 @@ export interface EffectTimers {
 }
 
 /** Effects announced by effectStarted/effectEnded events (grace is internal). */
-export type EffectName = 'ghost' | 'dozer';
+export type EffectName = 'ghost' | 'scissors' | 'dozer';
 
 export interface PickupState {
   id: number;
@@ -169,6 +171,8 @@ export type SimEvent =
   | { type: 'missileFizzled'; id: number; x: number; y: number }
   /** `player` was caught inside a loop `by` just closed; `loop` is the polygon, flat and thinned. */
   | { type: 'encircled'; player: number; by: number; loop: number[] }
+  /** `by` cut `player`'s body at (x, y): `dropped` units fell off; `segment` is the dropped path, thinned. */
+  | { type: 'cut'; player: number; by: number; x: number; y: number; dropped: number; segment: number[] }
   | { type: 'itemUsed'; player: number; kind: PickupKind }
   | { type: 'effectStarted'; player: number; effect: EffectName }
   | { type: 'effectEnded'; player: number; effect: EffectName }

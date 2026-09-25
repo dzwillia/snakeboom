@@ -49,7 +49,7 @@ export function describeRound(
 }
 
 /** The order the Powers page lists pickups in: the same as the title screen's line. */
-export const POWER_ORDER: readonly PickupKind[] = ['missile', 'ghost', 'shield', 'dozer'];
+export const POWER_ORDER: readonly PickupKind[] = ['missile', 'scissors', 'ghost', 'shield', 'dozer'];
 
 export interface PowerInfo {
   name: string;
@@ -100,6 +100,14 @@ export function describePower(kind: PickupKind, cfg: Config): PowerInfo {
           `A bubble that takes your next hit so you keep the heart, then a moment of grace to get clear. ` +
           `It goes up the moment you collect it, stays until it takes a hit, never takes an item slot, and you can't carry two.`,
       };
+    case 'scissors':
+      return {
+        name: 'SCISSORS',
+        stats: `${secs(cfg.scissorsDuration)} · ${share}`,
+        detail:
+          `Run your head across your opponent's body and it's cut: everything from there back to their tail falls off, ` +
+          `and you pass through instead of dying. They lose length, boost fuel and any loop they were drawing. Heads, walls, missiles and loops still kill you.`,
+      };
     case 'dozer':
       return {
         name: 'BULLDOZER',
@@ -121,6 +129,8 @@ export function describeItem(item: ItemState | null): string {
       return 'GHOST';
     case 'shield':
       return 'SHIELD';
+    case 'scissors':
+      return 'SCISSORS';
     case 'dozer':
       return 'DOZER';
   }
