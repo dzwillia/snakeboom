@@ -36,7 +36,10 @@ The AI lives in the rules engine (`src/sim/bots/opponent.ts`), so it is determin
 - **Encirclement kills.** When your head crosses your own trail, the loop you just closed is checked. If your opponent's head is inside it, they're gone. A Ghost phases through a closing loop; a Shield takes the hit.
 - **Rounds always end in a kill.** After 30 s the deadly border starts closing in, the clock counts down in red, and at 45 s it crushes fast until someone dies. First to the target wins the match.
 - **Growth and boost:** snakes keep growing all round, and **boosting burns your tail**: hold Boost to go twice as fast for as long as you have body to spend. The bar under your name is your length.
-- **Pickups** spawn every couple of seconds. You carry up to **three items** and Use fires the oldest. Both item queues show on the HUD, so you always know what your opponent has.
+- **Pickups** spawn every second or so. You carry up to **three items** and Use fires the oldest. Both item queues show on the HUD, so you always know what your opponent has.
+- **A big arena.** The field is 3200×2000, four times what it was. Locally the camera fits both heads and zooms between the whole arena and a close view; online it follows your own head. The **minimap** in the corner shows the arena, the border's dead zone, both heads, hazards and where your camera is looking.
+- **Wormholes.** Every 12 s a violet portal opens somewhere for 10 s, with a dashed exit ring at least 800 units away. Touch it and your head appears at the exit, heading the same way, with **no body along the chord**: the old body stays where it was until it trims away. A loop that would span a jump doesn't count, and you can't go straight back in for a second.
+- **The saw.** Every 15 s a yellow circular saw appears away from both heads and roves for 12 s, bouncing off the border and blocks. It **kills a head** it touches (a Shield pushes you clear) and **cuts any body** it runs through, exactly like Scissors.
 
 | Item | What it does |
 |---|---|

@@ -26,17 +26,17 @@
 ### Task 1: The big arena, the camera and the minimap
 - Sim: constants; `MAP_CELL` 80; border and pickup defaults; the golden hash. `pnpm soak` and the AI tests keep their timeouts (the territory BFS is 4× the cells).
 - Client: `camera.ts` (`targetView`, `clampView`, `easeView`, tested); `World.view`; `Fx.update` composes view, punch and shake; `render/minimap.ts`; `main.ts` sets the target each frame (local: all live heads; online: the local head); `OnlineMatch.localPlayer`.
-- [ ] Commit `feat: a 3200×2000 arena with a camera and a minimap`.
+- [x] Commit `feat: a 3200×2000 arena with a camera and a minimap`.
 
 ### Task 2: The wormhole
 - Sim: `WormholeState`, `state.wormholes`, `trailJump`, `SnakeState.portalCooldown`, spawn/expire/enter in `wormholes.ts`, the jump rule in `encircle.ts`, events `wormholeOpened/Closed/Warped`; tests.
 - Client: portal and exit rendering, minimap marks, a warp sound, camera snap on warp (no easing across the map).
-- [ ] Commit `feat(sim): the wormhole`.
+- [x] Commit `feat(sim): the wormhole`.
 
 ### Task 3: The saw
 - Sim: `SawState`, `state.saws`, `saws.ts` (spawn, move, bounce, head kill, body cut via the shared `cutTrail` from `scissors.ts`), cause `saw`, events `sawSpawned/Gone`; the AI's rollout hazard; tests.
 - Client: a spinning toothed disc, buzz and snip, minimap mark, `describeDeath` "CYAN ran into the saw".
-- [ ] Commit `feat(sim): the roving saw`.
+- [x] Commit `feat(sim): the roving saw`.
 
 ### Task 4: Verify and ship
 - Spec addendum in the hunt spec; README; tuning rows; `pnpm test`, `typecheck`, `build`, soaks, netsim; browser checks (camera in local play, following online, a warp, a saw cut); bump `0.14.0`; PR; merge; tag; deploy.
