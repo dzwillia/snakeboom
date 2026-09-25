@@ -6,7 +6,7 @@ import { headCum } from './trail';
 import type { DeathRecord, MatchState, SimEvent } from './types';
 
 /** A wormhole jump between `from` and the head: the "loop" would include a chord across the map. */
-function spansJump(solid: readonly boolean[], from: number): boolean {
+export function spansJump(solid: readonly boolean[], from: number): boolean {
   for (let k = from; k < solid.length; k++) if (!solid[k]) return true;
   return false;
 }

@@ -176,6 +176,39 @@ describe('AI opponent', () => {
     LONG,
   );
 
+  it('draws a loop around a pickup it wants within a few seconds, at every level', () => {
+    // Open map, a body long enough to loop with, CYAN circling far away: the pickup sits at a few
+    // offsets from PINK's head (ahead, off to a side, behind) and must be taken within 4 s.
+    const quiet: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000, wormholeInterval: 0, sawInterval: 0, borderCloseSeconds: 0 };
+    const offsets: Array<[number, number]> = [
+      [300, 0],
+      [300, -150],
+      [0, 250],
+      [-200, 200],
+    ];
+    for (const kind of DIFFICULTIES) {
+      for (const [ax, ay] of offsets) {
+        const state = createMatch(quiet, 11);
+        state.phase = 'playing';
+        state.phaseTicks = 0;
+        const me = state.snakes[1];
+        Object.assign(me, { x: 1400, y: 1000, prevX: 1400, prevY: 1000, heading: 0, targetLength: 400 });
+        Object.assign(state.snakes[0], { x: 300, y: 1800, prevX: 300, prevY: 1800, heading: 0 });
+        state.pickups.push({ id: 1, kind: 'missile', x: 1400 + ax, y: 1000 + ay, ttl: 100_000 });
+        const bot = createOpponent(kind, 5);
+        let took = -1;
+        for (let t = 0; t < 4 * TICK_RATE && took < 0 && me.alive; t++) {
+          const events = step(state, [{ turn: 1, boost: false, use: false }, opponentInput(bot, state, 1, quiet)], quiet);
+          if (events.some((e) => e.type === 'loopCollected' && e.player === 1)) took = t;
+        }
+        // Easy slips up on purpose and decides slowly; it gets the easy placements only.
+        if (kind === 'easy' && ay !== 0 && ax <= 0) continue;
+        expect(took, `${kind} with the pickup at (${ax}, ${ay})`).toBeGreaterThanOrEqual(0);
+        expect(me.items.map((i) => i.kind)).toEqual(['missile']);
+      }
+    }
+  }, 60000);
+
   it('lets a match override individual profile knobs', () => {
     const bot = createOpponent('easy', 1, { lookSteps: 40 });
     expect(bot.profile).toEqual({ ...PROFILES.easy, lookSteps: 40 });
