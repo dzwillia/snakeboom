@@ -7,6 +7,7 @@ export { checkInvariants } from './invariants';
 export { fnv1a, hashState } from './hash';
 export { trailLength } from './trail';
 export { WORMHOLE_TOUCH } from './wormholes';
+export { SAW_TOUCH } from './saws';
 export { PLOW_PUSH_LIMIT } from './dozer';
 export { botInput, createBot, type BotState } from './bots/simple-bot';
 export {

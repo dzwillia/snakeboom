@@ -18,22 +18,32 @@ export function applyScissors(state: MatchState, cfg: Config, events: SimEvent[]
     if (!me.alive || me.effects.scissors <= 0) return;
     state.snakes.forEach((victim, j) => {
       if (j === i || !victim.alive) return;
-      const trail = victim.trail;
       let newest = -1;
       forEachSolidPointNear(state, me.x, me.y, touch, (snake, index) => {
         if (snake === j && index > newest) newest = index;
       });
       if (newest < 0) return;
-      // Never cut the head off: the newest point is the head itself, and touching it is a head-on.
-      const last = trail.xs.length - 1;
-      if (newest >= last) return;
-      const before = trailLength(trail);
-      const dropped: number[] = [];
-      for (let k = trail.start; k <= newest; k++) dropped.push(trail.xs[k], trail.ys[k]);
-      trail.start = newest + 1;
-      victim.targetLength = Math.max(0, trailLength(trail));
-      victim.holeVersion++;
-      events.push({ type: 'cut', player: j, by: i, x: me.x, y: me.y, dropped: before - victim.targetLength, segment: decimatePolygon(dropped, CUT_POINTS_FOR_EVENT) });
+      cutTrail(state, j, newest, i, me.x, me.y, events);
     });
   });
+}
+
+/**
+ * Cuts `victim`'s body at trail index `newest`: everything from there back to the tail is dropped
+ * and the target length shrinks to what is left. Never cuts the head off (the newest point is the
+ * head itself, and touching it is a head hit). `by` is the cutter, or -1 for the saw.
+ */
+export function cutTrail(state: MatchState, victim: number, newest: number, by: number, x: number, y: number, events: SimEvent[]): boolean {
+  const s = state.snakes[victim];
+  const trail = s.trail;
+  const last = trail.xs.length - 1;
+  if (newest >= last) return false;
+  const before = trailLength(trail);
+  const dropped: number[] = [];
+  for (let k = trail.start; k <= newest; k++) dropped.push(trail.xs[k], trail.ys[k]);
+  trail.start = newest + 1;
+  s.targetLength = Math.max(0, trailLength(trail));
+  s.holeVersion++;
+  events.push({ type: 'cut', player: victim, by, x, y, dropped: before - s.targetLength, segment: decimatePolygon(dropped, CUT_POINTS_FOR_EVENT) });
+  return true;
 }

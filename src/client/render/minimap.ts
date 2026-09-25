@@ -41,6 +41,7 @@ export class Minimap {
       g.circle(w.x * s, w.y * s, 3).fill({ color: PALETTE.wormhole });
       g.circle(w.exitX * s, w.exitY * s, 3).stroke({ width: 1, color: PALETTE.wormhole });
     }
+    for (const saw of state.saws) g.rect(saw.x * s - 3, saw.y * s - 3, 6, 6).fill({ color: PALETTE.saw });
     state.snakes.forEach((sn, i) => {
       if (!sn.alive) return;
       g.circle(sn.x * s, sn.y * s, 3).fill({ color: PLAYER_COLORS[i] ?? 0xffffff });

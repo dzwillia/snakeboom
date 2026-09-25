@@ -88,6 +88,15 @@ export interface Config {
   wormholeMinJump: number;
   /** Seconds after a warp before a wormhole can take that head again. */
   portalCooldown: number;
+  /** Seconds between saws (one at a time); 0 or less means none. */
+  sawInterval: number;
+  /** Seconds a saw roves for. */
+  sawLifetime: number;
+  sawRadius: number;
+  /** Units per second; it bounces off the live border and blocks. */
+  sawSpeed: number;
+  /** A saw appears at least this far from every head. */
+  sawMinHeadDistance: number;
 }
 
 /**
@@ -141,6 +150,11 @@ export const DEFAULT_CONFIG: Config = {
   wormholeRadius: 30,
   wormholeMinJump: 800,
   portalCooldown: 1,
+  sawInterval: 15,
+  sawLifetime: 12,
+  sawRadius: 34,
+  sawSpeed: 180,
+  sawMinHeadDistance: 400,
 };
 
 /** The v0.7.0 feel (three hearts, slower and longer rounds), for side-by-side tuning sessions. Not a game mode. */
@@ -162,4 +176,5 @@ export const CLASSIC_CONFIG: Config = {
   dozerDuration: 5,
   hearts: 3,
   wormholeInterval: 0,
+  sawInterval: 0,
 };

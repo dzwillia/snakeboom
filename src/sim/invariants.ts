@@ -56,6 +56,12 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
     if (w.ttl <= 0) problems.push(`wormhole ${w.id} outlived its lifetime`);
     if (circleHitsWall(w.x, w.y, 0, state.inset) || circleHitsWall(w.exitX, w.exitY, 0, state.inset)) problems.push(`wormhole ${w.id} outside the live area`);
   }
+  if (state.saws.length > 1) problems.push(`${state.saws.length} saws at once`);
+  for (const saw of state.saws) {
+    if (![saw.x, saw.y, saw.vx, saw.vy].every(Number.isFinite)) problems.push(`saw ${saw.id} has a non-finite position or velocity`);
+    if (saw.ttl <= 0) problems.push(`saw ${saw.id} outlived its lifetime`);
+    if (circleHitsWall(saw.x, saw.y, 0, state.inset)) problems.push(`saw ${saw.id} outside the live area`);
+  }
   if (state.tiles.some((v) => v !== 0 && v !== 1)) problems.push('tiles hold values other than 0 and 1');
   if (!Number.isFinite(state.inset) || state.inset < 0) problems.push(`inset is ${state.inset}`);
   return problems;

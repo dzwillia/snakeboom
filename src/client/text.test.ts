@@ -23,6 +23,7 @@ describe('text', () => {
     expect(describeDeath(d(1, 'obstacle', null))).toBe('PINK crashed into a block');
     expect(describeDeath(d(0, 'missile', 1))).toBe('CYAN was shot down by PINK');
     expect(describeDeath(d(0, 'headOn', 1))).toBe('Head-on collision');
+    expect(describeDeath(d(1, 'saw', null))).toBe('PINK ran into the saw');
   });
 
   it('titles the round and merges duplicate lines', () => {

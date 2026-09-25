@@ -119,6 +119,13 @@ export class EventSink {
           break;
         case 'wormholeClosed':
           break;
+        case 'sawSpawned':
+          fx.ring(e.x, e.y, 80, 0.5, PALETTE.saw);
+          fx.ring(e.x, e.y, 40, 0.3, 0xffffff);
+          sound.play('saw');
+          break;
+        case 'sawGone':
+          break;
         case 'warped':
           fx.warpBurst(e.fromX, e.fromY, e.x, e.y, PLAYER_COLORS[e.player]);
           sound.play('warp');

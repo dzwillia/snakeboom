@@ -3,6 +3,7 @@ import { PLAYER_COLORS } from '../colors';
 import { ArenaView } from './arena';
 import { MissileView } from './missiles';
 import { PickupView } from './pickups';
+import { SawView } from './saws';
 import { SnakeView } from './snakes';
 import { WormholeView } from './wormholes';
 import type { World } from './world';
@@ -17,6 +18,7 @@ export class Renderer {
   private readonly snakes: SnakeView[];
   private readonly missiles: MissileView;
   private readonly wormholes: WormholeView;
+  private readonly saws: SawView;
   private lastTiles: readonly number[] | null = null;
   private lastTilesVersion = -1;
 
@@ -26,6 +28,7 @@ export class Renderer {
     this.snakes = PLAYER_COLORS.map((color) => new SnakeView(world.glow, color));
     this.missiles = new MissileView(world.glow);
     this.wormholes = new WormholeView(world.glow);
+    this.saws = new SawView(world.glow);
   }
 
   draw(state: MatchState | null, alpha: number, cfg: Config, timeSeconds = 0, offsets?: readonly { x: number; y: number }[]): void {
@@ -36,6 +39,7 @@ export class Renderer {
         this.pickups.clear();
         this.missiles.clear();
         this.wormholes.clear();
+        this.saws.clear();
         this.lastTiles = null;
         this.lastTilesVersion = -1;
       }
@@ -64,5 +68,6 @@ export class Renderer {
       else view.hide();
     });
     this.missiles.draw(state.missiles, cfg, timeSeconds);
+    this.saws.draw(state.saws, cfg, timeSeconds);
   }
 }

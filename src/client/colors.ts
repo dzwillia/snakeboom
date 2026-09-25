@@ -12,6 +12,7 @@ export const PALETTE = {
   missile: 0xff3030,
   fuse: 0xffb020,
   wormhole: 0xb388ff,
+  saw: 0xffd23f,
 };
 
 export const PICKUP_COLORS: Record<PickupKind, number> = {

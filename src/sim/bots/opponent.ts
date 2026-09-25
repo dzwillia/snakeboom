@@ -134,6 +134,8 @@ const STICK_W = 4;
 const CUT_MIN = 4;
 const CUT_MAX = 12;
 const SEEK_RANGE = 520;
+/** Ticks ahead that a saw counts as a hazard in rollouts (0.8 s). */
+const SAW_HORIZON = 48;
 /** How close to the moving border a head can be before the middle becomes its only goal. */
 const BORDER_BAND = 320;
 const INTERCEPT_RANGE = 700;
@@ -183,6 +185,8 @@ interface Ctx {
   graceTicks: number;
   /** Live missiles that can hit me: where they are, where they point, how long they have. */
   missiles: { x: number; y: number; heading: number; ttl: number }[];
+  /** Roving saws, taken to keep their velocity (bounces are not predicted). */
+  saws: { x: number; y: number; vx: number; vy: number; ttl: number }[];
   opp: SnakeState | null;
   /** The opponent's predicted head position at each step, holding course. */
   oppX: number[];
@@ -288,6 +292,7 @@ function buildCtx(state: MatchState, idx: number, cfg: Config, look: number): Ct
     scissorTicks: Math.max(0, me.effects.scissors - DOZER_MARGIN),
     graceTicks: me.effects.grace,
     missiles: state.missiles.filter((m) => m.owner !== idx).map((m) => ({ x: m.x, y: m.y, heading: m.heading, ttl: m.ttl })),
+    saws: state.saws.map((s) => ({ x: s.x, y: s.y, vx: s.vx, vy: s.vy, ttl: s.ttl })),
     opp,
     oppX,
     oppY,
@@ -320,6 +325,8 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
   const missileTurn = cfg.missileTurnRate * DT * STEP_TICKS;
   const missileReach = cfg.missileRadius + r + 8;
   const missileReach2 = missileReach * missileReach;
+  const sawReach = cfg.sawRadius + r + 8;
+  const sawReach2 = sawReach * sawReach;
   let seg = 0;
   let segEnd = holds.length > 0 ? holds[0] : Infinity;
   const probe = { blocked: false };
@@ -347,6 +354,17 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
       mx[m] += detCos(mh[m]) * missileStep;
       my[m] += detSin(mh[m]) * missileStep;
       if (tick > ctx.graceTicks && dist2(mx[m], my[m], x, y) < missileReach2) return fail();
+    }
+    // Saws: straight lines bouncing off the border, and only for the next SAW_HORIZON ticks; further
+    // out the plan gets replaced long before the saw gets there, and a long sweep would wall off half the map.
+    if (tick <= SAW_HORIZON && tick > ctx.graceTicks) {
+      for (const saw of ctx.saws) {
+        if (saw.ttl < tick) continue;
+        const inset = insetAt(state, cfg, tick) + cfg.sawRadius;
+        const sx = bounce(saw.x + saw.vx * DT * tick, inset, ARENA_WIDTH - inset);
+        const sy = bounce(saw.y + saw.vy * DT * tick, inset, ARENA_HEIGHT - inset);
+        if (dist2(sx, sy, x, y) < sawReach2) return fail();
+      }
     }
     if (tick > ctx.protectedTicks) {
       if (tick > ctx.dozerTicks && circleHitsTiles(state.tiles, x, y, r + 2)) return fail();
@@ -408,6 +426,15 @@ function pickGoal(ctx: Ctx, p: OpponentProfile): Goal | null {
     }
   }
   return null;
+}
+
+/** Folds a coordinate back inside [lo, hi] as if it had bounced off those edges. */
+function bounce(v: number, lo: number, hi: number): number {
+  const span = hi - lo;
+  if (span <= 0) return lo;
+  let t = (v - lo) % (2 * span);
+  if (t < 0) t += 2 * span;
+  return lo + (t <= span ? t : 2 * span - t);
 }
 
 /** Distance from a point to the nearest arena edge (before any border inset). */

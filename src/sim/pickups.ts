@@ -27,8 +27,8 @@ export function pickKind(weights: Record<PickupKind, number>, rng: RngState): Pi
   return kinds[kinds.length - 1];
 }
 
-/** Clear of walls, blocks, bodies, other pickups and wormholes, and far from every head. */
-function isClear(state: MatchState, cfg: Config, x: number, y: number, c: number): boolean {
+/** Clear of walls, blocks, bodies, other pickups, wormholes and saws, and at least `h` from every head. */
+function isClear(state: MatchState, cfg: Config, x: number, y: number, c: number, h: number): boolean {
   if (circleHitsTiles(state.tiles, x, y, c)) return false;
   const probe = { body: false };
   forEachSolidPointNear(state, x, y, c, () => {
@@ -40,19 +40,28 @@ function isClear(state: MatchState, cfg: Config, x: number, y: number, c: number
   for (const w of state.wormholes) {
     if (dist2(w, x, y) < wc * wc || dist2({ x: w.exitX, y: w.exitY }, x, y) < wc * wc) return false;
   }
-  const h = cfg.pickupMinHeadDistance;
+  const sc = c + cfg.sawRadius;
+  for (const saw of state.saws) if (dist2(saw, x, y) < sc * sc) return false;
   for (const s of state.snakes) if (s.alive && dist2(s, x, y) < h * h) return false;
   return true;
 }
 
-/** A random spot with `clearance` (pickupClearance by default) around it, or null after SPAWN_TRIES misses. */
-export function findSpawnPoint(state: MatchState, cfg: Config, clearance = cfg.pickupClearance): { x: number; y: number } | null {
+/**
+ * A random spot with `clearance` (pickupClearance by default) around it and `headDistance`
+ * (pickupMinHeadDistance by default) from every head, or null after SPAWN_TRIES misses.
+ */
+export function findSpawnPoint(
+  state: MatchState,
+  cfg: Config,
+  clearance = cfg.pickupClearance,
+  headDistance = cfg.pickupMinHeadDistance,
+): { x: number; y: number } | null {
   const c = clearance + state.inset;
   if (ARENA_WIDTH - 2 * c <= 0 || ARENA_HEIGHT - 2 * c <= 0) return null;
   for (let t = 0; t < SPAWN_TRIES; t++) {
     const x = rngRange(state.rng, c, ARENA_WIDTH - c);
     const y = rngRange(state.rng, c, ARENA_HEIGHT - c);
-    if (isClear(state, cfg, x, y, clearance)) return { x, y };
+    if (isClear(state, cfg, x, y, clearance, headDistance)) return { x, y };
   }
   return null;
 }
