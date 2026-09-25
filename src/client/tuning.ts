@@ -1,5 +1,5 @@
 import GUI from 'lil-gui';
-import { DEFAULT_CONFIG, type Config, type PickupKind } from '../sim';
+import { CLASSIC_CONFIG, DEFAULT_CONFIG, type Config, type PickupKind } from '../sim';
 import { DEFAULT_SETTINGS, OPPONENT_MODES, resetInPlace, type ClientSettings } from './settings';
 import { describeOpponent } from './text';
 
@@ -13,6 +13,17 @@ export interface TuningPanel {
 /** Live sliders for every M1 tunable. The sim reads `cfg` each tick, so changes apply at once. */
 export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: { onChange(): void }): TuningPanel {
   const gui = new GUI({ title: 'SnakeBoom tuning  ( ` to hide )' });
+
+  // Presets: the current defaults, or the v0.7.0 feel for a side-by-side.
+  const presets = {
+    preset: 'pace',
+    apply() {
+      resetInPlace(cfg, presets.preset === 'classic' ? CLASSIC_CONFIG : DEFAULT_CONFIG);
+      refresh();
+      hooks.onChange();
+    },
+  };
+  gui.add(presets, 'preset', { 'Pace (default)': 'pace', 'Classic (v0.7)': 'classic' }).name('preset').onChange(() => presets.apply());
 
   const opponent = gui.addFolder('Opponent');
   opponent
@@ -93,7 +104,9 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   audio.add(settings, 'muted');
 
   for (const folder of gui.folders.slice(1)) folder.close();
-  const refresh = () => gui.controllersRecursive().forEach((c) => c.updateDisplay());
+  function refresh(): void {
+    gui.controllersRecursive().forEach((c) => c.updateDisplay());
+  }
   const actions = {
     reset: () => {
       resetInPlace(cfg, DEFAULT_CONFIG);

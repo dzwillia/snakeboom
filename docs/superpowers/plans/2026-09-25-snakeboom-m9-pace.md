@@ -95,7 +95,11 @@
 `CLASSIC_CONFIG` holds the v0.7.0 values for the five remaining items (Turbo and Slow are gone in both). The tuning panel gets a preset control at the top: **Pace** (defaults) / **Classic**, which calls `resetInPlace` with that config.
 
 - [ ] **Step 1:** Change the defaults, add `CLASSIC_CONFIG` and the preset control, run the determinism test, paste the new golden hash with a comment naming this change.
-- [ ] **Step 2:** `pnpm soak --rounds 200` and `pnpm soak --bots hard,normal --rounds 100`; paste the round-length lines here. Target: median 20–35 s, p90 under 50 s, zero time-outs, and the AI still wins some rounds against the simple bot.
+- [x] **Step 2:** `pnpm soak --rounds 200` and `pnpm soak --bots hard,normal --rounds 100`; paste the round-length lines here. Target: median 20–35 s, p90 under 50 s, zero time-outs, and the AI still wins some rounds against the simple bot.
+  <!-- 2026-09-25: simple vs simple, 200 rounds: min 3.2 · median 15.0 · p90 34.0 · max 48.0 s, 0 time-outs, 7.0 pickups and 7.7 explosions per round.
+       hard vs normal, 60 rounds: wins 30–28, every round decided by the border (min 41 · median 47 · max 49 s).
+       pnpm duel 45 hard,normal over seeds 33–35: 2–6, 6–2, 4–4. Two strong survivors reach the border every time; the
+       endgame is close to a coin flip between them, which is exactly what the tuning session should judge. -->
 - [ ] **Step 3:** Update the spec's §6 table, add the §11 entry, update the README's "How it plays" and items table.
 - [ ] **Step 4: Commit** `feat: pace defaults, CLASSIC preset, golden hash`.
 
