@@ -187,6 +187,8 @@ interface Ctx {
   missiles: { x: number; y: number; heading: number; ttl: number }[];
   /** Roving saws, taken to keep their velocity (bounces are not predicted). */
   saws: { x: number; y: number; vx: number; vy: number; ttl: number }[];
+  /** Ticks the opponent's flamethrower keeps burning; its cone follows the opponent's predicted path. */
+  oppFlameTicks: number;
   opp: SnakeState | null;
   /** The opponent's predicted head position at each step, holding course. */
   oppX: number[];
@@ -293,6 +295,7 @@ function buildCtx(state: MatchState, idx: number, cfg: Config, look: number): Ct
     graceTicks: me.effects.grace,
     missiles: state.missiles.filter((m) => m.owner !== idx).map((m) => ({ x: m.x, y: m.y, heading: m.heading, ttl: m.ttl })),
     saws: state.saws.map((s) => ({ x: s.x, y: s.y, vx: s.vx, vy: s.vy, ttl: s.ttl })),
+    oppFlameTicks: opp ? opp.effects.flame : 0,
     opp,
     oppX,
     oppY,
@@ -379,6 +382,14 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
       // The opponent's head, and the trail it will have laid by the time we get there.
       const upto = Math.min(k + 2, ctx.oppX.length - 1);
       for (let j = 0; j <= upto; j++) if (dist2(ctx.oppX[j], ctx.oppY[j], x, y) < headReach2) return fail();
+      // Their cone of fire, while it burns, from where they will be.
+      if (ctx.opp && tick <= ctx.oppFlameTicks && tick > ctx.graceTicks) {
+        const j = Math.min(k, ctx.oppX.length - 1);
+        const fx = x - ctx.oppX[j];
+        const fy = y - ctx.oppY[j];
+        const reach = cfg.flameRange + r + 8;
+        if (fx * fx + fy * fy < reach * reach && Math.abs(wrapAngle(detAtan2(fy, fx) - ctx.opp.heading)) < cfg.flameSpread + 0.15) return fail();
+      }
       if (!cut) {
         const last = Math.min(k + CUT_MAX, ctx.oppX.length - 1);
         for (let j = k + CUT_MIN; j <= last; j++) {
@@ -706,6 +717,15 @@ function wantUse(ctx: Ctx, bot: OpponentState, best: Plan): boolean {
       return boxed || (opp !== null && oppDist < 260 && rngNext(bot.rng) < 0.04 * p.itemSkill) || unclog;
     case 'dozer':
       return boxed || unclog;
+    case 'flame': {
+      // Light it when the opponent is ahead and within reach of the cone.
+      if (!opp) return unclog;
+      const dx = opp.x - me.x;
+      const dy = opp.y - me.y;
+      const ahead = (dx * detCos(me.heading) + dy * detSin(me.heading)) / Math.max(1, oppDist);
+      if (oppDist > cfg.flameRange * 1.3 || ahead < 0.6) return unclog;
+      return rngNext(bot.rng) < 0.5 * (0.2 + 0.8 * p.itemSkill);
+    }
   }
 }
 

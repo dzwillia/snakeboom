@@ -38,12 +38,12 @@ export function tryHeart(state: MatchState, idx: number, cause: DeathCause, cfg:
 }
 
 /**
- * Missiles leave you where you are and anything but a wall pushes you clear. Then, because grace never
+ * Missiles, loops and fire leave you where you are and anything else but a wall pushes you clear. Then, because grace never
  * covers walls, a head crossing one (hit by it, or pushed into it) slides along it.
  */
 function deflect(state: MatchState, idx: number, cause: DeathCause, cfg: Config): void {
   const s = state.snakes[idx];
-  if (cause !== 'wall' && cause !== 'missile' && cause !== 'encircled') pushClear(state, idx, cause, cfg);
+  if (cause !== 'wall' && cause !== 'missile' && cause !== 'encircled' && cause !== 'flame') pushClear(state, idx, cause, cfg);
   if (cause === 'wall' || circleHitsWall(s.x, s.y, cfg.snakeRadius, state.inset)) slideAlongWall(s, cfg.snakeRadius, state.inset);
 }
 
