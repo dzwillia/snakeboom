@@ -34,12 +34,20 @@ export class Screens {
   private kind: ScreenKind = 'none';
   private covered: { kind: ScreenKind; html: string } | null = null;
 
-  constructor(private readonly root: HTMLElement) {}
+  constructor(
+    private readonly root: HTMLElement,
+    version = __APP_VERSION__,
+  ) {
+    this.version = version;
+  }
 
   clear(): void {
     this.covered = null;
     this.show('', 'none');
   }
+
+  /** The build's version, for the title and pause screens; the deploy's git tag, or a -dev build. */
+  readonly version: string;
 
   title(opts: TitleOptions): void {
     const row = (id: MenuRow, html: string) =>
@@ -66,7 +74,8 @@ export class Screens {
         <div class="hint">SPACE TO GO</div>
         <div class="small"><kbd>▲</kbd> <kbd>▼</kbd> CHOOSE · <kbd>◀</kbd> <kbd>▶</kbd> ADJUST · ${opts.hearts} ${opts.hearts === 1 ? 'HEART' : 'HEARTS'} PER ROUND</div>
         <div class="small"><kbd>H</kbd> POWERS · <kbd>ESC</kbd> PAUSE · <kbd>M</kbd> MUTE · <kbd>\`</kbd> TUNING</div>
-      </div>`,
+      </div>
+      <div class="version" title="The build you are playing">${escapeHtml(this.version)}</div>`,
       'title',
     );
   }
@@ -231,7 +240,10 @@ export class Screens {
 
   /** Shows the pause panel, remembering what it covers. */
   paused(): void {
-    this.cover(`<div class="panel"><div class="banner-title" style="color:var(--text)">PAUSED</div><div class="hint">ESC TO RESUME</div></div>`);
+    this.cover(
+      `<div class="panel"><div class="banner-title" style="color:var(--text)">PAUSED</div><div class="hint">ESC TO RESUME</div>` +
+        `<div class="small">${escapeHtml(this.version)}</div></div>`,
+    );
   }
 
   /** Brings back a banner the pause panel covered; transient countdown numbers are dropped. */
