@@ -1,7 +1,7 @@
 import { circleHitsTiles, circleHitsWall } from '../arena';
 import { insetAt } from '../border';
 import { forEachSolidPointNear } from '../collision';
-import { ARENA_HEIGHT, ARENA_WIDTH, DT, TICK_RATE, TILE_COLS, TILE_ROWS, TILE_SIZE, type Config } from '../config';
+import { ARENA_HEIGHT, ARENA_WIDTH, DT, TICK_RATE, TILE_COLS, TILE_ROWS, TILE_SIZE, type Config, type PickupKind } from '../config';
 import { detAtan2, detCos, detSin, wrapAngle } from '../detmath';
 import { createRng, rngInt, rngNext, type RngState } from '../rng';
 import { headCum } from '../trail';
@@ -90,6 +90,8 @@ export interface OpponentState {
   lastGrace: number;
   /** Clear steps of the plan in force (diagnostics). */
   lastSteps: number;
+  /** Index of the carried item it is cycling the selection toward before firing; -1 when none. */
+  wanted: number;
 }
 
 export function createOpponent(difficulty: Difficulty, seed: number, profile?: Partial<OpponentProfile>): OpponentState {
@@ -102,6 +104,7 @@ export function createOpponent(difficulty: Difficulty, seed: number, profile?: P
     boost: false,
     lastGrace: 0,
     lastSteps: 0,
+    wanted: -1,
   };
 }
 
@@ -214,6 +217,7 @@ export function opponentInput(bot: OpponentState, state: MatchState, idx: number
     bot.boost = false;
     bot.lastGrace = 0;
     bot.lastSteps = 0;
+    bot.wanted = -1;
     return NO_INPUT;
   }
   const p = bot.profile;
@@ -221,6 +225,7 @@ export function opponentInput(bot: OpponentState, state: MatchState, idx: number
   const speed = cruiseSpeed(cfg, false);
 
   let use = false;
+  let select = false;
   if (bot.cooldown > 0) bot.cooldown--;
   // A deflection (heart or Shield) moved and turned us: whatever we were doing no longer applies.
   if (me.effects.grace > bot.lastGrace) bot.cooldown = 0;
@@ -239,10 +244,20 @@ export function opponentInput(bot: OpponentState, state: MatchState, idx: number
     bot.turn = best.turns[0];
     bot.lastSteps = best.steps;
     bot.boost = wantBoost(ctx, bot, best, goal);
-    use = wantUse(ctx, bot, best);
+    const wanted = wantUse(ctx, bot, best);
+    if (wanted !== null) bot.wanted = wanted;
+  }
+  // Fire only works on the selected item: cycle the selection toward the one it wants (one Select
+  // per tick), then fire. Anything that shrank the queue in the meantime drops the plan.
+  if (bot.wanted >= me.items.length) bot.wanted = -1;
+  if (bot.wanted >= 0) {
+    if (me.selected === bot.wanted) {
+      use = true;
+      bot.wanted = -1;
+    } else select = true;
   }
 
-  return { turn: bot.turn, boost: bot.boost, use };
+  return { turn: bot.turn, boost: bot.boost, use, select };
 }
 
 function cruiseSpeed(cfg: Config, boosting: boolean): number {
@@ -687,46 +702,52 @@ function wantBoost(ctx: Ctx, bot: OpponentState, best: Plan, goal: Goal | null):
   return rollout(ctx, best.turns, best.holds, cruiseSpeed(cfg, true), ctx.look).steps === ctx.look;
 }
 
-function wantUse(ctx: Ctx, bot: OpponentState, best: Plan): boolean {
+/**
+ * Which carried item it wants to fire now, as an index into me.items, or null. The selected item
+ * gets first say, so a wanted item already under the cursor fires without a detour.
+ */
+function wantUse(ctx: Ctx, bot: OpponentState, best: Plan): number | null {
   const { me, cfg, opp } = ctx;
   const p = bot.profile;
-  const item = me.items[0];
-  if (!item || me.useCooldown > 0) return false;
+  if (me.items.length === 0 || me.useCooldown > 0) return null;
   const boxed = best.steps < ctx.look * 0.4;
   const unclog = me.items.length >= cfg.itemSlots && rngNext(bot.rng) < 0.01;
   const oppDist = opp ? Math.sqrt(dist2(opp.x, opp.y, me.x, me.y)) : Infinity;
   const oppBoxed = opp !== null && p.itemSkill > 0.5 && straightClear(ctx, opp, 12) < 8;
+  // How squarely the opponent sits ahead of us: 1 dead ahead, -1 behind.
+  const ahead = opp ? ((opp.x - me.x) * detCos(me.heading) + (opp.y - me.y) * detSin(me.heading)) / Math.max(1, oppDist) : -1;
 
-  switch (item.kind) {
-    case 'shield':
-      return true;
-    case 'missile': {
-      // Fire when the opponent is roughly ahead and in range; a missile can turn, but not around.
-      if (!opp) return unclog;
-      const dx = opp.x - me.x;
-      const dy = opp.y - me.y;
-      const ahead = (dx * detCos(me.heading) + dy * detSin(me.heading)) / Math.max(1, oppDist);
-      if (oppDist > 320 || ahead < 0.3) return unclog;
-      const chance = oppBoxed ? 0.5 : oppDist < 350 ? 0.12 : 0.03;
-      return rngNext(bot.rng) < chance * (0.2 + 0.8 * p.itemSkill);
+  const wants = (kind: PickupKind): boolean => {
+    switch (kind) {
+      case 'shield':
+        return true;
+      case 'missile': {
+        // Fire when the opponent is roughly ahead and in range; a missile can turn, but not around.
+        if (!opp) return unclog;
+        if (oppDist > 320 || ahead < 0.3) return unclog;
+        const chance = oppBoxed ? 0.5 : oppDist < 350 ? 0.12 : 0.03;
+        return rngNext(bot.rng) < chance * (0.2 + 0.8 * p.itemSkill);
+      }
+      case 'ghost':
+        return boxed || unclog;
+      case 'scissors':
+        // Cut through when boxed, or when the opponent's body is right ahead and worth shortening.
+        return boxed || (opp !== null && oppDist < 260 && rngNext(bot.rng) < 0.04 * p.itemSkill) || unclog;
+      case 'dozer':
+        return boxed || unclog;
+      case 'flame':
+        // Light it when the opponent is ahead and within reach of the cone.
+        if (!opp) return unclog;
+        if (oppDist > cfg.flameRange * 1.3 || ahead < 0.6) return unclog;
+        return rngNext(bot.rng) < 0.5 * (0.2 + 0.8 * p.itemSkill);
     }
-    case 'ghost':
-      return boxed || unclog;
-    case 'scissors':
-      // Cut through when boxed, or when the opponent's body is right ahead and worth shortening.
-      return boxed || (opp !== null && oppDist < 260 && rngNext(bot.rng) < 0.04 * p.itemSkill) || unclog;
-    case 'dozer':
-      return boxed || unclog;
-    case 'flame': {
-      // Light it when the opponent is ahead and within reach of the cone.
-      if (!opp) return unclog;
-      const dx = opp.x - me.x;
-      const dy = opp.y - me.y;
-      const ahead = (dx * detCos(me.heading) + dy * detSin(me.heading)) / Math.max(1, oppDist);
-      if (oppDist > cfg.flameRange * 1.3 || ahead < 0.6) return unclog;
-      return rngNext(bot.rng) < 0.5 * (0.2 + 0.8 * p.itemSkill);
-    }
+  };
+
+  for (let k = 0; k < me.items.length; k++) {
+    const i = (me.selected + k) % me.items.length;
+    if (wants(me.items[i].kind)) return i;
   }
+  return null;
 }
 
 /** How many steps the other snake can hold course before hitting something static. */

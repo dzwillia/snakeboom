@@ -7,7 +7,7 @@ import { trailLength } from './trail';
 import { NO_INPUT, type MatchState, type PlayerInput, type SimEvent } from './types';
 
 const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000, hearts: 1, borderCloseSeconds: 0 };
-const straight: PlayerInput = { turn: 0, boost: false, use: false };
+const straight: PlayerInput = { turn: 0, boost: false, use: false, select: false };
 
 /** PINK has laid a long horizontal body along y = 500 from x = 300 to 900 and is heading away east; CYAN comes down from above to cross it at x = 600. */
 function crossing(): MatchState {

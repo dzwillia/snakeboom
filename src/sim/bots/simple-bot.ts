@@ -49,7 +49,7 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
   else if (best === LOOK_STEPS && me.targetLength > 200 && rngNext(bot.rng) < 0.004) bot.boostTicks = 20 + rngInt(bot.rng, 40);
 
   let use = false;
-  switch (me.items[0]?.kind) {
+  switch (me.items[me.selected]?.kind) {
     case 'missile':
       use = rngNext(bot.rng) < (state.snakes.some((o, j) => j !== idx && o.alive) ? 0.03 : 0);
       break;
@@ -67,7 +67,7 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
       use = rngNext(bot.rng) < 0.02;
       break;
   }
-  return { turn, boost: bot.boostTicks > 0, use };
+  return { turn, boost: bot.boostTicks > 0, use, select: false };
 }
 
 function dist2(p: { x: number; y: number }, x: number, y: number): number {

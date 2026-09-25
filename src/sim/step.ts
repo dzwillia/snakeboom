@@ -4,7 +4,7 @@ import { detectEncirclements } from './encircle';
 import { applyScissors } from './scissors';
 import { DT, TICK_RATE, type Config } from './config';
 import { borderSpeedAt, maxInset } from './border';
-import { tickItemTimers, useItem } from './items';
+import { selectNextItem, tickItemTimers, useItem } from './items';
 import { MAPS } from './maps';
 import { plow } from './dozer';
 import { detectNearMisses } from './nearMiss';
@@ -69,8 +69,12 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   closeBorder(state, cfg, events);
   moveSaws(state, cfg);
   tickItemTimers(state, events);
+  // Fire before Select, so a press fires the item the HUD showed as selected when the key went down.
   state.snakes.forEach((s, i) => {
-    if (s.alive && (inputs[i] ?? NO_INPUT).use) useItem(state, i, cfg, events);
+    if (!s.alive) return;
+    const input = inputs[i] ?? NO_INPUT;
+    if (input.use) useItem(state, i, cfg, events);
+    if (input.select) selectNextItem(s);
   });
 
   const growth = growthRate(cfg, state.overtime);

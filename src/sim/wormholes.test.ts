@@ -8,9 +8,9 @@ import { type MatchState, type PlayerInput, type SimEvent, type WormholeState } 
 import { enterWormholes, updateWormholes } from './wormholes';
 
 const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000, borderCloseSeconds: 0, hearts: 1 };
-const straight: PlayerInput = { turn: 0, boost: false, use: false };
+const straight: PlayerInput = { turn: 0, boost: false, use: false, select: false };
 /** Holding a turn keeps a snake circling in one spot (radius about 44) instead of running into the wall. */
-const circle: PlayerInput = { turn: 1, boost: false, use: false };
+const circle: PlayerInput = { turn: 1, boost: false, use: false, select: false };
 
 function playing(seed = 5): MatchState {
   const s = createMatch(cfg, seed);
@@ -122,7 +122,7 @@ describe('wormholes', () => {
     Object.assign(me, { x: 1200, y: 600, prevX: 1200, prevY: 600, heading: 0, targetLength: 5000 });
     // Portal on the box's top edge, exit on its bottom edge, so the loop closes back at the start.
     hole(s, 2000, 600, 2000, 1400, 6000);
-    const left: PlayerInput = { turn: -1, boost: false, use: false };
+    const left: PlayerInput = { turn: -1, boost: false, use: false, select: false };
     const events: SimEvent[] = [];
     // East along the top, through the portal, out at the bottom heading east; then turn round and come back west along the bottom, then north up the left side.
     events.push(...run(s, 180, [straight, circle]));

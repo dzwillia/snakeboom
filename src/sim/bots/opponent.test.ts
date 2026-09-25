@@ -4,6 +4,7 @@ import { checkInvariants } from '../invariants';
 import { createMatch } from '../state';
 import { rematch, step } from '../step';
 import { NO_INPUT, type MatchState, type PlayerInput } from '../types';
+import { createItem } from '../items';
 import { botInput, createBot } from './simple-bot';
 import { createOpponent, DIFFICULTIES, opponentInput, PROFILES, type Difficulty } from './opponent';
 
@@ -89,6 +90,37 @@ describe('AI opponent', () => {
       expect(typeof input.use).toBe('boolean');
       step(state, [NO_INPUT, input], DEFAULT_CONFIG);
     }
+  });
+
+  it('selects the item it wants before firing it, instead of firing the front one', () => {
+    const state = createMatch(DEFAULT_CONFIG, 21);
+    while (state.phase !== 'playing') step(state, [NO_INPUT, NO_INPUT], DEFAULT_CONFIG);
+    const [human, me] = state.snakes;
+    // Both heading east at the same speed, the human 150 units dead ahead: a missile's dream, nothing to be boxed by.
+    me.x = 800;
+    me.y = 1000;
+    me.heading = 0;
+    human.x = 950;
+    human.y = 1000;
+    human.heading = 0;
+    me.items = [createItem('ghost', DEFAULT_CONFIG), createItem('missile', DEFAULT_CONFIG)];
+    const bot = createOpponent('hard', 4, { itemSkill: 1, mistakeRate: 0 });
+    const presses: string[] = [];
+    let fired = false;
+    for (let t = 0; t < 600 && !fired; t++) {
+      const input = opponentInput(bot, state, 1, DEFAULT_CONFIG);
+      if (input.select) presses.push('select');
+      if (input.use) {
+        presses.push('use');
+        expect(me.items[me.selected].kind).toBe('missile');
+      }
+      const events = step(state, [NO_INPUT, input], DEFAULT_CONFIG);
+      if (events.some((e) => e.type === 'missileFired' && e.player === 1)) fired = true;
+      expect(events.some((e) => e.type === 'effectStarted' && e.player === 1)).toBe(false);
+    }
+    expect(fired).toBe(true);
+    expect(presses).toEqual(['select', 'use']);
+    expect(me.items.map((i) => i.kind)).toEqual(['ghost', 'missile']);
   });
 
   // These play whole rounds, so they get a generous timeout: the higher levels think hard.

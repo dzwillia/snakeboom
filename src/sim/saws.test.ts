@@ -9,8 +9,8 @@ import { trailLength } from './trail';
 import type { MatchState, PlayerInput, SawState, SimEvent } from './types';
 
 const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000, borderCloseSeconds: 0, hearts: 1, wormholeInterval: 0 };
-const straight: PlayerInput = { turn: 0, boost: false, use: false };
-const circle: PlayerInput = { turn: 1, boost: false, use: false };
+const straight: PlayerInput = { turn: 0, boost: false, use: false, select: false };
+const circle: PlayerInput = { turn: 1, boost: false, use: false, select: false };
 
 function playing(seed = 5): MatchState {
   const s = createMatch(cfg, seed);

@@ -8,8 +8,8 @@ import { step } from './step';
 import type { MatchState, PlayerInput, SimEvent } from './types';
 
 const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000, hearts: 1 };
-const straight: PlayerInput = { turn: 0, boost: false, use: false };
-const fire: PlayerInput = { ...straight, use: true };
+const straight: PlayerInput = { turn: 0, boost: false, use: false, select: false };
+const fire: PlayerInput = { ...straight, use: true, select: false };
 
 /** CYAN at (300, 530) facing east with a missile; PINK `gap` ahead at y = 500, also facing east (off CYAN's line). */
 function armed(gap = 150): MatchState {

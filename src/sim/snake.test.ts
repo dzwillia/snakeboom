@@ -6,7 +6,7 @@ import { trailLength } from './trail';
 import type { PlayerInput } from './types';
 
 const cfg: Config = { ...DEFAULT_CONFIG };
-const straight: PlayerInput = { turn: 0, boost: false, use: false };
+const straight: PlayerInput = { turn: 0, boost: false, use: false, select: false };
 
 function run(ticks: number, input: PlayerInput, c: Config = cfg, growth = 0) {
   const s = createSnake(0, 800, 500, 0, c);

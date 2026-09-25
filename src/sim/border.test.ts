@@ -30,8 +30,8 @@ describe('the closing border', () => {
     s.snakes[1].x = 900;
     for (const sn of s.snakes) sn.y = 500;
     const circle: PlayerInput[] = [
-      { turn: 1, boost: false, use: false },
-      { turn: -1, boost: false, use: false },
+      { turn: 1, boost: false, use: false, select: false },
+      { turn: -1, boost: false, use: false, select: false },
     ];
     const events = run(s, 2 * TICK_RATE, cfg, circle);
     expect(s.inset).toBe(0);
@@ -73,8 +73,8 @@ describe('the closing border', () => {
     Object.assign(s.snakes[0], { x: 700, y: 500 });
     Object.assign(s.snakes[1], { x: 900, y: 500 });
     const circle: PlayerInput[] = [
-      { turn: 1, boost: false, use: false },
-      { turn: -1, boost: false, use: false },
+      { turn: 1, boost: false, use: false, select: false },
+      { turn: -1, boost: false, use: false, select: false },
     ];
     let over: SimEvent | undefined;
     for (let t = 0; t < 12 * TICK_RATE && !over; t++) over = step(s, circle, cfg).find((e) => e.type === 'roundOver');

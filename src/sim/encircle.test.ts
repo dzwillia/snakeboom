@@ -5,7 +5,7 @@ import { step } from './step';
 import { NO_INPUT, type MatchState, type PlayerInput, type SimEvent } from './types';
 
 const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000, hearts: 1, borderCloseSeconds: 0 };
-const straight: PlayerInput = { turn: 0, boost: false, use: false };
+const straight: PlayerInput = { turn: 0, boost: false, use: false, select: false };
 const right: PlayerInput = { ...straight, turn: 1 };
 const TURN_90_TICKS = Math.ceil(Math.PI / 2 / (cfg.turnRate / TICK_RATE));
 
