@@ -43,8 +43,10 @@ export interface Config {
   pickupRadius: number;
   /** Pickups never spawn closer than this to a head. */
   pickupMinHeadDistance: number;
-  /** Pickups spawn at least this far from walls, blocks, bodies and other pickups. */
+  /** Pickups spawn at least this far from walls, blocks, bodies and other pickups (room to draw a loop around one). */
   pickupClearance: number;
+  /** True: a pickup is taken by closing a loop around it (the encirclement polygon). False: by running over it. */
+  collectByLoop: boolean;
   /** Relative spawn chance per kind. */
   pickupWeights: Record<PickupKind, number>;
   /** Body length per item slot: you carry floor(length / slotLength) items, at least 1 and at most itemSlots (a Shield is a bubble and never takes a slot). */
@@ -133,7 +135,8 @@ export const DEFAULT_CONFIG: Config = {
   pickupLifetime: 12,
   pickupRadius: 14,
   pickupMinHeadDistance: 300,
-  pickupClearance: 40,
+  pickupClearance: 60,
+  collectByLoop: true,
   pickupWeights: { missile: 30, scissors: 15, flame: 15, ghost: 15, shield: 15, dozer: 10 },
   slotLength: 150,
   itemSlots: 6,

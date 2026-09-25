@@ -2,6 +2,7 @@ import { circleHitsTiles } from './arena';
 import { forEachSolidPointNear } from './collision';
 import { circleHitsWall } from './arena';
 import { ARENA_HEIGHT, ARENA_WIDTH, TICK_RATE, type Config, type PickupKind } from './config';
+import { decimatePolygon, LOOP_EVENT_POINTS, pointInPolygon } from './geometry';
 import { createItem } from './items';
 import { slotsFor } from './storage';
 import { rngNext, rngRange, type RngState } from './rng';
@@ -102,11 +103,38 @@ export function updatePickups(state: MatchState, cfg: Config, events: SimEvent[]
 }
 
 /** A Shield needs no bubble already; anything else needs a free item slot (the body's length says how many there are). */
-function canCarry(s: SnakeState, kind: PickupKind, cfg: Config): boolean {
+export function canCarry(s: SnakeState, kind: PickupKind, cfg: Config): boolean {
   return kind === 'shield' ? !s.shield : s.items.length < slotsFor(s, cfg);
 }
 
-/** Heads with room collect pickups they touch; when both reach one, the closer head wins. */
+function give(s: SnakeState, p: PickupState, cfg: Config): void {
+  if (p.kind === 'shield') s.shield = true;
+  else s.items.push(createItem(p.kind, cfg));
+}
+
+/**
+ * The loop rule: `seat` just closed `poly` (flat; the polygon encirclement tests). Every pickup
+ * whose centre is inside it is taken in id order, each if the snake has room for it; the rest
+ * stay. Emits one loopCollected for the loop, then a pickupCollected per pickup. Returns how many were taken.
+ */
+export function collectInLoop(state: MatchState, cfg: Config, seat: number, poly: readonly number[], events: SimEvent[]): number {
+  if (state.pickups.length === 0) return 0;
+  const taker = state.snakes[seat];
+  const inside = state.pickups.filter((p) => pointInPolygon(p.x, p.y, poly)).sort((a, b) => a.id - b.id);
+  const taken: PickupState[] = [];
+  for (const p of inside) {
+    if (!canCarry(taker, p.kind, cfg)) continue;
+    give(taker, p, cfg);
+    taken.push(p);
+  }
+  if (taken.length === 0) return 0;
+  state.pickups = state.pickups.filter((p) => !taken.includes(p));
+  events.push({ type: 'loopCollected', player: seat, loop: decimatePolygon(poly, LOOP_EVENT_POINTS), ids: taken.map((p) => p.id) });
+  for (const p of taken) events.push({ type: 'pickupCollected', id: p.id, kind: p.kind, player: seat, x: p.x, y: p.y });
+  return taken.length;
+}
+
+/** The run-over rule (collectByLoop off): heads with room collect pickups they touch; when both reach one, the closer head wins. */
 export function collectPickups(state: MatchState, cfg: Config, events: SimEvent[]): void {
   if (state.pickups.length === 0) return;
   const reach = cfg.snakeRadius + cfg.pickupRadius;
@@ -126,10 +154,8 @@ export function collectPickups(state: MatchState, cfg: Config, events: SimEvent[
       kept.push(p);
       continue;
     }
-    const taker = state.snakes[winner];
-    if (p.kind === 'shield') taker.shield = true;
-    else taker.items.push(createItem(p.kind, cfg));
-    events.push({ type: 'pickupCollected', id: p.id, kind: p.kind, player: winner });
+    give(state.snakes[winner], p, cfg);
+    events.push({ type: 'pickupCollected', id: p.id, kind: p.kind, player: winner, x: p.x, y: p.y });
   }
   state.pickups = kept;
 }

@@ -94,7 +94,7 @@ describe('pickups', () => {
     Object.assign(b, { x: 505, y: 500 });
     const events: SimEvent[] = [];
     collectPickups(s, cfg, events);
-    expect(events).toEqual([{ type: 'pickupCollected', id: 50, kind: 'missile', player: 1 }]);
+    expect(events).toEqual([{ type: 'pickupCollected', id: 50, kind: 'missile', player: 1, x: 500, y: 500 }]);
     expect(b.items).toEqual([{ kind: 'missile', charges: 3 }]);
     expect(a.items).toEqual([]);
     expect(s.pickups).toEqual([]);
