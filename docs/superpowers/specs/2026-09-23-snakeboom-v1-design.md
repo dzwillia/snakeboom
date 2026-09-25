@@ -59,6 +59,8 @@ The long-term goal is a hosted web game with 1v1 duels started from invite links
 
 ## 3. Gameplay
 
+> **Superseded in part (2026-09-25):** sections 3.2 to 3.6 describe the v1 rules. Since v0.13.0 the game runs the **hunt** rules in `2026-09-25-snakeboom-hunt-design.md`: your own body is safe, encirclement kills, boost burns tail, homing missiles replace bombs, one life, and Reverse, Turbo and Slow are gone. Sections 3.1, 3.7 and 3.8 (arena, rounds, maps) still apply, with the closing border from v0.12.0.
+
 ### 3.1 Arena and coordinates
 
 - The world is 1600×1000 units, scaled to fit the window with letterboxing.

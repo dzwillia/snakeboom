@@ -1,6 +1,6 @@
 # SnakeBoom
 
-A two-player neon snake duel on one keyboard. Your snake never stops growing: trap your opponent so they crash into your body, a block, a wall, or themselves, and throw bombs that blow holes in everything.
+A two-player neon snake duel, on one keyboard or online. Your snake never stops growing and your own body never hurts you, so your body is a weapon: close a loop around your opponent's head and you've eaten them. Or shoot them down with a homing missile, or let the closing border do the work.
 
 ## Play
 
@@ -16,7 +16,7 @@ pnpm dev        # opens the game in your browser (http://localhost:5199)
 
 The title screen is a short menu: ↑ / ↓ moves between **LOCAL** (← / → picks who plays PINK: a second human, or the local AI at easy, normal or hard), **FIRST TO N** (← / → picks the match length, 1–10), **CREATE LINK** and **QUICK MATCH**, and <kbd>Space</kbd> goes. In a match, <kbd>Space</kbd> rematches, <kbd>Esc</kbd> pauses, <kbd>M</kbd> mutes, <kbd>H</kbd> (or <kbd>?</kbd>) opens the Powers page, and <kbd>`</kbd> opens the tuning panel, where every gameplay number is a live slider.
 
-The Powers page lists every pickup with its icon, what it does and the numbers it currently runs on (durations, charges, blast radius, spawn share), read live from the tuning config. It opens from the title screen or from pause, so you can check a power mid-match.
+The Powers page lists every pickup with its icon, what it does and the numbers it currently runs on (durations, charges, missile flight time, spawn share), read live from the tuning config. It opens from the title screen or from pause, so you can check a power mid-match.
 
 ### Playing solo against the AI
 
@@ -24,23 +24,24 @@ Pick an AI level on the title screen's LOCAL row (or in the tuning panel under *
 
 | Level | How it plays |
 |---|---|
-| **Easy** | Looks under a second ahead, reacts slowly, wanders toward pickups, uses items at random and stays confused by Reverse for a full second. Good for testing a mechanic in peace. |
+| **Easy** | Looks under a second ahead, reacts slowly, wanders toward pickups, uses items at random and rarely dodges a missile. Good for testing a mechanic in peace. |
 | **Normal** | Looks further, replans quickly when something lands in its path, fights for territory and saves Ghost for when it's boxed in. |
-| **Hard** | Plans two and a half seconds ahead every other tick, fights for territory (the floor it can reach before you can), cuts across your line just ahead of your head, boosts to get there, bombs you when you're cornered and reads Reverse instantly. |
+| **Hard** | Plans two and a half seconds ahead every other tick, fights for territory (the floor it can reach before you can), cuts across your line just ahead of your head, boosts to get there and fires a missile when you're cornered in front of it. (It doesn't draw loops or dodge missiles yet.) |
 
 The AI lives in the rules engine (`src/sim/bots/opponent.ts`), so it is deterministic and works headlessly: `pnpm soak --bots hard,easy` pits two levels against each other and prints win counts and who hurt whom, `--profile '{"aggression":0.5}'` overrides knobs on the first AI seat, and `--debug 1` prints what the first AI was seeing when it hurt itself. The same code could drive a server-side bot online later. Difficulty levels are a table of knobs (look-ahead, reaction time, aggression, greed, boost use, item skill, mistake rate) at the top of that file.
 
 ## How it plays
 
 - **One life.** A wall, a block or your opponent's body kills you; a head-on collision kills you both. Your **own body never hurts you**: cross it, weave through it, draw shapes with it. (Hearts are still a tuning-panel slider.)
+- **Encirclement kills.** When your head crosses your own trail, the loop you just closed is checked. If your opponent's head is inside it, they're gone. A Ghost phases through a closing loop; a Shield takes the hit.
 - **Rounds always end in a kill.** After 30 s the deadly border starts closing in, the clock counts down in red, and at 45 s it crushes fast until someone dies. First to the target wins the match.
 - **Growth and boost:** snakes keep growing all round, and **boosting burns your tail**: hold Boost to go twice as fast for as long as you have body to spend. The bar under your name is your length.
 - **Pickups** spawn every couple of seconds. You carry up to **three items** and Use fires the oldest. Both item queues show on the HUD, so you always know what your opponent has.
 
 | Item | What it does |
 |---|---|
-| **Bomb ×3** | Thrown ahead of your opponent. A reticle marks the blast zone, and it goes off 1 s after landing. Blasts hit heads (yours too), punch holes through bodies, destroy blocks and set off other bombs. |
-| **Ghost** | For 2 s your head slips through bodies, heads and blocks. Walls and blasts still hit. |
+| **Missile ×3** | Fires from your head and homes on your opponent for 2 s. It turns, but not on a dime: a hard cut at the right moment or a boost outruns it, a Shield eats it, and it never hits you. |
+| **Ghost** | For 2 s your head slips through bodies, heads and blocks, and a closing loop can't catch you. Walls and missiles still hit. |
 | **Shield** | A bubble that takes your next hit so you keep your heart. It never takes a slot. |
 | **Bulldozer** | For 3 s your plow shoves blocks (and crushes the ones it can't move), straight into your opponent if you aim well. |
 
