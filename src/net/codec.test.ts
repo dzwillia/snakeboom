@@ -17,7 +17,8 @@ import {
 
 const ALL_INPUTS: PlayerInput[] = [];
 for (const turn of [-1, 0, 1] as const)
-  for (const boost of [false, true]) for (const use of [false, true]) ALL_INPUTS.push({ turn, boost, use });
+  for (const boost of [false, true])
+    for (const use of [false, true]) for (const select of [false, true]) ALL_INPUTS.push({ turn, boost, use, select });
 
 describe('input byte', () => {
   it('round-trips every input', () => {
@@ -26,8 +27,14 @@ describe('input byte', () => {
 
   it('rejects the unused turn code and out-of-range bytes', () => {
     expect(unpackInput(3)).toBeNull();
-    expect(unpackInput(16)).toBeNull();
+    expect(unpackInput(32)).toBeNull();
     expect(unpackInput(-1)).toBeNull();
+  });
+
+  it('carries Select in bit 4', () => {
+    expect(packInput({ turn: 0, boost: false, use: false, select: true })).toBe(16);
+    expect(unpackInput(16)).toEqual({ turn: 0, boost: false, use: false, select: true });
+    expect(packInput({ turn: -1, boost: true, use: true, select: true })).toBe(2 | 4 | 8 | 16);
   });
 });
 
@@ -39,11 +46,11 @@ describe('input frames', () => {
   });
 
   it('is 6 bytes, little-endian', () => {
-    expect([...encodeInput(0x01020304, { turn: 1, boost: true, use: false })]).toEqual([FRAME_INPUT, 4, 3, 2, 1, 5]);
+    expect([...encodeInput(0x01020304, { turn: 1, boost: true, use: false, select: false })]).toEqual([FRAME_INPUT, 4, 3, 2, 1, 5]);
   });
 
   it('rejects the wrong length, frame byte or turn code', () => {
-    const good = encodeInput(7, { turn: 0, boost: false, use: false });
+    const good = encodeInput(7, { turn: 0, boost: false, use: false, select: false });
     expect(decodeInput(good.subarray(0, 5))).toBeNull();
     expect(decodeInput(new Uint8Array([...good, 0]))).toBeNull();
     const badFrame = Uint8Array.from(good);
@@ -55,8 +62,8 @@ describe('input frames', () => {
   });
 
   it('refuses ticks outside 32 bits', () => {
-    expect(() => encodeInput(-1, { turn: 0, boost: false, use: false })).toThrow(RangeError);
-    expect(() => encodeInput(2 ** 32, { turn: 0, boost: false, use: false })).toThrow(RangeError);
+    expect(() => encodeInput(-1, { turn: 0, boost: false, use: false, select: false })).toThrow(RangeError);
+    expect(() => encodeInput(2 ** 32, { turn: 0, boost: false, use: false, select: false })).toThrow(RangeError);
   });
 });
 
@@ -70,11 +77,11 @@ describe('relayed frames', () => {
   });
 
   it('starts with the frame byte and the player', () => {
-    expect([...encodeRelayed(1, 7, { turn: 0, boost: false, use: false })]).toEqual([FRAME_RELAYED, 1, 7, 0, 0, 0, 0]);
+    expect([...encodeRelayed(1, 7, { turn: 0, boost: false, use: false, select: false })]).toEqual([FRAME_RELAYED, 1, 7, 0, 0, 0, 0]);
   });
 
   it('rejects a player above 1, the wrong frame byte and the wrong length', () => {
-    const good = encodeRelayed(0, 7, { turn: 0, boost: false, use: false });
+    const good = encodeRelayed(0, 7, { turn: 0, boost: false, use: false, select: false });
     const badPlayer = Uint8Array.from(good);
     badPlayer[1] = 2;
     expect(decodeRelayed(badPlayer)).toBeNull();
@@ -82,12 +89,12 @@ describe('relayed frames', () => {
     badFrame[0] = FRAME_INPUT;
     expect(decodeRelayed(badFrame)).toBeNull();
     expect(decodeRelayed(good.subarray(1))).toBeNull();
-    expect(() => encodeRelayed(2, 7, { turn: 0, boost: false, use: false })).toThrow(RangeError);
+    expect(() => encodeRelayed(2, 7, { turn: 0, boost: false, use: false, select: false })).toThrow(RangeError);
   });
 });
 
 describe('replay blobs', () => {
-  const frame = (player: number, tick: number) => encodeRelayed(player, tick, { turn: 1, boost: false, use: tick % 2 === 0 });
+  const frame = (player: number, tick: number) => encodeRelayed(player, tick, { turn: 1, boost: false, use: tick % 2 === 0, select: false });
 
   it('round-trips 0, 1 and 1000 frames', () => {
     for (const n of [0, 1, 1000]) {

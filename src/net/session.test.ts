@@ -195,15 +195,15 @@ describe('NetSession bookkeeping', () => {
 
   it('ignores duplicates and inputs for ticks it has already confirmed', () => {
     const s = make(1);
-    s.receive(1, { turn: 1, boost: false, use: false });
-    s.receive(1, { turn: -1, boost: false, use: false });
+    s.receive(1, { turn: 1, boost: false, use: false, select: false });
+    s.receive(1, { turn: -1, boost: false, use: false, select: false });
     s.advance(NO_INPUT);
     expect(s.confirmedTick).toBe(0);
     expect(s.tick).toBe(1);
     s.advance(NO_INPUT);
     expect(s.confirmedTick).toBe(1);
     expect(s.confirmedState.snakes[1].heading).toBe(s.state.snakes[1].heading);
-    s.receive(1, { turn: -1, boost: true, use: true });
+    s.receive(1, { turn: -1, boost: true, use: true, select: false });
     s.receive(0, NO_INPUT);
     s.receive(-5, NO_INPUT);
     s.advance(NO_INPUT);
@@ -218,7 +218,7 @@ describe('NetSession bookkeeping', () => {
     expect(s.confirmedTick).toBe(240);
     expect(s.state.phase).toBe('playing');
     expect(s.takeCorrections()).toEqual([]);
-    s.receive(245, { turn: 1, boost: true, use: false });
+    s.receive(245, { turn: 1, boost: true, use: false, select: false });
     s.advance(NO_INPUT);
     const corrections = s.takeCorrections();
     expect(corrections.map((c) => c.player)).toEqual([1]);

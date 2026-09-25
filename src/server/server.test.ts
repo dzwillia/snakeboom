@@ -118,13 +118,13 @@ describe('relay server', () => {
     expect(startA.winsToWin).toBe(3);
     expect(startA.inputDelay).toBeGreaterThanOrEqual(1);
 
-    a.sendFrame(encodeInput(1, { turn: 1, boost: false, use: false }));
+    a.sendFrame(encodeInput(1, { turn: 1, boost: false, use: false, select: false }));
     a.sendFrame(encodeInput(2, NO_INPUT));
-    a.sendFrame(encodeInput(3, { turn: -1, boost: true, use: true }));
+    a.sendFrame(encodeInput(3, { turn: -1, boost: true, use: true, select: false }));
     const frames = await b.waitFrames(3);
     expect(frames.map((f) => decodeRelayed(f)?.tick)).toEqual([1, 2, 3]);
     expect(frames.map((f) => decodeRelayed(f)?.player)).toEqual([0, 0, 0]);
-    expect(decodeRelayed(frames[2])?.input).toEqual({ turn: -1, boost: true, use: true });
+    expect(decodeRelayed(frames[2])?.input).toEqual({ turn: -1, boost: true, use: true, select: false });
 
     a.send({ type: 'hash', tick: 60, hash: 1 });
     b.send({ type: 'hash', tick: 60, hash: 1 });

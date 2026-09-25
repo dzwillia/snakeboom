@@ -77,16 +77,16 @@ describe('rejoin from the relay log', () => {
   it('restores local inputs without sending and ignores confirmed ticks', () => {
     const sends: number[] = [];
     const s = new NetSession({ seed: 1, cfg, local: 0, inputDelay: 2, send: (t) => sends.push(t) });
-    s.restoreLocal(2, { turn: 1, boost: false, use: false });
-    s.restoreLocal(3, { turn: 1, boost: false, use: false });
-    s.receive(1, { turn: 0, boost: false, use: false });
-    s.receive(2, { turn: 0, boost: false, use: false });
+    s.restoreLocal(2, { turn: 1, boost: false, use: false, select: false });
+    s.restoreLocal(3, { turn: 1, boost: false, use: false, select: false });
+    s.receive(1, { turn: 0, boost: false, use: false, select: false });
+    s.receive(2, { turn: 0, boost: false, use: false, select: false });
     expect(s.catchUp(10)).toBe(2);
     expect(sends).toEqual([]);
     expect(s.confirmedTick).toBe(2);
-    s.restoreLocal(1, { turn: -1, boost: true, use: true });
+    s.restoreLocal(1, { turn: -1, boost: true, use: true, select: false });
     expect(s.catchUp(10)).toBe(0);
-    s.advance({ turn: 0, boost: false, use: false });
+    s.advance({ turn: 0, boost: false, use: false, select: false });
     expect(sends).toEqual([4]);
   });
 });

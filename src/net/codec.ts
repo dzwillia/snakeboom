@@ -12,16 +12,21 @@ export const RELAYED_FRAME_BYTES = 7;
 const TURN_CODES: Record<-1 | 0 | 1, number> = { 0: 0, 1: 1, [-1]: 2 };
 const MAX_TICK = 0xffffffff;
 
-/** Bits 0–1: turn (0 straight, 1 right, 2 left). Bit 2: boost. Bit 3: use. */
+/** Bits 0–1: turn (0 straight, 1 right, 2 left). Bit 2: boost. Bit 3: use (Fire). Bit 4: select. */
 export function packInput(input: PlayerInput): number {
-  return TURN_CODES[input.turn] | (input.boost ? 4 : 0) | (input.use ? 8 : 0);
+  return TURN_CODES[input.turn] | (input.boost ? 4 : 0) | (input.use ? 8 : 0) | (input.select ? 16 : 0);
 }
 
-/** Inverse of packInput; a turn code of 3 gives null. */
+/** Inverse of packInput; a turn code of 3 or a byte above 31 gives null. */
 export function unpackInput(byte: number): PlayerInput | null {
   const code = byte & 3;
-  if (code === 3 || byte > 15 || byte < 0 || !Number.isInteger(byte)) return null;
-  return { turn: code === 0 ? 0 : code === 1 ? 1 : -1, boost: (byte & 4) !== 0, use: (byte & 8) !== 0 };
+  if (code === 3 || byte > 31 || byte < 0 || !Number.isInteger(byte)) return null;
+  return {
+    turn: code === 0 ? 0 : code === 1 ? 1 : -1,
+    boost: (byte & 4) !== 0,
+    use: (byte & 8) !== 0,
+    select: (byte & 16) !== 0,
+  };
 }
 
 function writeTick(out: Uint8Array, at: number, tick: number): void {
