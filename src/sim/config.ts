@@ -59,6 +59,8 @@ export interface Config {
   /** Seconds before it fizzles. */
   missileLife: number;
   missileRadius: number;
+  /** The newest path length of your own trail that doesn't count as crossing it (so the head's own neck can't close a loop). */
+  loopIgnore: number;
   ghostDuration: number;
   /** Timed specials (Ghost, Bulldozer) flash for this many seconds before they run out. */
   effectWarning: number;
@@ -110,6 +112,7 @@ export const DEFAULT_CONFIG: Config = {
   missileTurnRate: 3,
   missileLife: 2,
   missileRadius: 10,
+  loopIgnore: 24,
   ghostDuration: 2,
   effectWarning: 1,
   shieldGrace: 0.5,

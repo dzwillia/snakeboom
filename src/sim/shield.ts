@@ -42,7 +42,7 @@ export function tryHeart(state: MatchState, idx: number, cause: DeathCause, cfg:
  */
 function deflect(state: MatchState, idx: number, cause: DeathCause, cfg: Config): void {
   const s = state.snakes[idx];
-  if (cause !== 'wall' && cause !== 'missile') pushClear(state, idx, cause, cfg);
+  if (cause !== 'wall' && cause !== 'missile' && cause !== 'encircled') pushClear(state, idx, cause, cfg);
   if (cause === 'wall' || circleHitsWall(s.x, s.y, cfg.snakeRadius, state.inset)) slideAlongWall(s, cfg.snakeRadius, state.inset);
 }
 

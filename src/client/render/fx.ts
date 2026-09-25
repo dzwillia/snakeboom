@@ -47,6 +47,7 @@ export class Fx {
   private particles: Particle[] = [];
   private rings: Ring[] = [];
   private flashes: Flash[] = [];
+  private loops: { points: number[]; color: number; life: number; maxLife: number }[] = [];
   private shake = 0;
   private screenFlash = 0;
   private chainFlash = 0;
@@ -76,6 +77,12 @@ export class Fx {
     this.ring(s.x, s.y, 90, 0.5, color);
     this.ring(s.x, s.y, 40, 0.3, 0xffffff);
     this.addShake(14);
+  }
+
+  /** A loop that just caught someone: the polygon flares in the looper's colour and fades. */
+  loopSnap(points: number[], color: number, _victim: number): void {
+    this.loops.push({ points, color, life: 0.7, maxLife: 0.7 });
+    this.addShake(8);
   }
 
   /** A missile finding its mark: a flash, two rings and a fan of sparks in the victim's colour. */
@@ -192,6 +199,19 @@ export class Fx {
       g.moveTo(p.x, p.y)
         .lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03)
         .stroke({ width: p.size, color: p.color, alpha: p.life / p.maxLife, cap: 'round' });
+    }
+
+    this.loops = this.loops.filter((l) => (l.life -= dt) > 0);
+    for (const l of this.loops) {
+      const k = 1 - l.life / l.maxLife;
+      const pts = l.points;
+      if (pts.length >= 6) {
+        g.moveTo(pts[0], pts[1]);
+        for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]);
+        g.closePath();
+        g.stroke({ width: 6 + 10 * (1 - k), color: l.color, alpha: 0.9 * (1 - k), join: 'round' });
+        g.fill({ color: l.color, alpha: 0.18 * (1 - k) });
+      }
     }
 
     this.rings = this.rings.filter((r) => (r.life -= dt) > 0);

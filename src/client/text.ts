@@ -28,6 +28,8 @@ export function describeDeath(d: DeathRecord, names: readonly string[] = PLAYER_
       return 'Head-on collision';
     case 'missile':
       return `${victim} was shot down by ${killer}`;
+    case 'encircled':
+      return `${killer} encircled ${victim}`;
   }
 }
 

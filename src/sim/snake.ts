@@ -29,6 +29,7 @@ export function createSnake(id: number, x: number, y: number, heading: number, c
     holeVersion: 0,
     effects: noEffects(),
     nearMissCooldown: 0,
+    crossing: false,
   };
 }
 

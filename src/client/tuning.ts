@@ -77,6 +77,9 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   missiles.add(cfg, 'missileLife', 0.5, 6, 0.1).name('life (s)');
   missiles.add(cfg, 'missileRadius', 4, 30, 1).name('radius');
 
+  const loops = gui.addFolder('Loops');
+  loops.add(cfg, 'loopIgnore', 8, 80, 2).name('own neck ignored (units)');
+
   const power = gui.addFolder('Power-ups');
   power.add(cfg, 'ghostDuration', 0.5, 10, 0.25).name('ghost (s)');
   power.add(cfg, 'effectWarning', 0, 10, 0.25).name('expiry warning (s)');

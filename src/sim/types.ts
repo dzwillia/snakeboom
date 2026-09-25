@@ -4,7 +4,7 @@ import type { RngState } from './rng';
 export type Phase = 'countdown' | 'playing' | 'roundOver' | 'matchOver';
 
 /** Listed in reporting priority order (spec 3.3). */
-export type DeathCause = 'missile' | 'headOn' | 'body' | 'obstacle' | 'wall';
+export type DeathCause = 'missile' | 'encircled' | 'headOn' | 'body' | 'obstacle' | 'wall';
 
 export interface PlayerInput {
   turn: -1 | 0 | 1;
@@ -103,6 +103,8 @@ export interface SnakeState {
   effects: EffectTimers;
   /** Ticks until another near miss can be reported for this snake. */
   nearMissCooldown: number;
+  /** True while the head is touching its own trail (a loop closes on the tick this turns true). */
+  crossing: boolean;
 }
 
 export interface DeathRecord {
@@ -165,6 +167,8 @@ export type SimEvent =
   | { type: 'missileFired'; id: number; player: number; x: number; y: number; heading: number }
   | { type: 'missileHit'; id: number; player: number; x: number; y: number }
   | { type: 'missileFizzled'; id: number; x: number; y: number }
+  /** `player` was caught inside a loop `by` just closed; `loop` is the polygon, flat and thinned. */
+  | { type: 'encircled'; player: number; by: number; loop: number[] }
   | { type: 'itemUsed'; player: number; kind: PickupKind }
   | { type: 'effectStarted'; player: number; effect: EffectName }
   | { type: 'effectEnded'; player: number; effect: EffectName }

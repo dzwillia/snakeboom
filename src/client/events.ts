@@ -97,6 +97,10 @@ export class EventSink {
           fx.missileHit(e.x, e.y, PLAYER_COLORS[e.player]);
           sound.play('missileHit');
           break;
+        case 'encircled':
+          fx.loopSnap(e.loop, PLAYER_COLORS[e.by], e.player);
+          sound.play('snap');
+          break;
         case 'missileFizzled':
           fx.pickupBurst(e.x, e.y, PALETTE.missile);
           sound.play('missileFizzle', 0.6);
