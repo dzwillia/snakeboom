@@ -19,6 +19,9 @@ const GLYPHS: Record<PickupKind, string> = {
     `<path d="M-0.75 -0.8 L0.55 0.35 M-0.75 0.8 L0.55 -0.35" stroke="currentColor" stroke-width="0.18" stroke-linecap="round" fill="none"/>` +
     `<circle cx="0.7" cy="0.5" r="0.26" fill="none" stroke="currentColor" stroke-width="0.14"/>` +
     `<circle cx="0.7" cy="-0.5" r="0.26" fill="none" stroke="currentColor" stroke-width="0.14"/>`,
+  flame:
+    `<path d="M0 -0.95 C0.55 -0.45 0.75 -0.1 0.7 0.3 C0.65 0.7 0.35 0.95 0 0.95 C-0.35 0.95 -0.65 0.7 -0.7 0.3 C-0.75 -0.05 -0.5 -0.35 -0.3 -0.5 C-0.3 -0.15 -0.15 0 0 0.05 C0.15 -0.25 0.15 -0.6 0 -0.95 Z" fill="currentColor"/>` +
+    `<circle cx="0" cy="0.5" r="0.25" fill="${BG}" opacity="0.7"/>`,
   ghost:
     `<circle cx="0" cy="-0.15" r="0.6" fill="currentColor"/>` +
     `<rect x="-0.6" y="-0.15" width="1.2" height="0.75" fill="currentColor"/>` +

@@ -29,7 +29,8 @@ export type SoundName =
   | 'hurt'
   | 'portal'
   | 'warp'
-  | 'saw';
+  | 'saw'
+  | 'flame';
 
 // ZzFX parameters: volume, randomness, frequency, attack, sustain, release, shape, shapeCurve,
 // slide, deltaSlide, pitchJump, pitchJumpTime, repeatTime, noise, modulation, bitCrush, delay,
@@ -62,6 +63,7 @@ const BANK: Record<SoundName, number[]> = {
   portal: [0.5, 0, 180, 0.1, 0.4, 0.5, 2, 1, 0, 0, 0, 0, 0, 0, 12, 0.2],
   warp: [0.8, 0, 240, 0.01, 0.15, 0.35, 1, 1.5, 40, -30, 0, 0, 0, 0, 20, 0.1],
   saw: [0.6, 0.1, 110, 0.05, 0.5, 0.3, 3, 1, 0, 0, 0, 0, 0.08, 0.3, 0, 0.2],
+  flame: [0.7, 0.2, 90, 0.05, 0.6, 0.4, 4, 1, 0, 0, 0, 0, 0, 2.5, 0, 0.4, 0, 0.7],
 };
 
 /** Synthesized sound effects (no audio files). */
