@@ -3,6 +3,7 @@ import { forEachSolidPointNear } from '../collision';
 import { DT, type Config } from '../config';
 import { detAtan2, detCos, detSin, wrapAngle } from '../detmath';
 import { createRng, rngInt, rngNext, type RngState } from '../rng';
+import { slotsFor } from '../storage';
 import { NO_INPUT, type MatchState, type PlayerInput, type SnakeState } from '../types';
 
 /** A cheap look-ahead bot for soak tests (and the seed of a future AI opponent). */
@@ -78,7 +79,7 @@ function dist2(p: { x: number; y: number }, x: number, y: number): number {
 
 /** Turn toward the nearest pickup in range while the slot is empty; null when there's nothing to chase. */
 function seekTurn(state: MatchState, me: SnakeState, cfg: Config): -1 | 0 | 1 | null {
-  if (me.items.length >= cfg.itemSlots) return null;
+  if (me.items.length >= slotsFor(me, cfg)) return null;
   let target: { x: number; y: number } | null = null;
   let best = SEEK_RANGE * SEEK_RANGE;
   for (const p of state.pickups) {

@@ -52,7 +52,7 @@ export function cutBySaws(state: MatchState, cfg: Config, events: SimEvent[]): v
       forEachSolidPointNear(state, saw.x, saw.y, reach, (snake, index) => {
         if (snake === j && index > newest) newest = index;
       });
-      if (newest >= 0) cutTrail(state, j, newest, -1, saw.x, saw.y, events);
+      if (newest >= 0) cutTrail(state, j, newest, -1, saw.x, saw.y, cfg, events);
     });
   }
 }

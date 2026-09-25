@@ -6,6 +6,7 @@ export { rematch, step } from './step';
 export { checkInvariants } from './invariants';
 export { fnv1a, hashState } from './hash';
 export { trailLength } from './trail';
+export { slotsFor } from './storage';
 export { WORMHOLE_TOUCH } from './wormholes';
 export { SAW_TOUCH } from './saws';
 export { inCone } from './flame';

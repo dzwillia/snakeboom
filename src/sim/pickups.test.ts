@@ -89,7 +89,7 @@ describe('pickups', () => {
   it('gives a shared pickup to the closer head only', () => {
     const s = playing();
     const [a, b] = s.snakes;
-    s.pickups = [{ id: 50, kind: 'missile', x: 500, y: 500, ttl: 100 }];
+    s.pickups = [{ id: 50, kind: 'missile', x: 500, y: 500, ttl: 100, dropped: false }];
     Object.assign(a, { x: 490, y: 500 });
     Object.assign(b, { x: 505, y: 500 });
     const events: SimEvent[] = [];
@@ -109,7 +109,7 @@ describe('pickups', () => {
       { kind: 'dozer', charges: 1 },
     ];
     Object.assign(a, { x: 500, y: 500 });
-    s.pickups = [{ id: 7, kind: 'missile', x: 505, y: 500, ttl: 100 }];
+    s.pickups = [{ id: 7, kind: 'missile', x: 505, y: 500, ttl: 100, dropped: false }];
     const events: SimEvent[] = [];
     collectPickups(s, cfg, events);
     expect(events).toEqual([]);

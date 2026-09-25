@@ -5,27 +5,36 @@ import { collectPickups } from './pickups';
 import { checkInvariants } from './invariants';
 import { createMatch } from './state';
 import { step } from './step';
-import { NO_INPUT, type MatchState, type SimEvent } from './types';
+import { createTrail, trailPush } from './trail';
+import { NO_INPUT, type MatchState, type SimEvent, type SnakeState } from './types';
 
 const cfg = DEFAULT_CONFIG;
+
+/** Lays `units` of straight body behind the head (length is storage: three slots need 450 units). */
+function layBody(s: SnakeState, units: number): void {
+  s.trail = createTrail();
+  for (let k = 10; k >= 1; k--) trailPush(s.trail, s.x - (units * k) / 10, s.y);
+  trailPush(s.trail, s.x, s.y);
+}
 
 function playing(): MatchState {
   const s = createMatch(cfg, 2);
   s.phase = 'playing';
+  layBody(s.snakes[0], 3 * cfg.slotLength);
   return s;
 }
 
 /** Drops a pickup of `kind` on CYAN's head and lets it collect. */
 function grab(s: MatchState, kind: PickupKind, id: number): SimEvent[] {
   const cyan = s.snakes[0];
-  s.pickups.push({ id, kind, x: cyan.x, y: cyan.y, ttl: 100 });
+  s.pickups.push({ id, kind, x: cyan.x, y: cyan.y, ttl: 100, dropped: false });
   const events: SimEvent[] = [];
   collectPickups(s, cfg, events);
   return events;
 }
 
 describe('item queue', () => {
-  it('holds up to itemSlots items in the order they were grabbed', () => {
+  it('holds as many items as the body has slots for, in the order they were grabbed', () => {
     const s = playing();
     grab(s, 'ghost', 1);
     grab(s, 'missile', 2);

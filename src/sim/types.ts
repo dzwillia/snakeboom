@@ -39,7 +39,7 @@ export interface Grid {
   cells: number[][];
 }
 
-/** What a snake holds in its single item slot. */
+/** One carried item. */
 export interface ItemState {
   kind: PickupKind;
   /** Uses left; the slot empties at 0. */
@@ -69,6 +69,8 @@ export interface PickupState {
   y: number;
   /** Ticks until it disappears. */
   ttl: number;
+  /** True when it fell off a snake (a cut or boost shed it) rather than spawning; these don't count toward maxPickups. */
+  dropped: boolean;
 }
 
 /** A homing missile in flight. */
@@ -119,7 +121,7 @@ export interface SnakeState {
   targetLength: number;
   boosting: boolean;
   trail: Trail;
-  /** Carried items, oldest first; Fire uses items[selected]. */
+  /** Carried items, oldest first; Fire uses items[selected]. Never more than slotsFor(this) (see storage.ts). */
   items: ItemState[];
   /**
    * Index into `items` of the item Fire uses; 0 when empty. It follows the item, not the slot:
@@ -203,7 +205,8 @@ export type SimEvent =
   | ({ type: 'death' } & DeathRecord)
   | { type: 'roundOver'; winner: number | null; deaths: DeathRecord[] }
   | { type: 'matchOver'; winner: number }
-  | { type: 'pickupSpawned'; id: number; kind: PickupKind; x: number; y: number }
+  /** `dropped` is set when it fell off a snake instead of spawning. */
+  | { type: 'pickupSpawned'; id: number; kind: PickupKind; x: number; y: number; dropped?: boolean }
   | { type: 'pickupCollected'; id: number; kind: PickupKind; player: number }
   | { type: 'pickupExpired'; id: number }
   | { type: 'missileFired'; id: number; player: number; x: number; y: number; heading: number }

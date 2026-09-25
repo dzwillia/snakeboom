@@ -47,7 +47,9 @@ export interface Config {
   pickupClearance: number;
   /** Relative spawn chance per kind. */
   pickupWeights: Record<PickupKind, number>;
-  /** Items a snake can carry at once; Select picks one and Fire uses it (a Shield is a bubble and never takes a slot). */
+  /** Body length per item slot: you carry floor(length / slotLength) items, at least 1 and at most itemSlots (a Shield is a bubble and never takes a slot). */
+  slotLength: number;
+  /** The most items a snake can carry however long it is; Select picks one and Fire uses it. */
   itemSlots: number;
   /** Shots in one missile pickup. */
   missileCharges: number;
@@ -133,7 +135,8 @@ export const DEFAULT_CONFIG: Config = {
   pickupMinHeadDistance: 300,
   pickupClearance: 40,
   pickupWeights: { missile: 30, scissors: 15, flame: 15, ghost: 15, shield: 15, dozer: 10 },
-  itemSlots: 3,
+  slotLength: 150,
+  itemSlots: 6,
   missileCharges: 3,
   missileCooldown: 0.4,
   missileSpeed: 420,
@@ -180,6 +183,7 @@ export const CLASSIC_CONFIG: Config = {
   firstPickupDelay: 1,
   pickupInterval: 1.5,
   pickupWeights: { missile: 30, scissors: 0, flame: 0, ghost: 15, shield: 20, dozer: 35 },
+  itemSlots: 3,
   ghostDuration: 3,
   effectWarning: 3,
   dozerDuration: 5,

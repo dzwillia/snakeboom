@@ -1,5 +1,6 @@
 import { circleHitsWall } from './arena';
 import type { Config } from './config';
+import { slotsFor } from './storage';
 import { trailLength } from './trail';
 import type { MatchState } from './types';
 
@@ -24,7 +25,8 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
     if (t.start < 0 || t.start >= t.xs.length) problems.push(`snake ${i}: trail start ${t.start} out of range`);
     const len = trailLength(t);
     if (len > Math.max(0, s.targetLength) + 1e-6) problems.push(`snake ${i}: trail ${len} longer than ${s.targetLength}`);
-    if (s.items.length > Math.max(0, cfg.itemSlots)) problems.push(`snake ${i}: carries ${s.items.length} items (max ${cfg.itemSlots})`);
+    const slots = slotsFor(s, cfg);
+    if (s.items.length > slots) problems.push(`snake ${i}: carries ${s.items.length} items in ${slots} slots (${len} units of body)`);
     for (const item of s.items) {
       if (item.charges < 1) problems.push(`snake ${i}: carries an empty ${item.kind}`);
       if (item.kind === 'shield') problems.push(`snake ${i}: a Shield is taking a slot`);
@@ -43,9 +45,9 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
   });
   const points = state.scores.reduce((a, b) => a + b, 0);
   if (points > state.round) problems.push(`${points} points after ${state.round} rounds`);
-  if (state.pickups.length > Math.max(0, cfg.maxPickups)) {
-    problems.push(`${state.pickups.length} pickups on the field (max ${cfg.maxPickups})`);
-  }
+  // Drops (what a cut or boost shed) don't count: they may take the field past the cap and expire as usual.
+  const spawned = state.pickups.filter((p) => !p.dropped).length;
+  if (spawned > Math.max(0, cfg.maxPickups)) problems.push(`${spawned} spawned pickups on the field (max ${cfg.maxPickups})`);
   for (const p of state.pickups) {
     if (circleHitsWall(p.x, p.y, 0, state.inset)) problems.push(`pickup ${p.id} outside the live area`);
     if (p.ttl <= 0) problems.push(`pickup ${p.id} outlived its lifetime`);

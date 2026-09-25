@@ -11,6 +11,7 @@ import { detectNearMisses } from './nearMiss';
 import { collectPickups, updatePickups } from './pickups';
 import { createRng } from './rng';
 import { advanceSnake, growthRate } from './snake';
+import { shedAtTail } from './storage';
 import { applyFlames } from './flame';
 import { cutBySaws, moveSaws, sawHeads, updateSaws } from './saws';
 import { enterWormholes, updateWormholes } from './wormholes';
@@ -81,6 +82,8 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   state.snakes.forEach((s, i) => {
     if (!s.alive) return;
     if (advanceSnake(s, i, inputs[i] ?? NO_INPUT, cfg, growth, state.grid)) events.push({ type: 'boostStarted', player: i });
+    // Boost burns the tail, and the tail is storage: past a slot boundary the oldest item falls off there.
+    if (s.boosting) shedAtTail(state, i, cfg, events);
     if (s.effects.dozer > 0) {
       const { moved, crushed } = plow(state, i, cfg);
       if (moved > 0 || crushed.length > 0) events.push({ type: 'plowed', player: i, moved, crushed });

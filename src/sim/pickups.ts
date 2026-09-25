@@ -3,6 +3,7 @@ import { forEachSolidPointNear } from './collision';
 import { circleHitsWall } from './arena';
 import { ARENA_HEIGHT, ARENA_WIDTH, TICK_RATE, type Config, type PickupKind } from './config';
 import { createItem } from './items';
+import { slotsFor } from './storage';
 import { rngNext, rngRange, type RngState } from './rng';
 import type { MatchState, PickupState, SimEvent, SnakeState } from './types';
 
@@ -94,14 +95,15 @@ export function updatePickups(state: MatchState, cfg: Config, events: SimEvent[]
     x: spot.x,
     y: spot.y,
     ttl: Math.max(1, Math.round(cfg.pickupLifetime * TICK_RATE)),
+    dropped: false,
   };
   state.pickups.push(pickup);
   events.push({ type: 'pickupSpawned', id: pickup.id, kind, x: pickup.x, y: pickup.y });
 }
 
-/** A Shield needs no bubble already; anything else needs a free item slot. */
+/** A Shield needs no bubble already; anything else needs a free item slot (the body's length says how many there are). */
 function canCarry(s: SnakeState, kind: PickupKind, cfg: Config): boolean {
-  return kind === 'shield' ? !s.shield : s.items.length < cfg.itemSlots;
+  return kind === 'shield' ? !s.shield : s.items.length < slotsFor(s, cfg);
 }
 
 /** Heads with room collect pickups they touch; when both reach one, the closer head wins. */
