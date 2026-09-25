@@ -2,7 +2,7 @@ import { Graphics } from 'pixi.js';
 import { ARENA_HEIGHT, ARENA_WIDTH, TILE_COLS, TILE_SIZE, type SnakeState } from '../../sim';
 import { PALETTE, PICKUP_COLORS } from '../colors';
 import type { ClientSettings } from '../settings';
-import type { World } from './world';
+import { HUD_HEIGHT, type World } from './world';
 
 interface Particle {
   x: number;
@@ -234,11 +234,16 @@ export class Fx {
     const b = this.world.base;
     const shake = calm ? 0 : this.shake;
     const jitter = () => (shake > 0.3 ? (Math.random() * 2 - 1) * shake * b.scale : 0);
+    // The view (centre + zoom) first, then the death punch around its own point, then shake.
+    const view = this.world.view;
+    const s1 = b.scale * view.zoom;
+    const screen = this.world.app.screen;
+    const centerX = screen.width / 2;
+    const centerY = HUD_HEIGHT + (screen.height - HUD_HEIGHT) / 2;
+    const px0 = centerX - view.cx * s1;
+    const py0 = centerY - view.cy * s1;
     const zoom = calm ? 1 : this.camera.zoom;
-    this.world.root.scale.set(b.scale * zoom);
-    this.world.root.position.set(
-      b.x + this.camera.x * b.scale * (1 - zoom) + jitter(),
-      b.y + this.camera.y * b.scale * (1 - zoom) + jitter(),
-    );
+    this.world.root.scale.set(s1 * zoom);
+    this.world.root.position.set(px0 + this.camera.x * s1 * (1 - zoom) + jitter(), py0 + this.camera.y * s1 * (1 - zoom) + jitter());
   }
 }

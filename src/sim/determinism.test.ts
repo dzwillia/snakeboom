@@ -17,7 +17,7 @@ function drive(state: MatchState, bots: BotState[], ticks: number): void {
  * constant (run the test and paste the new value); an unintended change is a determinism regression.
  * Updated 2026-09-25 when Turbo and Slow were removed (M9 Task 1) and again for the closing border and the pace defaults (M9 Tasks 2 and 3), and for the hunt rules (M10).
  */
-const GOLDEN_HASH = 0x8065c881;
+const GOLDEN_HASH = 0xd5f771ca;
 
 describe('determinism', () => {
   it('produces the golden hash for a fixed seed and input script', () => {

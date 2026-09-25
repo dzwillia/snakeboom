@@ -2,6 +2,8 @@ import '@fontsource/orbitron/700.css';
 import '@fontsource/orbitron/900.css';
 import './style.css';
 import {
+  ARENA_HEIGHT,
+  ARENA_WIDTH,
   createMatch,
   createOpponent,
   DEFAULT_CONFIG,
@@ -26,7 +28,9 @@ import { Fx } from './render/fx';
 import { Renderer } from './render/renderer';
 import { applyBloom, createWorld } from './render/world';
 import { Screens } from './screens';
+import { easeView, fitView, followView, type View } from './camera';
 import { deathBeatAt } from './deathBeat';
+import { Minimap } from './render/minimap';
 import { browserStorage, CONFIG_KEY, loadSettings, loadStored, saveStored, SETTINGS_KEY, settingsDefaults } from './settings';
 import { nextOpponent, nextWins, PLAYER_NAMES } from './text';
 import { createTuningPanel } from './tuning';
@@ -64,6 +68,7 @@ async function boot(): Promise<void> {
 
   const world = await createWorld(element('game'), settings);
   const renderer = new Renderer(world);
+  const minimap = new Minimap(world);
   const fx = new Fx(world, settings);
   const hud = new Hud(element('hud'));
   const screens = new Screens(element('screens'));
@@ -143,7 +148,15 @@ async function boot(): Promise<void> {
       fx.setCamera(f ? f.zoom : 1, beat ? beat.x : 0, beat ? beat.y : 0);
       fx.setFlash(f ? f.flash : 0);
       const s = activeState();
+      // The camera: fit every live head locally; follow your own head online.
+      const heads = s ? s.snakes.filter((sn) => sn.alive).map((sn) => ({ x: sn.x, y: sn.y })) : [];
+      let target: View;
+      if (!s) target = { cx: ARENA_WIDTH / 2, cy: ARENA_HEIGHT / 2, zoom: 1 };
+      else if (online && online.localPlayer >= 0 && s.snakes[online.localPlayer]?.alive) target = followView(s.snakes[online.localPlayer], ARENA_WIDTH, ARENA_HEIGHT);
+      else target = fitView(heads, ARENA_WIDTH, ARENA_HEIGHT);
+      world.view = easeView(world.view, target, frameSeconds);
       renderer.draw(s, alpha, activeCfg(), performance.now() / 1000, online?.offsets);
+      minimap.draw(s, world.view);
       fx.update(frameSeconds);
       hud.update(s, activeCfg(), performance.now() / 1000);
       online?.frame(performance.now());

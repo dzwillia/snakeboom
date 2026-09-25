@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAP_COLS, MAP_ROWS } from '../config';
+import { MAP_CELL, MAP_COLS, MAP_ROWS } from '../config';
 import { PI } from '../detmath';
 import { MAP_DEFS, MAPS } from './index';
 import { mapRows, parseMap } from './parse';
@@ -68,9 +68,9 @@ describe('maps', () => {
 
   it('places spawns at cell centers with headings in radians', () => {
     const open = MAPS[0];
-    expect(open.spawns[0]).toEqual({ x: 260, y: 220, heading: 0 });
-    expect(open.spawns[1].x).toBe(1340);
-    expect(open.spawns[1].y).toBe(780);
+    expect(open.spawns[0]).toEqual({ x: 6.5 * MAP_CELL, y: 5.5 * MAP_CELL, heading: 0 });
+    expect(open.spawns[1].x).toBe(33.5 * MAP_CELL);
+    expect(open.spawns[1].y).toBe(19.5 * MAP_CELL);
     expect(open.spawns[1].heading).toBeCloseTo(PI, 12);
   });
 

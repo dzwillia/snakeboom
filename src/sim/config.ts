@@ -1,9 +1,10 @@
-export const ARENA_WIDTH = 1600;
-export const ARENA_HEIGHT = 1000;
+export const ARENA_WIDTH = 3200;
+export const ARENA_HEIGHT = 2000;
 export const TILE_SIZE = 20;
-export const TILE_COLS = 80;
-export const TILE_ROWS = 50;
-export const MAP_CELL = 40;
+export const TILE_COLS = 160;
+export const TILE_ROWS = 100;
+/** A hand-made map cell in units: the 40×25 source grids scale up to the whole arena (4×4 tiles per cell). */
+export const MAP_CELL = 80;
 export const MAP_COLS = 40;
 export const MAP_ROWS = 25;
 export const TICK_RATE = 60;
@@ -94,17 +95,17 @@ export const DEFAULT_CONFIG: Config = {
   overtimeGrowthMultiplier: 3,
   roundMaxSeconds: 45,
   borderCloseSeconds: 15,
-  borderCloseSpeed: 12,
+  borderCloseSpeed: 24,
   borderCrushSpeed: 120,
   boostMultiplier: 2,
   boostBurnPerSecond: 60,
   minLength: 60,
-  maxPickups: 6,
+  maxPickups: 12,
   firstPickupDelay: 0.5,
-  pickupInterval: 1.5,
+  pickupInterval: 1,
   pickupLifetime: 12,
   pickupRadius: 14,
-  pickupMinHeadDistance: 150,
+  pickupMinHeadDistance: 300,
   pickupClearance: 40,
   pickupWeights: { missile: 35, scissors: 20, ghost: 15, shield: 15, dozer: 15 },
   itemSlots: 3,
@@ -137,9 +138,9 @@ export const CLASSIC_CONFIG: Config = {
   overtimeAt: 180,
   roundMaxSeconds: 90,
   borderCloseSeconds: 0,
-  maxPickups: 4,
+  maxPickups: 8,
   firstPickupDelay: 1,
-  pickupInterval: 2.5,
+  pickupInterval: 1.5,
   pickupWeights: { missile: 30, scissors: 0, ghost: 15, shield: 20, dozer: 35 },
   ghostDuration: 3,
   effectWarning: 3,
