@@ -55,7 +55,7 @@ The AI lives in the rules engine (`src/sim/bots/opponent.ts`), so it is determin
 
 Every timed special draws a **countdown ring** around your head in its colour, emptying as the time runs out, with the seconds left just above it, so you never have to look up at the HUD. Timed specials also flash on and off for their last second, on your snake and on the HUD. The tuning panel has a **Classic** preset with the slower v0.7 feel for comparison.
 
-Five hand-made, symmetrical maps rotate between rounds: Open, Pillars, Cross, Bunkers and Lanes.
+Maps rotate between rounds: the five hand-made, symmetrical ones (Open, Pillars, Cross, Bunkers and Lanes) plus three **random** slots per bag, each a fresh layout generated from the match seed when it comes up, built from the same vocabulary (pillars, walls with gaps, lanes and bunkers), point-symmetric so neither player is favoured, and checked so the spawns connect through nearly all of the floor. Round 1 is always Open. The tuning panel's **Maps** folder picks hand-made only, random only or both, and sets how many blocks a random map gets.
 
 ## Online (preview)
 

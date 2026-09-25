@@ -59,6 +59,12 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   match.add(cfg, 'countdownSeconds', 1, 5, 1).name('countdown (s)');
   match.add(cfg, 'roundOverSeconds', 1, 6, 0.5).name('round banner (s)');
 
+  const maps = gui.addFolder('Maps');
+  maps
+    .add(cfg, 'maps', { 'Hand-made and random': 'both', 'Hand-made only': 'handmade', 'Random only': 'random' })
+    .name('rotation (from next round)');
+  maps.add(cfg, 'mapDensity', 0, 1, 0.05).name('random map blocks');
+
   const pickups = gui.addFolder('Pickups');
   pickups.add(cfg, 'maxPickups', 0, 20, 1).name('max on field');
   pickups.add(cfg, 'slotLength', 30, 600, 10).name('body per item slot');
