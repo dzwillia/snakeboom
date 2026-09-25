@@ -127,13 +127,16 @@ function bunker(rng: RngState): number[] {
   return out;
 }
 
-/** One feature, weighted pillars 4 : walls 4 : lanes 2 : bunkers 2. */
-function pickFeature(rng: RngState): number[] {
-  const roll = rngInt(rng, 12);
-  if (roll < 4) return pillar(rng);
-  if (roll < 8) return wall(rng);
-  if (roll < 10) return lane(rng);
-  return bunker(rng);
+/**
+ * One feature, weighted walls 4 : lanes 2 : bunkers 3 : pillars 3. With `structure` set, no pillar:
+ * the first feature of every map is a wall, a lane pair or a bunker, so no map is pillars alone.
+ */
+function pickFeature(rng: RngState, structure: boolean): number[] {
+  const roll = rngInt(rng, structure ? 9 : 12);
+  if (roll < 4) return wall(rng);
+  if (roll < 6) return lane(rng);
+  if (roll < 9) return bunker(rng);
+  return pillar(rng);
 }
 
 /** Marks every cell within MARGIN (Chebyshev) of `cells` as off limits to later features. */
@@ -206,18 +209,21 @@ function attempt(rng: RngState, density: number, layout: SpawnLayout): number[] 
     if (fits(blocked, cells)) add(cells);
   }
 
+  let placed = 0;
   for (let i = 0; i < PLACEMENTS && count < target; i++) {
-    const cells = pickFeature(rng);
+    const cells = pickFeature(rng, placed === 0);
     if (cells.length * 2 > target - count + BUDGET_SLACK) continue;
     const twin = cells.map(mirror);
     if (!fits(blocked, cells) || !fits(blocked, twin)) continue;
     if (sameCells(cells, twin)) {
       add(cells);
+      placed++;
       continue;
     }
     if (near(cells, twin)) continue;
     add(cells);
     add(twin);
+    placed++;
   }
   return solid;
 }
