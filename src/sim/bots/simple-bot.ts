@@ -56,16 +56,12 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
     case 'bomb':
       use = rngNext(bot.rng) < (state.snakes.some((o, j) => j !== idx && o.alive) ? 0.03 : 0);
       break;
-    case 'slow':
     case 'reverse':
       use = rngNext(bot.rng) < (near ? 0.08 : 0.005);
       break;
     case 'ghost':
       // Escape when boxed in; otherwise use it eventually so it doesn't block the queue.
       use = best < LOOK_STEPS / 3 || rngNext(bot.rng) < 0.005;
-      break;
-    case 'turbo':
-      use = best === LOOK_STEPS && rngNext(bot.rng) < 0.01;
       break;
     case 'dozer':
       use = best < LOOK_STEPS / 2 || rngNext(bot.rng) < 0.005;

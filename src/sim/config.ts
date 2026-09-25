@@ -10,7 +10,7 @@ export const TICK_RATE = 60;
 export const DT = 1 / TICK_RATE;
 
 /** What a pickup can contain. */
-export type PickupKind = 'bomb' | 'ghost' | 'shield' | 'turbo' | 'slow' | 'reverse' | 'dozer';
+export type PickupKind = 'bomb' | 'ghost' | 'shield' | 'reverse' | 'dozer';
 
 /** Tunable gameplay values. Seconds and world units unless noted. */
 export interface Config {
@@ -60,14 +60,10 @@ export interface Config {
   /** Fuse given to a bomb caught in another bomb's blast. */
   chainDelay: number;
   ghostDuration: number;
-  /** Timed specials (Ghost, Turbo, Slow, Reverse, Bulldozer) flash for this many seconds before they run out. */
+  /** Timed specials (Ghost, Reverse, Bulldozer) flash for this many seconds before they run out. */
   effectWarning: number;
   /** Invulnerability (except walls) after a Shield absorbs a hit. */
   shieldGrace: number;
-  turboDuration: number;
-  slowDuration: number;
-  /** Speed multiplier while slowed. */
-  slowFactor: number;
   reverseDuration: number;
   /** Seconds a Bulldozer plow lasts. */
   dozerDuration: number;
@@ -101,7 +97,7 @@ export const DEFAULT_CONFIG: Config = {
   pickupRadius: 14,
   pickupMinHeadDistance: 150,
   pickupClearance: 40,
-  pickupWeights: { bomb: 25, ghost: 13, shield: 20, turbo: 20, slow: 20, reverse: 12.5, dozer: 35 },
+  pickupWeights: { bomb: 25, ghost: 13, shield: 20, reverse: 12.5, dozer: 35 },
   itemSlots: 3,
   bombCharges: 3,
   bombThrowCooldown: 0.5,
@@ -113,9 +109,6 @@ export const DEFAULT_CONFIG: Config = {
   ghostDuration: 3,
   effectWarning: 3,
   shieldGrace: 0.5,
-  turboDuration: 4,
-  slowDuration: 4,
-  slowFactor: 0.6,
   reverseDuration: 4,
   dozerDuration: 5,
   hearts: 3,

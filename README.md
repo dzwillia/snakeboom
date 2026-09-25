@@ -25,7 +25,7 @@ Pick an AI level on the title screen's LOCAL row (or in the tuning panel under *
 | Level | How it plays |
 |---|---|
 | **Easy** | Looks under a second ahead, reacts slowly, wanders toward pickups, uses items at random and stays confused by Reverse for a full second. Good for testing a mechanic in peace. |
-| **Normal** | Looks further, replans quickly when something lands in its path, fights for territory and times Slow and Reverse for when you're boxed in. |
+| **Normal** | Looks further, replans quickly when something lands in its path, fights for territory and times Reverse for when you're boxed in. |
 | **Hard** | Plans two and a half seconds ahead every other tick, fights for territory (the floor it can reach before you can), cuts across your line just ahead of your head, boosts to get there, bombs you when you're cornered and reads Reverse instantly. |
 
 The AI lives in the rules engine (`src/sim/bots/opponent.ts`), so it is deterministic and works headlessly: `pnpm soak --bots hard,easy` pits two levels against each other and prints win counts and who hurt whom, `--profile '{"aggression":0.5}'` overrides knobs on the first AI seat, and `--debug 1` prints what the first AI was seeing when it hurt itself. The same code could drive a server-side bot online later. Difficulty levels are a table of knobs (look-ahead, reaction time, aggression, greed, boost use, item skill, mistake rate) at the top of that file.
@@ -42,8 +42,6 @@ The AI lives in the rules engine (`src/sim/bots/opponent.ts`), so it is determin
 | **Bomb ×3** | Thrown ahead of your opponent. A reticle marks the blast zone, and it goes off 1 s after landing. Blasts hit heads (yours too), punch holes through bodies, destroy blocks and set off other bombs. |
 | **Ghost** | For 3 s your head slips through bodies, heads and blocks. Walls and blasts still hit. |
 | **Shield** | A bubble that takes your next hit so you keep your heart. It never takes a slot. |
-| **Turbo** | 4 s of free boost. |
-| **Slow** | Your opponent moves at 60% speed for 4 s. |
 | **Reverse** | Your opponent's left and right are swapped for 4 s. |
 | **Bulldozer** | For 5 s your plow shoves blocks (and crushes the ones it can't move), straight into your opponent if you aim well. |
 

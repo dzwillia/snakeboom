@@ -47,8 +47,6 @@ export interface ItemState {
 /** Timed effects on a snake, in ticks remaining (0 = off). */
 export interface EffectTimers {
   ghost: number;
-  turbo: number;
-  slow: number;
   reverse: number;
   /** Bulldozer: the plow shoves blocks and the head ignores them. */
   dozer: number;
@@ -57,7 +55,7 @@ export interface EffectTimers {
 }
 
 /** Effects announced by effectStarted/effectEnded events (grace is internal). */
-export type EffectName = 'ghost' | 'turbo' | 'slow' | 'reverse' | 'dozer';
+export type EffectName = 'ghost' | 'reverse' | 'dozer';
 
 export interface PickupState {
   id: number;

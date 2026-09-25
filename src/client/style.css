@@ -8,8 +8,6 @@
   --bomb: #ff4d2e;
   --ghost: #e8f4ff;
   --shield: #3dff7a;
-  --turbo: #ffe14d;
-  --slow: #4d7cff;
   --reverse: #b44dff;
   --dozer: #ff9f1c;
   --hud-h: 64px;
@@ -553,14 +551,6 @@ kbd {
   color: var(--shield);
 }
 
-.power[data-kind='turbo'] {
-  color: var(--turbo);
-}
-
-.power[data-kind='slow'] {
-  color: var(--slow);
-}
-
 .power[data-kind='reverse'] {
   color: var(--reverse);
 }
@@ -632,14 +622,6 @@ kbd {
 
 .slot[data-kind='shield'] {
   color: var(--shield);
-}
-
-.slot[data-kind='turbo'] {
-  color: var(--turbo);
-}
-
-.slot[data-kind='slow'] {
-  color: var(--slow);
 }
 
 .slot[data-kind='reverse'] {

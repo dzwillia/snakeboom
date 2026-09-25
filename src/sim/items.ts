@@ -3,7 +3,7 @@ import { detCos, detSin } from './detmath';
 import { snakeSpeed } from './snake';
 import type { EffectName, ItemState, MatchState, SimEvent } from './types';
 
-const ANNOUNCED: EffectName[] = ['ghost', 'turbo', 'slow', 'reverse', 'dozer'];
+const ANNOUNCED: EffectName[] = ['ghost', 'reverse', 'dozer'];
 
 export function createItem(kind: PickupKind, cfg: Config): ItemState {
   return { kind, charges: kind === 'bomb' ? Math.max(1, Math.round(cfg.bombCharges)) : 1 };
@@ -72,12 +72,6 @@ export function useItem(state: MatchState, idx: number, cfg: Config, events: Sim
     }
     case 'ghost':
       startEffect(state, idx, 'ghost', cfg.ghostDuration, events);
-      break;
-    case 'turbo':
-      startEffect(state, idx, 'turbo', cfg.turboDuration, events);
-      break;
-    case 'slow':
-      for (const j of opponents) startEffect(state, j, 'slow', cfg.slowDuration, events);
       break;
     case 'reverse':
       for (const j of opponents) startEffect(state, j, 'reverse', cfg.reverseDuration, events);

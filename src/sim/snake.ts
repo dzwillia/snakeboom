@@ -5,7 +5,7 @@ import { createTrail, trailPush, trailTrim } from './trail';
 import type { EffectTimers, Grid, PlayerInput, SnakeState } from './types';
 
 export function noEffects(): EffectTimers {
-  return { ghost: 0, turbo: 0, slow: 0, reverse: 0, dozer: 0, grace: 0 };
+  return { ghost: 0, reverse: 0, dozer: 0, grace: 0 };
 }
 
 export function createSnake(id: number, x: number, y: number, heading: number, cfg: Config): SnakeState {
@@ -38,13 +38,13 @@ export function growthRate(cfg: Config, overtime: boolean): number {
   return cfg.growthPerSecond * (overtime ? cfg.overtimeGrowthMultiplier : 1);
 }
 
-/** Current speed in units per second: boosting and Slow both multiply. */
+/** Current speed in units per second: base speed, multiplied while boosting. */
 export function snakeSpeed(s: SnakeState, cfg: Config): number {
-  return cfg.baseSpeed * (s.boosting ? cfg.boostMultiplier : 1) * (s.effects.slow > 0 ? cfg.slowFactor : 1);
+  return cfg.baseSpeed * (s.boosting ? cfg.boostMultiplier : 1);
 }
 
 /**
- * Advances a live snake by one tick: boost meter (Turbo makes boosting free), steering
+ * Advances a live snake by one tick: boost meter, steering
  * (Reverse swaps left and right), movement, a new trail point (indexed in the grid), growth
  * and tail trimming. Returns true on the tick boosting starts.
  */
@@ -57,10 +57,9 @@ export function advanceSnake(
   grid: Grid,
 ): boolean {
   const wasBoosting = s.boosting;
-  const turbo = s.effects.turbo > 0;
-  if (input.boost && (s.boostMeter > 0 || turbo)) {
+  if (input.boost && s.boostMeter > 0) {
     s.boosting = true;
-    if (!turbo) s.boostMeter = Math.max(0, s.boostMeter - DT / cfg.boostMeterSeconds);
+    s.boostMeter = Math.max(0, s.boostMeter - DT / cfg.boostMeterSeconds);
   } else {
     s.boosting = false;
     if (!input.boost) s.boostMeter = Math.min(1, s.boostMeter + DT / cfg.boostRefillSeconds);

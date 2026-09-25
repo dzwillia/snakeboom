@@ -83,7 +83,7 @@ describe('bulldozer', () => {
     const c: Config = {
       ...cfg,
       firstPickupDelay: 0,
-      pickupWeights: { bomb: 0, ghost: 0, shield: 0, turbo: 0, slow: 0, reverse: 0, dozer: 1 },
+      pickupWeights: { bomb: 0, ghost: 0, shield: 0, reverse: 0, dozer: 1 },
     };
     const s = createMatch(c, 4);
     s.phase = 'playing';

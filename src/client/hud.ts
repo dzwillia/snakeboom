@@ -2,12 +2,10 @@ import { TICK_RATE, type Config, type EffectName, type MatchState, type SnakeSta
 import { blinkOn } from './blink';
 import { PLAYER_NAMES, describeItem, formatClock } from './text';
 
-const EFFECT_ORDER: EffectName[] = ['dozer', 'ghost', 'turbo', 'slow', 'reverse'];
+const EFFECT_ORDER: EffectName[] = ['dozer', 'ghost', 'reverse'];
 const EFFECT_LABELS: Record<EffectName, string> = {
   dozer: 'DOZER',
   ghost: 'GHOST',
-  turbo: 'TURBO',
-  slow: 'SLOWED',
   reverse: 'REVERSED',
 };
 

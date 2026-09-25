@@ -49,7 +49,7 @@ export function describeRound(
 }
 
 /** The order the Powers page lists pickups in: the same as the title screen's line. */
-export const POWER_ORDER: readonly PickupKind[] = ['bomb', 'ghost', 'shield', 'turbo', 'slow', 'reverse', 'dozer'];
+export const POWER_ORDER: readonly PickupKind[] = ['bomb', 'ghost', 'shield', 'reverse', 'dozer'];
 
 export interface PowerInfo {
   name: string;
@@ -101,18 +101,6 @@ export function describePower(kind: PickupKind, cfg: Config): PowerInfo {
           `A bubble that takes your next hit so you keep the heart, then a moment of grace to get clear. ` +
           `It goes up the moment you collect it, stays until it takes a hit, never takes an item slot, and you can't carry two.`,
       };
-    case 'turbo':
-      return {
-        name: 'TURBO',
-        stats: `${secs(cfg.turboDuration)} · ×${num(cfg.boostMultiplier)} speed · ${share}`,
-        detail: `Free boost: hold Boost as long as you like and the meter doesn't drain.`,
-      };
-    case 'slow':
-      return {
-        name: 'SLOW',
-        stats: `${secs(cfg.slowDuration)} · opponent at ${Math.round(cfg.slowFactor * 100)}% speed · ${share}`,
-        detail: `Your opponent crawls. Their turns get tighter too, so it's a chance to box them in, not a free kill.`,
-      };
     case 'reverse':
       return {
         name: 'REVERSE',
@@ -140,10 +128,6 @@ export function describeItem(item: ItemState | null): string {
       return 'GHOST';
     case 'shield':
       return 'SHIELD';
-    case 'turbo':
-      return 'TURBO';
-    case 'slow':
-      return 'SLOW';
     case 'reverse':
       return 'REVERSE';
     case 'dozer':

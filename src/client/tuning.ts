@@ -67,9 +67,6 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   power.add(cfg, 'ghostDuration', 0.5, 10, 0.25).name('ghost (s)');
   power.add(cfg, 'effectWarning', 0, 10, 0.25).name('expiry warning (s)');
   power.add(cfg, 'shieldGrace', 0, 3, 0.1).name('shield grace (s)');
-  power.add(cfg, 'turboDuration', 0.5, 15, 0.5).name('turbo (s)');
-  power.add(cfg, 'slowDuration', 0.5, 15, 0.5).name('slow (s)');
-  power.add(cfg, 'slowFactor', 0.1, 1, 0.05).name('slow speed ×');
   power.add(cfg, 'reverseDuration', 0.5, 15, 0.5).name('reverse (s)');
   power.add(cfg, 'dozerDuration', 0.5, 15, 0.5).name('bulldozer (s)');
 

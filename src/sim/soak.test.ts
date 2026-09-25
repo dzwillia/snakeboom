@@ -57,7 +57,7 @@ describe('soak', () => {
     [
       'shields only',
       {
-        pickupWeights: { bomb: 0, ghost: 0, shield: 1, turbo: 0, slow: 0, reverse: 0, dozer: 0 },
+        pickupWeights: { bomb: 0, ghost: 0, shield: 1, reverse: 0, dozer: 0 },
         firstPickupDelay: 0,
         pickupInterval: 1,
         maxPickups: 4,
@@ -66,7 +66,7 @@ describe('soak', () => {
     [
       'ghosts only',
       {
-        pickupWeights: { bomb: 0, ghost: 1, shield: 0, turbo: 0, slow: 0, reverse: 0, dozer: 0 },
+        pickupWeights: { bomb: 0, ghost: 1, shield: 0, reverse: 0, dozer: 0 },
         firstPickupDelay: 0,
         pickupInterval: 1,
         maxPickups: 4,
@@ -76,7 +76,7 @@ describe('soak', () => {
     [
       'dozers everywhere',
       {
-        pickupWeights: { bomb: 0, ghost: 0, shield: 0, turbo: 0, slow: 0, reverse: 0, dozer: 1 },
+        pickupWeights: { bomb: 0, ghost: 0, shield: 0, reverse: 0, dozer: 1 },
         firstPickupDelay: 0,
         pickupInterval: 1,
         maxPickups: 4,
@@ -85,7 +85,7 @@ describe('soak', () => {
     ],
     [
       'every power-up at once',
-      { firstPickupDelay: 0, pickupInterval: 0.5, maxPickups: 6, slowFactor: 0.2, turboDuration: 20, reverseDuration: 20 },
+      { firstPickupDelay: 0, pickupInterval: 0.5, maxPickups: 6, reverseDuration: 20 },
     ],
   ];
   for (const [name, overrides] of extremes) {

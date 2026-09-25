@@ -23,11 +23,9 @@ function use(s: MatchState, idx = 0): SimEvent[] {
 }
 
 describe('power-ups', () => {
-  it('Ghost and Turbo affect the user; Slow and Reverse hit the opponent', () => {
+  it('Ghost affects the user; Reverse hits the opponent', () => {
     for (const [kind, target] of [
       ['ghost', 0],
-      ['turbo', 0],
-      ['slow', 1],
       ['reverse', 1],
     ] as const) {
       const s = holding(kind);
@@ -48,10 +46,10 @@ describe('power-ups', () => {
     expect(s.snakes[0].shield).toBe(true);
   });
 
-  it('Slow and Reverse skip dead opponents', () => {
-    const s = holding('slow');
+  it('Reverse skips dead opponents', () => {
+    const s = holding('reverse');
     s.snakes[1].alive = false;
-    expect(use(s)).toEqual([{ type: 'itemUsed', player: 0, kind: 'slow' }]);
+    expect(use(s)).toEqual([{ type: 'itemUsed', player: 0, kind: 'reverse' }]);
   });
 
   it('effects wear off and report it; grace wears off silently', () => {
@@ -65,21 +63,11 @@ describe('power-ups', () => {
     expect(events).toEqual([{ type: 'effectEnded', player: 0, effect: 'ghost' }]);
   });
 
-  it('Slow cuts speed to slowFactor', () => {
+  it('speed is base speed, doubled while boosting', () => {
     const sn = createSnake(0, 800, 500, 0, cfg);
     expect(snakeSpeed(sn, cfg)).toBe(cfg.baseSpeed);
-    sn.effects.slow = 10;
-    expect(snakeSpeed(sn, cfg)).toBeCloseTo(cfg.baseSpeed * cfg.slowFactor, 9);
-  });
-
-  it('Turbo lets you boost without draining the meter, even from empty', () => {
-    const sn = createSnake(0, 400, 500, 0, cfg);
-    sn.boostMeter = 0;
-    sn.effects.turbo = 100;
-    advanceSnake(sn, 0, { turn: 0, boost: true, use: false }, cfg, 0, createGrid(ARENA_WIDTH, ARENA_HEIGHT));
-    expect(sn.boosting).toBe(true);
-    expect(sn.boostMeter).toBe(0);
-    expect(sn.x).toBeCloseTo(400 + (cfg.baseSpeed * cfg.boostMultiplier) / TICK_RATE, 9);
+    sn.boosting = true;
+    expect(snakeSpeed(sn, cfg)).toBeCloseTo(cfg.baseSpeed * cfg.boostMultiplier, 9);
   });
 
   it('Reverse swaps left and right', () => {
@@ -93,11 +81,10 @@ describe('power-ups', () => {
     expect(reversed.heading).toBeCloseTo(-normal.heading, 12);
   });
 
-  // Review Focus 3: the neck stays safe at Slow's tighter turning circle.
-  it('never clips its own neck while slowed and turning at the maximum rate', () => {
+  // The neck stays safe while turning at the maximum rate.
+  it('never clips its own neck while turning at the maximum rate', () => {
     const s = holding('bomb');
     const me = s.snakes[0];
-    me.effects.slow = 10_000;
     for (let t = 0; t < 3 * TICK_RATE; t++) {
       advanceSnake(me, 0, { turn: 1, boost: false, use: false }, cfg, 0, s.grid);
       expect(detectHit(s, 0, cfg)).toBeNull();

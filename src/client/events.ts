@@ -7,8 +7,6 @@ import { describeRound } from './text';
 
 const ITEM_SOUNDS: Partial<Record<PickupKind, SoundName>> = {
   ghost: 'ghost',
-  turbo: 'turbo',
-  slow: 'slow',
   reverse: 'reverse',
   dozer: 'dozer',
 };
