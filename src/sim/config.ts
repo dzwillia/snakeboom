@@ -11,7 +11,7 @@ export const TICK_RATE = 60;
 export const DT = 1 / TICK_RATE;
 
 /** What a pickup can contain. */
-export type PickupKind = 'missile' | 'scissors' | 'ghost' | 'shield' | 'dozer';
+export type PickupKind = 'missile' | 'scissors' | 'flame' | 'ghost' | 'shield' | 'dozer';
 
 /** Tunable gameplay values. Seconds and world units unless noted. */
 export interface Config {
@@ -71,6 +71,12 @@ export interface Config {
   dozerDuration: number;
   /** Seconds the Scissors cut for. */
   scissorsDuration: number;
+  /** Flamethrower: seconds the cone burns. */
+  flameDuration: number;
+  /** How far ahead of the head the fire reaches, in units. */
+  flameRange: number;
+  /** Half-angle of the cone, in radians. */
+  flameSpread: number;
   /** Hits a snake can take per round; the last one kills. */
   hearts: number;
   /** Invulnerability (except walls) after losing a heart. */
@@ -126,7 +132,7 @@ export const DEFAULT_CONFIG: Config = {
   pickupRadius: 14,
   pickupMinHeadDistance: 300,
   pickupClearance: 40,
-  pickupWeights: { missile: 35, scissors: 20, ghost: 15, shield: 15, dozer: 15 },
+  pickupWeights: { missile: 30, scissors: 15, flame: 15, ghost: 15, shield: 15, dozer: 10 },
   itemSlots: 3,
   missileCharges: 3,
   missileCooldown: 0.4,
@@ -140,6 +146,9 @@ export const DEFAULT_CONFIG: Config = {
   shieldGrace: 0.5,
   dozerDuration: 3,
   scissorsDuration: 3,
+  flameDuration: 2.5,
+  flameRange: 150,
+  flameSpread: 0.5,
   hearts: 1,
   heartGrace: 1,
   winsToWin: 5,
@@ -170,7 +179,7 @@ export const CLASSIC_CONFIG: Config = {
   maxPickups: 8,
   firstPickupDelay: 1,
   pickupInterval: 1.5,
-  pickupWeights: { missile: 30, scissors: 0, ghost: 15, shield: 20, dozer: 35 },
+  pickupWeights: { missile: 30, scissors: 0, flame: 0, ghost: 15, shield: 20, dozer: 35 },
   ghostDuration: 3,
   effectWarning: 3,
   dozerDuration: 5,

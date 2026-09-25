@@ -1,10 +1,31 @@
-import { Container, Graphics } from 'pixi.js';
-import { TICK_RATE, type Config, type SnakeState, type Trail } from '../../sim';
+import { Container, Graphics, Text } from 'pixi.js';
+import { TICK_RATE, type Config, type EffectName, type SnakeState, type Trail } from '../../sim';
 import { blinkOn } from '../blink';
 import { PALETTE, PICKUP_COLORS } from '../colors';
 
 /** Points per body chunk. Only the tail and head chunks are redrawn each frame. */
 const CHUNK = 128;
+
+/** The timed specials the head counts down, innermost ring first. */
+const TIMED: EffectName[] = ['dozer', 'scissors', 'flame', 'ghost'];
+/** Countdown ring radius and spacing, in screen pixels (they keep their size whatever the zoom). */
+const RING_PX = 22;
+const RING_GAP_PX = 5;
+const RING_WIDTH_PX = 3;
+const LABEL_PX = 13;
+
+function effectSeconds(cfg: Config, effect: EffectName): number {
+  switch (effect) {
+    case 'dozer':
+      return cfg.dozerDuration;
+    case 'scissors':
+      return cfg.scissorsDuration;
+    case 'flame':
+      return cfg.flameDuration;
+    case 'ghost':
+      return cfg.ghostDuration;
+  }
+}
 
 /** One chunk's two strokes; they live in separate layers so every core sits above every tube. */
 interface Chunk {
@@ -17,6 +38,13 @@ export class SnakeView {
   private readonly tubes = new Container();
   private readonly cores = new Container();
   private readonly head = new Graphics();
+  /** The countdown ring(s) and the seconds left, drawn above the head at a constant screen size. */
+  private readonly timer = new Graphics();
+  private readonly label = new Text({
+    text: '',
+    style: { fontFamily: 'Orbitron, system-ui, sans-serif', fontSize: LABEL_PX, fontWeight: '700', fill: 0xffffff },
+  });
+  private lastLabel = '';
   private readonly chunks = new Map<number, Chunk>();
   private lastHoleVersion = -1;
 
@@ -25,7 +53,9 @@ export class SnakeView {
     private readonly color: number,
   ) {
     const layer = new Container();
-    layer.addChild(this.tubes, this.cores, this.head);
+    this.label.anchor.set(0.5, 1);
+    this.label.visible = false;
+    layer.addChild(this.tubes, this.cores, this.head, this.timer, this.label);
     parent.addChild(layer);
   }
 
@@ -34,6 +64,8 @@ export class SnakeView {
     this.chunks.clear();
     this.lastHoleVersion = -1;
     this.head.clear();
+    this.timer.clear();
+    this.label.visible = false;
     this.setVisible(true);
   }
 
@@ -41,7 +73,8 @@ export class SnakeView {
     this.setVisible(false);
   }
 
-  update(s: SnakeState, alpha: number, cfg: Config, t: number, offset?: { x: number; y: number }): void {
+  /** `worldScale` is screen pixels per world unit, so the countdown can keep its size on screen. */
+  update(s: SnakeState, alpha: number, cfg: Config, t: number, offset?: { x: number; y: number }, worldScale = 1): void {
     this.setVisible(true);
     const radius = cfg.snakeRadius;
     const trail = s.trail;
@@ -77,12 +110,59 @@ export class SnakeView {
       }
     }
     this.drawHead(s, hx, hy, cfg, t);
+    this.drawCountdown(s, hx, hy, cfg, worldScale);
   }
 
   private setVisible(visible: boolean): void {
     this.tubes.visible = visible;
     this.cores.visible = visible;
     this.head.visible = visible;
+    this.timer.visible = visible;
+    if (!visible) this.label.visible = false;
+  }
+
+  /**
+   * One ring per running timed special, in its colour, emptying clockwise from the top as the
+   * time runs out, and the seconds left of the one ending soonest just above the head.
+   */
+  private drawCountdown(s: SnakeState, x: number, y: number, cfg: Config, worldScale: number): void {
+    const g = this.timer;
+    g.clear();
+    const px = 1 / Math.max(1e-6, worldScale);
+    let ring = 0;
+    let soonest: { ticks: number; color: number } | null = null;
+    for (const effect of TIMED) {
+      const ticks = s.effects[effect];
+      if (ticks <= 0) continue;
+      const total = Math.max(1, Math.round(effectSeconds(cfg, effect) * TICK_RATE));
+      const left = Math.min(1, ticks / total);
+      const color = PICKUP_COLORS[effect];
+      const radius = (RING_PX + ring * (RING_GAP_PX + RING_WIDTH_PX)) * px;
+      g.circle(x, y, radius).stroke({ width: RING_WIDTH_PX * px, color, alpha: 0.25 });
+      if (left > 0.002) {
+        const from = -Math.PI / 2;
+        g.moveTo(x + Math.cos(from) * radius, y + Math.sin(from) * radius)
+          .arc(x, y, radius, from, from + Math.PI * 2 * left)
+          .stroke({ width: RING_WIDTH_PX * px, color, alpha: 0.95, cap: 'round' });
+      }
+      if (!soonest || ticks < soonest.ticks) soonest = { ticks, color };
+      ring++;
+    }
+    if (!soonest) {
+      this.label.visible = false;
+      this.lastLabel = '';
+      return;
+    }
+    const text = (soonest.ticks / TICK_RATE).toFixed(1);
+    if (text !== this.lastLabel) {
+      this.lastLabel = text;
+      this.label.text = text;
+    }
+    this.label.style.fill = soonest.color;
+    this.label.scale.set(px);
+    const top = (RING_PX + (ring - 1) * (RING_GAP_PX + RING_WIDTH_PX) + RING_WIDTH_PX + 3) * px;
+    this.label.position.set(x, y - top);
+    this.label.visible = true;
   }
 
   private drawChunk(
@@ -160,6 +240,30 @@ export class SnakeView {
         g.moveTo(x + hx * r * 0.6, y + hy * r * 0.6).lineTo(x + ax * r * 3.2, y + ay * r * 3.2);
       }
       g.stroke({ width: 3, color: PICKUP_COLORS.scissors, cap: 'round' });
+    }
+
+    if (shows(e.flame)) {
+      // A cone of fire: layered tongues that flicker in length and sway, bright at the core.
+      const hx = Math.cos(s.heading);
+      const hy = Math.sin(s.heading);
+      const range = cfg.flameRange;
+      const spread = cfg.flameSpread;
+      const tongues = 7;
+      for (let k = 0; k < tongues; k++) {
+        const a = -spread + ((k + 0.5) / tongues) * spread * 2 + Math.sin(t * 23 + k * 1.7) * 0.06;
+        const len = range * (0.8 + 0.2 * Math.sin(t * 31 + k * 2.3)) * (1 - 0.3 * Math.abs(a) / spread);
+        const dx = hx * Math.cos(a) - hy * Math.sin(a);
+        const dy = hx * Math.sin(a) + hy * Math.cos(a);
+        const w = r * 0.9;
+        const tipX = x + dx * len;
+        const tipY = y + dy * len;
+        g.poly([x + dx * r - dy * w, y + dy * r + dx * w, tipX, tipY, x + dx * r + dy * w, y + dy * r - dx * w])
+          .fill({ color: k % 2 === 0 ? PICKUP_COLORS.flame : 0xffd23f, alpha: 0.45 });
+      }
+      // The hot core.
+      const coreLen = range * (0.45 + 0.1 * Math.sin(t * 40));
+      g.poly([x + hx * r - hy * r * 0.5, y + hy * r + hx * r * 0.5, x + hx * coreLen, y + hy * coreLen, x + hx * r + hy * r * 0.5, y + hy * r - hx * r * 0.5])
+        .fill({ color: 0xffffff, alpha: 0.6 });
     }
 
     if (shows(e.ghost)) {

@@ -45,11 +45,12 @@ The AI lives in the rules engine (`src/sim/bots/opponent.ts`), so it is determin
 |---|---|
 | **Missile ×3** | Fires from your head and homes on your opponent for 2 s. It turns, but not on a dime: a hard cut at the right moment or a boost outruns it, a Shield eats it, and it never hits you. |
 | **Scissors** | For 3 s, running your head across your opponent's body cuts it: everything from there back to their tail falls off, and you pass through. They lose length, boost fuel and any loop they were drawing. Heads, walls, missiles and loops still kill you. |
+| **Flamethrower** | For 2.5 s a cone of fire reaches 150 units ahead of your head. Your opponent's body in it is cut like Scissors would, from a distance; their head in it is torched (a Shield takes the hit, a Ghost doesn't help); their missiles burn up. It never hurts you. |
 | **Ghost** | For 2 s your head slips through bodies, heads and blocks, and a closing loop can't catch you. Walls and missiles still hit. |
 | **Shield** | A bubble that takes your next hit so you keep your heart. It never takes a slot. |
 | **Bulldozer** | For 3 s your plow shoves blocks (and crushes the ones it can't move), straight into your opponent if you aim well. |
 
-Timed specials flash on and off for their last second, on your snake and on the HUD. The tuning panel has a **Classic** preset with the slower v0.7 feel for comparison.
+Every timed special draws a **countdown ring** around your head in its colour, emptying as the time runs out, with the seconds left just above it, so you never have to look up at the HUD. Timed specials also flash on and off for their last second, on your snake and on the HUD. The tuning panel has a **Classic** preset with the slower v0.7 feel for comparison.
 
 Five hand-made, symmetrical maps rotate between rounds: Open, Pillars, Cross, Bunkers and Lanes.
 

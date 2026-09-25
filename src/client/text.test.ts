@@ -24,6 +24,7 @@ describe('text', () => {
     expect(describeDeath(d(0, 'missile', 1))).toBe('CYAN was shot down by PINK');
     expect(describeDeath(d(0, 'headOn', 1))).toBe('Head-on collision');
     expect(describeDeath(d(1, 'saw', null))).toBe('PINK ran into the saw');
+    expect(describeDeath(d(1, 'flame', 0))).toBe('PINK was torched by CYAN');
   });
 
   it('titles the round and merges duplicate lines', () => {
@@ -80,7 +81,7 @@ describe('text', () => {
   });
 
   it('turns pickup weights into spawn percentages', () => {
-    const cfg = { ...DEFAULT_CONFIG, pickupWeights: { missile: 50, scissors: 0, ghost: 25, shield: 25, dozer: 0 } };
+    const cfg = { ...DEFAULT_CONFIG, pickupWeights: { missile: 50, scissors: 0, flame: 0, ghost: 25, shield: 25, dozer: 0 } };
     expect(spawnShare('missile', cfg)).toBe(50);
     expect(spawnShare('dozer', cfg)).toBe(0);
     const none = { ...cfg, pickupWeights: { ...cfg.pickupWeights, missile: 0, ghost: 0, shield: 0 } };

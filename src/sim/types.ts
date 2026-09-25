@@ -4,7 +4,7 @@ import type { RngState } from './rng';
 export type Phase = 'countdown' | 'playing' | 'roundOver' | 'matchOver';
 
 /** Listed in reporting priority order (spec 3.3). */
-export type DeathCause = 'missile' | 'encircled' | 'saw' | 'headOn' | 'body' | 'obstacle' | 'wall';
+export type DeathCause = 'missile' | 'encircled' | 'saw' | 'flame' | 'headOn' | 'body' | 'obstacle' | 'wall';
 
 export interface PlayerInput {
   turn: -1 | 0 | 1;
@@ -51,12 +51,14 @@ export interface EffectTimers {
   scissors: number;
   /** Bulldozer: the plow shoves blocks and the head ignores them. */
   dozer: number;
+  /** Flamethrower: a cone of fire ahead of the head cuts bodies, kills heads and burns missiles. */
+  flame: number;
   /** Shield grace: immune to everything except walls. */
   grace: number;
 }
 
 /** Effects announced by effectStarted/effectEnded events (grace is internal). */
-export type EffectName = 'ghost' | 'scissors' | 'dozer';
+export type EffectName = 'ghost' | 'scissors' | 'dozer' | 'flame';
 
 export interface PickupState {
   id: number;

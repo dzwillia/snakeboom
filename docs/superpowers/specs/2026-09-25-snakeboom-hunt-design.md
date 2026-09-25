@@ -51,6 +51,15 @@ Shipped as v0.14.0 after this spec. See the M12 plan for the reasoning; the rule
 - **Events:** `wormholeOpened` / `wormholeClosed` / `warped`, `sawSpawned` / `sawGone`. All cosmetic for the net gate (played once, predicted).
 - **Classic preset:** both hazards off (`wormholeInterval` 0, `sawInterval` 0).
 
+## 3b. M13 addendum: the flamethrower and the head countdown (2026-09-26)
+
+Shipped as v0.15.0. See the M13 plan.
+
+- **Flamethrower** (`flameDuration` 2.5 s, `flameRange` 150, `flameSpread` 0.5 rad): a timed special; while it burns, the cone ahead of the head (within range + r and spread of the heading, tested with `detAtan2`/`wrapAngle`) cuts the opponent's body at the newest burning point via the shared `cutTrail` (the `cut` event's `by` is the flamer), marks the opponent's head for a hit with cause `flame` (after `saw`, before `headOn`; a Shield or spare heart takes it with no push, like a missile; grace ignores it; Ghost does not protect), and burns up the opponent's missiles (`missileFizzled`). Own body and own missiles are never touched; blocks, pickups, saws and wormholes are ignored (no line of sight). Runs after the saw cuts, before missiles resolve.
+- **Mix:** missile 30 · scissors 15 · flame 15 · ghost 15 · shield 15 · dozer 10. Classic: flame 0.
+- **Head countdown:** for every running timed special (Bulldozer, Scissors, Flame, Ghost) the client draws a ring around the head in the special's colour, emptying clockwise from the top in proportion to ticks left over the special's configured duration, and the seconds left (one decimal) above the head. Ring radius 22 px, 3 px wide, stacked 8 px apart, sized in screen pixels via the world scale. Several specials: the label follows the one ending soonest. The HUD chips and the last-second blink stay.
+- **AI:** lights the flame when the opponent is within 1.3× range and at least 0.6 ahead (cosine), with a chance scaled by `itemSkill`; treats the opponent's cone (from their predicted position, at their current heading, while their timer runs) as a rollout hazard.
+
 ## 4. Feel
 
 - **Encirclement:** the loop flashes in the looper's colour and shrinks onto the victim over the death beat, with a "snap" sound. The banner reads "CYAN ENCIRCLED PINK".

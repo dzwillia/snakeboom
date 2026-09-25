@@ -10,10 +10,10 @@ describe('Screens powers', () => {
     const screens = new Screens(root);
     screens.powers(DEFAULT_CONFIG);
     expect(screens.showing).toBe('powers');
-    for (const kind of ['missile', 'scissors', 'ghost', 'shield', 'dozer']) {
+    for (const kind of ['missile', 'scissors', 'flame', 'ghost', 'shield', 'dozer']) {
       expect(root.innerHTML).toContain(`data-kind="${kind}"`);
     }
-    expect((root.innerHTML.match(/<svg /g) ?? []).length).toBe(5);
+    expect((root.innerHTML.match(/<svg /g) ?? []).length).toBe(6);
     expect(root.innerHTML).toContain(`${DEFAULT_CONFIG.missileLife} s of flight`);
     expect(root.innerHTML).toContain('BACK TO TITLE');
     screens.powers(DEFAULT_CONFIG, 'pause');

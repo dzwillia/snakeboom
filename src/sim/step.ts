@@ -11,6 +11,7 @@ import { detectNearMisses } from './nearMiss';
 import { collectPickups, updatePickups } from './pickups';
 import { createRng } from './rng';
 import { advanceSnake, growthRate } from './snake';
+import { applyFlames } from './flame';
 import { cutBySaws, moveSaws, sawHeads, updateSaws } from './saws';
 import { enterWormholes, updateWormholes } from './wormholes';
 import { tryHeart, tryShield } from './shield';
@@ -86,6 +87,7 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   collectPickups(state, cfg, events);
   applyScissors(state, cfg, events);
   cutBySaws(state, cfg, events);
+  const torched = applyFlames(state, cfg, events);
   const missiled = updateMissiles(state, cfg, events);
   const sawn = sawHeads(state, cfg);
 
@@ -104,6 +106,11 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
     // The saw cuts through Ghosts too; only grace (a Shield or heart just spent) ignores it.
     if (sawn.has(i) && s.effects.grace <= 0) {
       hits.push({ player: i, cause: 'saw', killer: null, x: s.x, y: s.y });
+      return;
+    }
+    const flamer = torched.get(i);
+    if (flamer !== undefined && s.effects.grace <= 0) {
+      hits.push({ player: i, cause: 'flame', killer: flamer, x: s.x, y: s.y });
       return;
     }
     const hit = detectHit(state, i, cfg);

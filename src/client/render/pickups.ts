@@ -45,6 +45,18 @@ function drawGlyph(g: Graphics, kind: PickupKind, x: number, y: number, s: numbe
       g.circle(x + s * 0.7, y + s * 0.5, s * 0.26).stroke({ width: 2, color });
       g.circle(x + s * 0.7, y - s * 0.5, s * 0.26).stroke({ width: 2, color });
       break;
+    case 'flame':
+      // A flame: a teardrop with a licking tip and a dark hollow at the base.
+      g.moveTo(x, y - s * 0.95)
+        .bezierCurveTo(x + s * 0.55, y - s * 0.45, x + s * 0.75, y - s * 0.1, x + s * 0.7, y + s * 0.3)
+        .bezierCurveTo(x + s * 0.65, y + s * 0.7, x + s * 0.35, y + s * 0.95, x, y + s * 0.95)
+        .bezierCurveTo(x - s * 0.35, y + s * 0.95, x - s * 0.65, y + s * 0.7, x - s * 0.7, y + s * 0.3)
+        .bezierCurveTo(x - s * 0.75, y - s * 0.05, x - s * 0.5, y - s * 0.35, x - s * 0.3, y - s * 0.5)
+        .bezierCurveTo(x - s * 0.3, y - s * 0.15, x - s * 0.15, y, x, y + s * 0.05)
+        .bezierCurveTo(x + s * 0.15, y - s * 0.25, x + s * 0.15, y - s * 0.6, x, y - s * 0.95)
+        .fill({ color });
+      g.circle(x, y + s * 0.5, s * 0.25).fill({ color: PALETTE.background, alpha: 0.7 });
+      break;
     case 'ghost':
       g.circle(x, y - s * 0.15, s * 0.6).fill({ color });
       g.rect(x - s * 0.6, y - s * 0.15, s * 1.2, s * 0.75).fill({ color });

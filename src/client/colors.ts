@@ -18,6 +18,7 @@ export const PALETTE = {
 export const PICKUP_COLORS: Record<PickupKind, number> = {
   missile: 0xff4d2e,
   scissors: 0xff7ad9,
+  flame: 0xff7a1a,
   ghost: 0xe8f4ff,
   shield: 0x3dff7a,
   dozer: 0xff9f1c,

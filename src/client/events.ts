@@ -9,6 +9,7 @@ const ITEM_SOUNDS: Partial<Record<PickupKind, SoundName>> = {
   ghost: 'ghost',
   scissors: 'scissors',
   dozer: 'dozer',
+  flame: 'flame',
 };
 
 export interface DeathBeat {

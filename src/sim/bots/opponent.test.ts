@@ -109,7 +109,8 @@ describe('AI opponent', () => {
   it(
     'plays a lot better than the soak bot',
     () => {
-      const { wins, deaths } = duel(['hard', 'simple'], 6, 7);
+      // 12 rounds: with one life, fire and saws, a 6-round sample on one seed can land 4–2.
+      const { wins, deaths } = duel(['hard', 'simple'], 12, 7);
       expect(wins[0]).toBeGreaterThan(wins[1] * 3);
       expect(deaths[0]).toBeLessThan(deaths[1]);
     },

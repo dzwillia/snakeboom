@@ -7,6 +7,7 @@
   --red: #ff3b3b;
   --missile: #ff4d2e;
   --scissors: #ff7ad9;
+  --flame: #ff7a1a;
   --ghost: #e8f4ff;
   --shield: #3dff7a;
   --dozer: #ff9f1c;
@@ -547,6 +548,10 @@ kbd {
   color: var(--scissors);
 }
 
+.power[data-kind='flame'] {
+  color: var(--flame);
+}
+
 .power[data-kind='ghost'] {
   color: var(--ghost);
 }
@@ -618,6 +623,10 @@ kbd {
 
 .slot[data-kind='scissors'] {
   color: var(--scissors);
+}
+
+.slot[data-kind='flame'] {
+  color: var(--flame);
 }
 
 .slot[data-kind='ghost'] {

@@ -32,6 +32,8 @@ export function describeDeath(d: DeathRecord, names: readonly string[] = PLAYER_
       return `${killer} encircled ${victim}`;
     case 'saw':
       return `${victim} ran into the saw`;
+    case 'flame':
+      return `${victim} was torched by ${killer}`;
   }
 }
 
@@ -51,7 +53,7 @@ export function describeRound(
 }
 
 /** The order the Powers page lists pickups in: the same as the title screen's line. */
-export const POWER_ORDER: readonly PickupKind[] = ['missile', 'scissors', 'ghost', 'shield', 'dozer'];
+export const POWER_ORDER: readonly PickupKind[] = ['missile', 'scissors', 'flame', 'ghost', 'shield', 'dozer'];
 
 export interface PowerInfo {
   name: string;
@@ -110,6 +112,14 @@ export function describePower(kind: PickupKind, cfg: Config): PowerInfo {
           `Run your head across your opponent's body and it's cut: everything from there back to their tail falls off, ` +
           `and you pass through instead of dying. They lose length, boost fuel and any loop they were drawing. Heads, walls, missiles and loops still kill you.`,
       };
+    case 'flame':
+      return {
+        name: 'FLAMETHROWER',
+        stats: `${secs(cfg.flameDuration)} · ${num(cfg.flameRange)} units of reach · ${share}`,
+        detail:
+          `A cone of fire ahead of your head. Your opponent's body in it is cut like Scissors would, from a distance; ` +
+          `their head in it is torched (a Shield takes the hit, a Ghost doesn't help); their missiles burn up. It never hurts you.`,
+      };
     case 'dozer':
       return {
         name: 'BULLDOZER',
@@ -133,6 +143,8 @@ export function describeItem(item: ItemState | null): string {
       return 'SHIELD';
     case 'scissors':
       return 'SCISSORS';
+    case 'flame':
+      return 'FLAME';
     case 'dozer':
       return 'DOZER';
   }

@@ -22,7 +22,7 @@ export class Renderer {
   private lastTiles: readonly number[] | null = null;
   private lastTilesVersion = -1;
 
-  constructor(world: World) {
+  constructor(private readonly world: World) {
     this.arena = new ArenaView(world);
     this.pickups = new PickupView(world.glow);
     this.snakes = PLAYER_COLORS.map((color) => new SnakeView(world.glow, color));
@@ -61,10 +61,12 @@ export class Renderer {
     this.arena.setAlert(state.overtime && state.phase === 'playing', timeSeconds);
     this.wormholes.draw(state.wormholes, cfg, timeSeconds);
     this.pickups.draw(state.pickups, cfg, timeSeconds);
+    // Screen pixels per world unit as of the last frame, for things that keep their size on screen.
+    const worldScale = this.world.base.scale * this.world.view.zoom;
     state.snakes.forEach((s, i) => {
       const view = this.snakes[i];
       if (!view) return;
-      if (s.alive) view.update(s, state.phase === 'playing' ? alpha : 1, cfg, timeSeconds, offsets?.[i]);
+      if (s.alive) view.update(s, state.phase === 'playing' ? alpha : 1, cfg, timeSeconds, offsets?.[i], worldScale);
       else view.hide();
     });
     this.missiles.draw(state.missiles, cfg, timeSeconds);
