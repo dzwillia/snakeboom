@@ -622,11 +622,17 @@ kbd {
   opacity: 0.7;
 }
 
-.slot.next,
+/* The selected item (what Fire uses) and active chips glow; other carried items sit dimmer. */
+.slot.selected,
 .slot.chip {
   opacity: 1;
   box-shadow: 0 0 10px currentColor;
   text-shadow: 0 0 8px currentColor;
+}
+
+.slot.selected {
+  outline: 1px solid currentColor;
+  outline-offset: 1px;
 }
 
 .slot[data-kind='missile'] {

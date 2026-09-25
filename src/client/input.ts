@@ -1,10 +1,11 @@
 import type { PlayerInput } from '../sim';
 import { BINDINGS, GAME_KEYS, inputFromKeys } from './keys';
 
-/** Tracks held keys and latches Use presses between sim ticks. */
+/** Tracks held keys and latches Fire and Select presses between sim ticks. */
 export class KeyboardInput {
   private readonly down = new Set<string>();
   private readonly useLatched = BINDINGS.map(() => false);
+  private readonly selectLatched = BINDINGS.map(() => false);
   private readonly keyHandlers: Array<(code: string) => void> = [];
   private readonly blurHandlers: Array<() => void> = [];
 
@@ -28,28 +29,29 @@ export class KeyboardInput {
     return this.down.has(code);
   }
 
-  /** Inputs for one sim tick; consumes latched Use presses. */
+  /** Inputs for one sim tick; consumes latched Fire and Select presses. */
   sample(): PlayerInput[] {
-    const out = BINDINGS.map((b, i) => inputFromKeys(this.down, b, this.useLatched[i]));
-    this.useLatched.fill(false);
+    const out = BINDINGS.map((b, i) => inputFromKeys(this.down, b, this.useLatched[i], this.selectLatched[i]));
+    this.clearLatches();
     return out;
   }
 
   /**
    * Online, one person owns the keyboard: either hand steers the local snake. Both hands turning
-   * different ways cancel out; Boost and Use come from either. Consumes both Use latches.
+   * different ways cancel out; Boost, Fire and Select come from either. Consumes both sets of latches.
    */
   sampleLocal(): PlayerInput {
-    const a = inputFromKeys(this.down, BINDINGS[0], this.useLatched[0]);
-    const b = inputFromKeys(this.down, BINDINGS[1], this.useLatched[1]);
-    this.useLatched.fill(false);
+    const a = inputFromKeys(this.down, BINDINGS[0], this.useLatched[0], this.selectLatched[0]);
+    const b = inputFromKeys(this.down, BINDINGS[1], this.useLatched[1], this.selectLatched[1]);
+    this.clearLatches();
     const turn = a.turn === 0 ? b.turn : b.turn === 0 || b.turn === a.turn ? a.turn : 0;
-    return { turn, boost: a.boost || b.boost, use: a.use || b.use };
+    return { turn, boost: a.boost || b.boost, use: a.use || b.use, select: a.select || b.select };
   }
 
-  /** Forgets pending Use presses (pausing and resuming must not fire items). */
+  /** Forgets pending Fire and Select presses (pausing and resuming must not fire items). */
   clearLatches(): void {
     this.useLatched.fill(false);
+    this.selectLatched.fill(false);
   }
 
   private onKeyDown(e: KeyboardEvent): void {
@@ -60,13 +62,14 @@ export class KeyboardInput {
     this.down.add(e.code);
     BINDINGS.forEach((b, i) => {
       if (e.code === b.use) this.useLatched[i] = true;
+      if (e.code === b.select) this.selectLatched[i] = true;
     });
     for (const handler of this.keyHandlers) handler(e.code);
   }
 
   private releaseAll(): void {
     this.down.clear();
-    this.useLatched.fill(false);
+    this.clearLatches();
     for (const handler of this.blurHandlers) handler();
   }
 }
