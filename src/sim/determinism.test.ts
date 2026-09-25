@@ -19,8 +19,9 @@ function drive(state: MatchState, bots: BotState[], ticks: number): void {
  * Updated 2026-09-26 for item selection (#28): SnakeState.selected joined the hashed state.
  * Unchanged by length-as-storage (M14): tick 4000 falls in a countdown with no pickups out, and the simple bots fire what they grab at once.
  * Updated 2026-09-26 for collecting by loop and the wider pickup clearance (M15); re-pinned after the rebase.
+ * Updated 2026-09-26 for random maps (M16): the bag now holds eight entries and a random slot draws from the rng in startRound.
  */
-const GOLDEN_HASH = 0xf5770070;
+const GOLDEN_HASH = 0x20521787;
 
 describe('determinism', () => {
   it('produces the golden hash for a fixed seed and input script', () => {

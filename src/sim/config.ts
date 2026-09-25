@@ -13,6 +13,10 @@ export const DT = 1 / TICK_RATE;
 /** What a pickup can contain. */
 export type PickupKind = 'missile' | 'scissors' | 'flame' | 'ghost' | 'shield' | 'dozer';
 
+/** Which maps the bag deals: the five hand-made ones, freshly generated ones, or both. */
+export type MapMode = 'handmade' | 'random' | 'both';
+export const MAP_MODES: readonly MapMode[] = ['handmade', 'random', 'both'];
+
 /** Tunable gameplay values. Seconds and world units unless noted. */
 export interface Config {
   snakeRadius: number;
@@ -107,6 +111,10 @@ export interface Config {
   sawSpeed: number;
   /** A saw appears at least this far from every head. */
   sawMinHeadDistance: number;
+  /** Which maps rotate between rounds. Round 1 is Open unless this is 'random'. */
+  maps: MapMode;
+  /** 0–1: how many blocks a generated map gets, as a share of the most the generator places (15% of cells). 0.3 matches the hand-made maps. */
+  mapDensity: number;
 }
 
 /**
@@ -170,6 +178,8 @@ export const DEFAULT_CONFIG: Config = {
   sawRadius: 34,
   sawSpeed: 180,
   sawMinHeadDistance: 400,
+  maps: 'both',
+  mapDensity: 0.3,
 };
 
 /** The v0.7.0 feel (three hearts, slower and longer rounds), for side-by-side tuning sessions. Not a game mode. */
@@ -193,4 +203,5 @@ export const CLASSIC_CONFIG: Config = {
   hearts: 3,
   wormholeInterval: 0,
   sawInterval: 0,
+  maps: 'handmade',
 };

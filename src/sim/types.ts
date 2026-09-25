@@ -169,9 +169,12 @@ export interface MatchState {
   scores: number[];
   matchWinner: number | null;
   lastRoundWinner: number | null;
+  /** Index into the map catalogue for the current `maps` setting (hand-made maps first, then random slots). */
   mapIndex: number;
   /** Remaining shuffled map indices; popped from the end. */
   mapBag: number[];
+  /** The map this round is on: a hand-made name, or "Random" for a generated layout. */
+  mapName: string;
   rng: RngState;
   /** TILE_COLS * TILE_ROWS entries, 1 = solid. Replaced (new array) at each round start. */
   tiles: number[];

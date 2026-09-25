@@ -1,6 +1,6 @@
 export * from './config';
 export * from './types';
-export { MAPS } from './maps';
+export { generateMap, mapCatalogue, MAPS, RANDOM_SLOTS, type GeneratedMap, type MapEntry } from './maps';
 export { cloneState, createMatch } from './state';
 export { rematch, step } from './step';
 export { checkInvariants } from './invariants';
