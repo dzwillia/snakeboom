@@ -244,7 +244,7 @@ describe('relay server', () => {
     a.send({ type: 'leave' });
     await a.waitClosed();
     // The empty room lingers (its link still works), but it no longer holds the name.
-    expect(server.registry.get('reuse-me')?.room.empty).toBe(true);
+    expect(server.registry.get('reuse-me')?.room.abandoned).toBe(true);
     const b = new TestClient(server.port);
     await b.opened;
     b.send(hello('B'));
@@ -252,6 +252,35 @@ describe('relay server', () => {
     expect((await b.expect('welcome')).room).toBe('reuse-me');
     expect(server.registry.get('reuse-me')?.room.playerCount).toBe(1);
     b.close();
+  });
+
+  it('keeps a name while a match is waiting for its players to come back', async () => {
+    const a = new TestClient(server.port);
+    const b = new TestClient(server.port);
+    await Promise.all([a.opened, b.opened]);
+    a.send(hello('A'));
+    a.send({ type: 'create', winsToWin: 1, name: 'mid-match' });
+    await a.expect('welcome');
+    b.send(hello('B'));
+    b.send({ type: 'join', room: 'mid-match' });
+    await b.expect('welcome');
+    a.send({ type: 'ready', ready: true });
+    b.send({ type: 'ready', ready: true });
+    await a.expect('start');
+    // Both tabs drop: nobody is connected, but either can rejoin for 15 s, so the name is still in use.
+    a.close();
+    b.close();
+    await Promise.all([a.waitClosed(), b.waitClosed()]);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(server.registry.get('mid-match')?.room.playerCount).toBe(0);
+    expect(server.registry.get('mid-match')?.room.abandoned).toBe(false);
+    const c = new TestClient(server.port);
+    await c.opened;
+    c.send(hello('C'));
+    c.send({ type: 'create', winsToWin: 5, name: 'mid-match' });
+    expect((await c.expect('error')).message).toMatch(/is taken/);
+    c.close();
+    server.registry.get('mid-match')?.room.close('idle');
   });
 
   it('keeps names and codes apart: "ABC234" as a name is the room abc234, not the code', async () => {

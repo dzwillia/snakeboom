@@ -144,7 +144,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         // Named rooms count against the same per-address limit, so nobody can squat a list of names.
         if (!creations.allow(conn.ip, Date.now())) return slowDown(conn);
         const holder = name === undefined ? undefined : registry.get(name);
-        if (holder && !holder.room.empty) {
+        if (holder && !holder.room.abandoned) {
           log({ event: 'nameTaken', room: name });
           return send(conn.socket, { type: 'error', code: 'roomName', message: `"${name}" is taken right now. Try another name.` });
         }
