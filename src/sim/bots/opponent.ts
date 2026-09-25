@@ -2,7 +2,7 @@ import { circleHitsTiles, circleHitsWall } from '../arena';
 import { insetAt } from '../border';
 import { forEachSolidPointNear } from '../collision';
 import { DT, TILE_COLS, TILE_ROWS, TILE_SIZE, type Config } from '../config';
-import { detCos, detSin } from '../detmath';
+import { detAtan2, detCos, detSin, wrapAngle } from '../detmath';
 import { createRng, rngInt, rngNext, type RngState } from '../rng';
 import { headCum } from '../trail';
 import { NO_INPUT, type MatchState, type PlayerInput, type SnakeState } from '../types';
@@ -177,6 +177,10 @@ interface Ctx {
   dozerTicks: number;
   /** Ticks during which the opponent's body is a thing to cut, not to die on. */
   scissorTicks: number;
+  /** Ticks during which missiles can't hurt (grace). */
+  graceTicks: number;
+  /** Live missiles that can hit me: where they are, where they point, how long they have. */
+  missiles: { x: number; y: number; heading: number; ttl: number }[];
   opp: SnakeState | null;
   /** The opponent's predicted head position at each step, holding course. */
   oppX: number[];
@@ -278,6 +282,8 @@ function buildCtx(state: MatchState, idx: number, cfg: Config, look: number): Ct
     // Bulldozer a beat before it runs out.
     dozerTicks: Math.max(0, me.effects.dozer - DOZER_MARGIN),
     scissorTicks: Math.max(0, me.effects.scissors - DOZER_MARGIN),
+    graceTicks: me.effects.grace,
+    missiles: state.missiles.filter((m) => m.owner !== idx).map((m) => ({ x: m.x, y: m.y, heading: m.heading, ttl: m.ttl })),
     opp,
     oppX,
     oppY,
@@ -302,6 +308,14 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
   let y = me.y;
   let h = me.heading;
   let cut = false;
+  // Missiles chase the path being planned: pure pursuit at their real speed and turn rate.
+  const mx = ctx.missiles.map((m) => m.x);
+  const my = ctx.missiles.map((m) => m.y);
+  const mh = ctx.missiles.map((m) => m.heading);
+  const missileStep = cfg.missileSpeed * DT * STEP_TICKS;
+  const missileTurn = cfg.missileTurnRate * DT * STEP_TICKS;
+  const missileReach = cfg.missileRadius + r + 8;
+  const missileReach2 = missileReach * missileReach;
   let seg = 0;
   let segEnd = holds.length > 0 ? holds[0] : Infinity;
   const probe = { blocked: false };
@@ -321,6 +335,15 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
 
     // Walls are exact, and a deflection leaves the head only half a pixel clear of one.
     if (circleHitsWall(x, y, r + 1, insetAt(state, cfg, tick))) return fail();
+    for (let m = 0; m < mx.length; m++) {
+      if (ctx.missiles[m].ttl < tick) continue;
+      const want = detAtan2(y - my[m], x - mx[m]);
+      const delta = wrapAngle(want - mh[m]);
+      mh[m] = wrapAngle(mh[m] + Math.max(-missileTurn, Math.min(missileTurn, delta)));
+      mx[m] += detCos(mh[m]) * missileStep;
+      my[m] += detSin(mh[m]) * missileStep;
+      if (tick > ctx.graceTicks && dist2(mx[m], my[m], x, y) < missileReach2) return fail();
+    }
     if (tick > ctx.protectedTicks) {
       if (tick > ctx.dozerTicks && circleHitsTiles(state.tiles, x, y, r + 2)) return fail();
       // Own body is safe (hunt rules): only the opponent's points block, and not while the scissors are out.
@@ -576,6 +599,15 @@ function wantBoost(ctx: Ctx, bot: OpponentState, best: Plan, goal: Goal | null):
     const far = dist2(goal.x, goal.y, me.x, me.y) > 200 * 200;
     const toward = Math.sqrt(dist2(goal.x, goal.y, me.x, me.y)) - Math.sqrt(dist2(goal.x, goal.y, best.x, best.y));
     reason = far && toward > best.pathLen * 0.5;
+  }
+  // A missile closing in: boosting is the one thing that outruns it, whatever the goal says.
+  for (const m of ctx.missiles) {
+    const d2 = dist2(m.x, m.y, me.x, me.y);
+    const closing = (me.x - m.x) * detCos(m.heading) + (me.y - m.y) * detSin(m.heading) > 0;
+    if (d2 < 260 * 260 && closing) {
+      reason = true;
+      break;
+    }
   }
   if (!reason || rngNext(bot.rng) >= p.boostUse) return false;
   // Only if the same line is still clear at boost speed.
