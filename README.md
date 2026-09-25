@@ -79,7 +79,7 @@ To play across a LAN, run the relay on one machine and point the other at it: `V
 
 ## Hosting
 
-The site and the relay ship as two Docker images (`Dockerfile.web`, `Dockerfile.api`) and run behind the shared Caddy on the Happy Path box. A `v*` tag builds, pushes and deploys them through `.github/workflows/deploy.yml`. The runbook, including the one-time setup, is in [`infra/README.md`](infra/README.md).
+The site and the relay ship as two Docker images (`Dockerfile.web`, `Dockerfile.api`) and run behind the shared Caddy on the Happy Path box. A `v*` tag builds, pushes and deploys them through `.github/workflows/deploy.yml`; the tag is baked into the site as the version shown in the corner of the title screen (a local build shows `v0.x.y-dev`). The runbook, including the one-time setup, is in [`infra/README.md`](infra/README.md).
 
 ## Develop
 

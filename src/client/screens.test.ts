@@ -45,6 +45,19 @@ describe('Screens title', () => {
     expect(root.innerHTML).toContain('use item</p></div>\n          <div class="p2">');
   });
 
+  it('shows the build version on the title and pause screens', () => {
+    const root = fakeRoot();
+    const screens = new Screens(root, 'v0.16.0');
+    screens.title({ row: 'local', winsToWin: 5, hearts: 1, opponent: 'human' });
+    expect(root.innerHTML).toContain('<div class="version" title="The build you are playing">v0.16.0</div>');
+    screens.paused();
+    expect(root.innerHTML).toContain('v0.16.0');
+  });
+
+  it('defaults to the version Vite baked in', () => {
+    expect(new Screens(fakeRoot()).version).toMatch(/^v\d+\.\d+\.\d+/);
+  });
+
   it("shows PINK's seat as the AI when an AI level is chosen", () => {
     const root = fakeRoot();
     new Screens(root).title({ row: 'local', winsToWin: 5, hearts: 3, opponent: 'hard' });

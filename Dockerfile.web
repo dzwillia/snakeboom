@@ -8,6 +8,9 @@ COPY tsconfig.json vite.config.ts index.html ./
 COPY src ./src
 ARG VITE_API_URL=https://api.snakeboom.com
 ENV VITE_API_URL=$VITE_API_URL
+# The git tag, shown on the title screen; without it the build reads as a dev build.
+ARG APP_VERSION=
+ENV APP_VERSION=$APP_VERSION
 RUN pnpm exec vite build
 
 FROM caddy:2-alpine AS runtime
