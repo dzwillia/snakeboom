@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type RawData, type WebSocket } from 'ws';
-import { sanitizeName, isRoomCode } from '../net/names';
+import { isRoomCode, isRoomKey, normalizeRoomName, roomNameProblem, sanitizeName } from '../net/names';
 import { isClientMessage, PROTOCOL, type ClientMessage, type ServerMessage } from '../net/protocol';
 import { logLine } from './log';
 import { QuickMatch } from '../net/quickMatch';
@@ -121,17 +121,42 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const slowDown = (conn: Connection) =>
     send(conn.socket, { type: 'error', code: 'busy', message: 'Slow down a little.' });
 
+  /**
+   * A live room by code or name. Names are lowercase and codes uppercase, so an exact match is
+   * unambiguous; a lowercase code typed by hand (`abc234`) falls back to the code when no room
+   * has that name.
+   */
+  const lookup = (room: unknown): RoomEntry | undefined => {
+    if (!isRoomKey(room)) return undefined;
+    const exact = registry.get(room);
+    if (exact) return exact;
+    const asCode = room.toUpperCase();
+    return isRoomCode(asCode) ? registry.get(asCode) : undefined;
+  };
+
   const onLobbyMessage = (conn: Connection, message: ClientMessage) => {
     switch (message.type) {
       case 'create': {
+        // A chosen name: the client validates too, so a bad one here is a bug or a hand-made message.
+        const name = message.name === undefined ? undefined : normalizeRoomName(message.name);
+        const problem = name === undefined ? null : roomNameProblem(name);
+        if (problem) return send(conn.socket, { type: 'error', code: 'roomName', message: problem });
+        // Named rooms count against the same per-address limit, so nobody can squat a list of names.
         if (!creations.allow(conn.ip, Date.now())) return slowDown(conn);
-        const entry = registry.create(clampWins(message.winsToWin));
+        const holder = name === undefined ? undefined : registry.get(name);
+        if (holder && !holder.room.empty) {
+          log({ event: 'nameTaken', room: name });
+          return send(conn.socket, { type: 'error', code: 'roomName', message: `"${name}" is taken right now. Try another name.` });
+        }
+        // A room everyone has left lingers so its link keeps working, but it doesn't keep the name.
+        holder?.room.close('idle');
+        const entry = registry.create(clampWins(message.winsToWin), name);
         if (!entry) return send(conn.socket, { type: 'error', code: 'busy', message: 'The server is full right now.' });
         joinEntry(conn, entry);
         return;
       }
       case 'join': {
-        const entry = isRoomCode(message.room) ? registry.get(message.room) : undefined;
+        const entry = lookup(message.room);
         if (!entry) {
           log({ event: 'joinFailed', room: message.room });
           return send(conn.socket, { type: 'closed', reason: 'unknownRoom' });

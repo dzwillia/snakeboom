@@ -126,6 +126,11 @@ export class Room {
     return this.seats.filter((s) => s?.connected).length;
   }
 
+  /** Nobody holds a seat (an empty room lingers a while so its link still works). */
+  get empty(): boolean {
+    return this.seats.every((s) => s === null);
+  }
+
   /** Frames relayed so far in the current match (M6 sends these to a rejoining client). */
   get log(): readonly Uint8Array[] {
     return this.inputLog;

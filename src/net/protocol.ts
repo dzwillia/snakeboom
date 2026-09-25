@@ -26,7 +26,8 @@ export interface RoundResult {
 
 export type ClientMessage =
   | { type: 'hello'; protocol: number; version: string; name: string; session?: string; fromTick?: number }
-  | { type: 'create'; winsToWin: number }
+  /** `name`: a room name the host chose (see names.ts), or omitted for a random code. */
+  | { type: 'create'; winsToWin: number; name?: string }
   | { type: 'join'; room: string }
   /** Quick-match: join the oldest open room, or open my own and wait. */
   | { type: 'queue'; winsToWin: number }
@@ -45,7 +46,8 @@ export interface LobbyPlayer {
 }
 
 export type CloseReason = 'idle' | 'restart' | 'full' | 'unknownRoom';
-export type ErrorCode = 'version' | 'badMessage' | 'busy' | 'notInRoom';
+/** `roomName`: the chosen room name was refused (invalid, reserved or taken); `message` says why. */
+export type ErrorCode = 'version' | 'badMessage' | 'busy' | 'notInRoom' | 'roomName';
 
 export type ServerMessage =
   | { type: 'welcome'; player: number; room: string; session: string; name: string }
