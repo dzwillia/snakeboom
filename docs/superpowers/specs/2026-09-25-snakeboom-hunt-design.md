@@ -74,3 +74,10 @@ Shipped as v0.15.0. See the M13 plan.
 - Dodge missiles (they are moving obstacles in the rollout) and fire them when the opponent is committed to a line.
 
 Until then, the AI plays the new rules without these skills: it avoids bodies and walls, uses Ghost when boxed in, and fires missiles on the old bomb logic.
+
+## Addendum (2026-09-26, M15): loop a pickup to take it
+
+- **Collecting** (issue #27): a pickup is taken on the tick a head crosses its own trail, if the loop it just closed contains the pickup's centre: the same polygon, tick and `pointInPolygon` test as encirclement (`detectEncirclements` calls `collectInLoop`), so the `loopIgnore` neck rule and the wormhole-jump rule apply unchanged. Running over a pickup does nothing. Every pickup inside the loop is taken in id order, each subject to the room rule (a Shield needs no bubble already, anything else a free slot); the rest stay. Two heads closing loops around the same pickup on one tick: the lower seat takes it.
+- **Events:** `pickupCollected` carries the pickup's `x, y`; a loop that took at least one pickup also emits `loopCollected { player, loop, ids }` with the loop thinned like `encircled`.
+- **Config:** `collectByLoop` (default true) restores the run-over rule from the tuning panel; `pickupClearance` 40 → 60 so a full-rate circle (radius `baseSpeed / turnRate` ≈ 44) fits around a pickup next to a block.
+- **AI:** rollouts detect the planned path closing a loop the way the sim does and count the wanted pickups inside; `pickGoal` steers at the tangent point of a one-radius circle around the pickup; loop plans hold a full-rate turn until the loop closes, then go straight; a capture scores `LOOP_W` per pickup. See `src/sim/bots/opponent.ts`.
