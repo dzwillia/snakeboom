@@ -2,7 +2,6 @@ import { circleHitsWall, nearestSolidTilePoint } from './arena';
 import { forEachSolidPointNear } from './collision';
 import { ARENA_HEIGHT, ARENA_WIDTH, TICK_RATE, type Config } from './config';
 import { HALF_PI, PI, detAtan2, detCos, detSin } from './detmath';
-import { headCum } from './trail';
 import type { DeathCause, MatchState, SimEvent, SnakeState } from './types';
 
 /** tan(35°): how far a deflection off the moving border points inward. */
@@ -74,12 +73,11 @@ export function contactPoint(
       const dy = o.y - me.y;
       if (j !== idx && o.alive && dx * dx + dy * dy < touch * touch) consider(o.x, o.y);
     });
-  } else if (cause === 'body' || cause === 'self') {
-    const neckStart = headCum(me.trail) - cfg.neckLength;
+  } else if (cause === 'body') {
     forEachSolidPointNear(state, me.x, me.y, touch, (snake, i) => {
+      if (snake === idx) return;
       const t = state.snakes[snake].trail;
-      const blocks = cause === 'self' ? snake === idx && t.cum[i] < neckStart : snake !== idx;
-      if (blocks) consider(t.xs[i], t.ys[i]);
+      consider(t.xs[i], t.ys[i]);
     });
   }
   return found.d < Infinity ? { x: found.x, y: found.y } : null;

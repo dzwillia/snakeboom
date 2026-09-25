@@ -34,7 +34,6 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   move.add(cfg, 'baseSpeed', 60, 400, 5).name('speed');
   move.add(cfg, 'turnRate', 1, 8, 0.1).name('turn rate (rad/s)');
   move.add(cfg, 'snakeRadius', 3, 14, 0.5).name('thickness (radius)');
-  move.add(cfg, 'neckLength', 10, 60, 1).name('neck length');
 
   const growth = gui.addFolder('Growth');
   growth.add(cfg, 'startLength', 20, 600, 10).name('start length');
@@ -50,8 +49,8 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
 
   const boost = gui.addFolder('Boost');
   boost.add(cfg, 'boostMultiplier', 1, 3, 0.1).name('speed ×');
-  boost.add(cfg, 'boostMeterSeconds', 0.5, 6, 0.1).name('meter (s)');
-  boost.add(cfg, 'boostRefillSeconds', 1, 20, 0.5).name('refill (s)');
+  boost.add(cfg, 'boostBurnPerSecond', 0, 300, 5).name('burns body (units/s)');
+  boost.add(cfg, 'minLength', 20, 400, 10).name('min body to boost');
 
   const match = gui.addFolder('Match');
   match.add(cfg, 'winsToWin', 1, 10, 1).name('first to');
@@ -83,7 +82,6 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   power.add(cfg, 'ghostDuration', 0.5, 10, 0.25).name('ghost (s)');
   power.add(cfg, 'effectWarning', 0, 10, 0.25).name('expiry warning (s)');
   power.add(cfg, 'shieldGrace', 0, 3, 0.1).name('shield grace (s)');
-  power.add(cfg, 'reverseDuration', 0.5, 15, 0.5).name('reverse (s)');
   power.add(cfg, 'dozerDuration', 0.5, 15, 0.5).name('bulldozer (s)');
 
   const mix = gui.addFolder('Pickup mix');

@@ -12,10 +12,8 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
       ['y', s.y],
       ['heading', s.heading],
       ['targetLength', s.targetLength],
-      ['boostMeter', s.boostMeter],
     ];
     for (const [name, v] of values) if (!Number.isFinite(v)) problems.push(`snake ${i}: ${name} is ${v}`);
-    if (s.boostMeter < 0 || s.boostMeter > 1) problems.push(`snake ${i}: boostMeter ${s.boostMeter} outside 0..1`);
     // Grace covers the moving border, so a head may sit in the dead zone for a moment after a deflection.
     const excused = state.inset > 0 && s.effects.grace > 0;
     if (s.alive && !excused && circleHitsWall(s.x, s.y, cfg.snakeRadius, state.inset)) problems.push(`snake ${i}: alive outside the live area`);

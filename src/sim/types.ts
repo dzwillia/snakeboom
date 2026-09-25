@@ -4,7 +4,7 @@ import type { RngState } from './rng';
 export type Phase = 'countdown' | 'playing' | 'roundOver' | 'matchOver';
 
 /** Listed in reporting priority order (spec 3.3). */
-export type DeathCause = 'blast' | 'headOn' | 'body' | 'self' | 'obstacle' | 'wall';
+export type DeathCause = 'blast' | 'headOn' | 'body' | 'obstacle' | 'wall';
 
 export interface PlayerInput {
   turn: -1 | 0 | 1;
@@ -47,7 +47,6 @@ export interface ItemState {
 /** Timed effects on a snake, in ticks remaining (0 = off). */
 export interface EffectTimers {
   ghost: number;
-  reverse: number;
   /** Bulldozer: the plow shoves blocks and the head ignores them. */
   dozer: number;
   /** Shield grace: immune to everything except walls. */
@@ -55,7 +54,7 @@ export interface EffectTimers {
 }
 
 /** Effects announced by effectStarted/effectEnded events (grace is internal). */
-export type EffectName = 'ghost' | 'reverse' | 'dozer';
+export type EffectName = 'ghost' | 'dozer';
 
 export interface PickupState {
   id: number;
@@ -97,8 +96,6 @@ export interface SnakeState {
   /** Radians, 0 = east, clockwise positive (y points down). */
   heading: number;
   targetLength: number;
-  /** 0..1 */
-  boostMeter: number;
   boosting: boolean;
   trail: Trail;
   /** Carried items, oldest first; Use fires items[0]. */

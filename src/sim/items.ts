@@ -3,7 +3,7 @@ import { detCos, detSin } from './detmath';
 import { snakeSpeed } from './snake';
 import type { EffectName, ItemState, MatchState, SimEvent } from './types';
 
-const ANNOUNCED: EffectName[] = ['ghost', 'reverse', 'dozer'];
+const ANNOUNCED: EffectName[] = ['ghost', 'dozer'];
 
 export function createItem(kind: PickupKind, cfg: Config): ItemState {
   return { kind, charges: kind === 'bomb' ? Math.max(1, Math.round(cfg.bombCharges)) : 1 };
@@ -57,7 +57,6 @@ export function useItem(state: MatchState, idx: number, cfg: Config, events: Sim
   const s = state.snakes[idx];
   const item = s.items[0];
   if (!item || s.useCooldown > 0) return;
-  const opponents = state.snakes.flatMap((o, j) => (j !== idx && o.alive ? [j] : []));
   if (item.kind !== 'bomb') events.push({ type: 'itemUsed', player: idx, kind: item.kind });
   switch (item.kind) {
     case 'bomb': {
@@ -72,9 +71,6 @@ export function useItem(state: MatchState, idx: number, cfg: Config, events: Sim
     }
     case 'ghost':
       startEffect(state, idx, 'ghost', cfg.ghostDuration, events);
-      break;
-    case 'reverse':
-      for (const j of opponents) startEffect(state, j, 'reverse', cfg.reverseDuration, events);
       break;
     case 'dozer':
       startEffect(state, idx, 'dozer', cfg.dozerDuration, events);

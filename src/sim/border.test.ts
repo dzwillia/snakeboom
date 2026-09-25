@@ -6,7 +6,7 @@ import { createMatch } from './state';
 import { step } from './step';
 import { NO_INPUT, type MatchState, type PlayerInput, type SimEvent } from './types';
 
-const cfg: Config = { ...DEFAULT_CONFIG, roundMaxSeconds: 4, borderCloseSeconds: 2, borderCloseSpeed: 30, borderCrushSpeed: 300 };
+const cfg: Config = { ...DEFAULT_CONFIG, hearts: 2, roundMaxSeconds: 4, borderCloseSeconds: 2, borderCloseSpeed: 30, borderCrushSpeed: 300 };
 
 function playing(c: Config = cfg): MatchState {
   const s = createMatch(c, 3);

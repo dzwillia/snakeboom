@@ -8,7 +8,6 @@
   --bomb: #ff4d2e;
   --ghost: #e8f4ff;
   --shield: #3dff7a;
-  --reverse: #b44dff;
   --dozer: #ff9f1c;
   --hud-h: 64px;
 }
@@ -551,10 +550,6 @@ kbd {
   color: var(--shield);
 }
 
-.power[data-kind='reverse'] {
-  color: var(--reverse);
-}
-
 .power[data-kind='dozer'] {
   color: var(--dozer);
 }
@@ -622,10 +617,6 @@ kbd {
 
 .slot[data-kind='shield'] {
   color: var(--shield);
-}
-
-.slot[data-kind='reverse'] {
-  color: var(--reverse);
 }
 
 .slot[data-kind='dozer'] {

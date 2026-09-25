@@ -51,15 +51,6 @@ function drawGlyph(g: Graphics, kind: PickupKind, x: number, y: number, s: numbe
         join: 'round',
       });
       break;
-    case 'reverse':
-      g.moveTo(x - s * 0.7, y - s * 0.3)
-        .lineTo(x + s * 0.45, y - s * 0.3)
-        .moveTo(x + s * 0.7, y + s * 0.3)
-        .lineTo(x - s * 0.45, y + s * 0.3)
-        .stroke({ width: 2.5, color, cap: 'round' });
-      g.poly([x + s * 0.8, y - s * 0.3, x + s * 0.35, y - s * 0.62, x + s * 0.35, y + s * 0.02]).fill({ color });
-      g.poly([x - s * 0.8, y + s * 0.3, x - s * 0.35, y - s * 0.02, x - s * 0.35, y + s * 0.62]).fill({ color });
-      break;
     case 'dozer':
       g.rect(x - s * 0.3, y - s * 0.75, s * 0.65, s * 0.55).fill({ color });
       g.poly([x - s * 0.85, y - s * 0.1, x + s * 0.85, y - s * 0.1, x + s * 0.65, y + s * 0.55, x - s * 0.65, y + s * 0.55]).fill({ color });

@@ -25,16 +25,16 @@ Pick an AI level on the title screen's LOCAL row (or in the tuning panel under *
 | Level | How it plays |
 |---|---|
 | **Easy** | Looks under a second ahead, reacts slowly, wanders toward pickups, uses items at random and stays confused by Reverse for a full second. Good for testing a mechanic in peace. |
-| **Normal** | Looks further, replans quickly when something lands in its path, fights for territory and times Reverse for when you're boxed in. |
+| **Normal** | Looks further, replans quickly when something lands in its path, fights for territory and saves Ghost for when it's boxed in. |
 | **Hard** | Plans two and a half seconds ahead every other tick, fights for territory (the floor it can reach before you can), cuts across your line just ahead of your head, boosts to get there, bombs you when you're cornered and reads Reverse instantly. |
 
 The AI lives in the rules engine (`src/sim/bots/opponent.ts`), so it is deterministic and works headlessly: `pnpm soak --bots hard,easy` pits two levels against each other and prints win counts and who hurt whom, `--profile '{"aggression":0.5}'` overrides knobs on the first AI seat, and `--debug 1` prints what the first AI was seeing when it hurt itself. The same code could drive a server-side bot online later. Difficulty levels are a table of knobs (look-ahead, reaction time, aggression, greed, boost use, item skill, mistake rate) at the top of that file.
 
 ## How it plays
 
-- **Hearts:** you get **2 hearts** a round. Hitting a wall, a block, your opponent's body or your own costs a heart and bounces you off, with a second of grace. The hit on your last heart kills you. A head-on collision costs both of you a heart.
+- **One life.** A wall, a block or your opponent's body kills you; a head-on collision kills you both. Your **own body never hurts you**: cross it, weave through it, draw shapes with it. (Hearts are still a tuning-panel slider.)
 - **Rounds always end in a kill.** After 30 s the deadly border starts closing in, the clock counts down in red, and at 45 s it crushes fast until someone dies. First to the target wins the match.
-- **Growth:** snakes keep growing all round, so the arena keeps getting tighter.
+- **Growth and boost:** snakes keep growing all round, and **boosting burns your tail**: hold Boost to go twice as fast for as long as you have body to spend. The bar under your name is your length.
 - **Pickups** spawn every couple of seconds. You carry up to **three items** and Use fires the oldest. Both item queues show on the HUD, so you always know what your opponent has.
 
 | Item | What it does |
@@ -42,7 +42,6 @@ The AI lives in the rules engine (`src/sim/bots/opponent.ts`), so it is determin
 | **Bomb ×3** | Thrown ahead of your opponent. A reticle marks the blast zone, and it goes off 1 s after landing. Blasts hit heads (yours too), punch holes through bodies, destroy blocks and set off other bombs. |
 | **Ghost** | For 2 s your head slips through bodies, heads and blocks. Walls and blasts still hit. |
 | **Shield** | A bubble that takes your next hit so you keep your heart. It never takes a slot. |
-| **Reverse** | Your opponent's left and right are swapped for 2 s. |
 | **Bulldozer** | For 3 s your plow shoves blocks (and crushes the ones it can't move), straight into your opponent if you aim well. |
 
 Timed specials flash on and off for their last second, on your snake and on the HUD. The tuning panel has a **Classic** preset with the slower v0.7 feel for comparison.

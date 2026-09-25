@@ -3,7 +3,6 @@ import { forEachSolidPointNear } from '../collision';
 import { DT, type Config } from '../config';
 import { detAtan2, detCos, detSin, wrapAngle } from '../detmath';
 import { createRng, rngInt, rngNext, type RngState } from '../rng';
-import { headCum } from '../trail';
 import { NO_INPUT, type MatchState, type PlayerInput, type SnakeState } from '../types';
 
 /** A cheap look-ahead bot for soak tests (and the seed of a future AI opponent). */
@@ -22,7 +21,6 @@ const LOOK_STEPS = 30;
 const STEP_TICKS = 3;
 const TURNS = [-1, 0, 1] as const;
 const SEEK_RANGE = 450;
-const BOMB_RANGE = 220;
 
 export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Config): PlayerInput {
   const me = state.snakes[idx];
@@ -48,16 +46,12 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
   }
 
   if (bot.boostTicks > 0) bot.boostTicks--;
-  else if (best === LOOK_STEPS && rngNext(bot.rng) < 0.004) bot.boostTicks = 20 + rngInt(bot.rng, 40);
+  else if (best === LOOK_STEPS && me.targetLength > 200 && rngNext(bot.rng) < 0.004) bot.boostTicks = 20 + rngInt(bot.rng, 40);
 
-  const near = state.snakes.some((o, j) => j !== idx && o.alive && dist2(o, me.x, me.y) < BOMB_RANGE * BOMB_RANGE);
   let use = false;
   switch (me.items[0]?.kind) {
     case 'bomb':
       use = rngNext(bot.rng) < (state.snakes.some((o, j) => j !== idx && o.alive) ? 0.03 : 0);
-      break;
-    case 'reverse':
-      use = rngNext(bot.rng) < (near ? 0.08 : 0.005);
       break;
     case 'ghost':
       // Escape when boxed in; otherwise use it eventually so it doesn't block the queue.
@@ -101,7 +95,6 @@ function clearSteps(state: MatchState, idx: number, turn: -1 | 0 | 1, cfg: Confi
   const r = cfg.snakeRadius;
   const stepDist = cfg.baseSpeed * DT * STEP_TICKS;
   const stepTurn = turn * cfg.turnRate * DT * STEP_TICKS;
-  const ignoreOwnFrom = headCum(me.trail) - cfg.neckLength - 2 * r;
   let x = me.x;
   let y = me.y;
   let h = me.heading;
@@ -112,8 +105,8 @@ function clearSteps(state: MatchState, idx: number, turn: -1 | 0 | 1, cfg: Confi
     y += detSin(h) * stepDist;
     if (circleHitsWall(x, y, r + 2, state.inset) || circleHitsTiles(state.tiles, x, y, r + 2)) return k - 1;
     probe.blocked = false;
-    forEachSolidPointNear(state, x, y, 2 * r + 3, (snake, i) => {
-      if (snake !== idx || me.trail.cum[i] < ignoreOwnFrom) probe.blocked = true;
+    forEachSolidPointNear(state, x, y, 2 * r + 3, (snake) => {
+      if (snake !== idx) probe.blocked = true;
     });
     if (probe.blocked) return k - 1;
     const danger = cfg.blastRadius + r;

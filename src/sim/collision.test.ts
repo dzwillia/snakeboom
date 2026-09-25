@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { setTile } from './arena';
-import { detectHit, type Hit } from './collision';
+import { detectHit } from './collision';
 import { DEFAULT_CONFIG, TICK_RATE } from './config';
 import { advanceSnake } from './snake';
 import { createMatch, rebuildGrid } from './state';
@@ -60,15 +60,9 @@ describe('detectHit', () => {
     expect(detectHit(s, 0, cfg)).toEqual({ cause: 'body', killer: 1 });
   });
 
-  it('kills on your own body beyond the neck', () => {
+  it('never hurts you with your own body, even a long way back', () => {
     const s = playing();
     setPath(s, 0, [...line(200, 300, 400, 300), ...line(400, 312, 250, 312)]);
-    expect(detectHit(s, 0, cfg)).toEqual({ cause: 'self', killer: 0 });
-  });
-
-  it('ignores your own neck', () => {
-    const s = playing();
-    setPath(s, 0, line(200, 300, 400, 300));
     expect(detectHit(s, 0, cfg)).toBeNull();
   });
 
@@ -92,22 +86,12 @@ describe('detectHit', () => {
     expect(detectHit(s, 0, cfg)).toBeNull();
   });
 
-  it('never clips its own neck while turning at the maximum rate', () => {
+  it('can circle through its own tail for ten seconds without dying', () => {
     const s = playing();
-    for (let t = 0; t < 3 * TICK_RATE; t++) {
+    s.snakes[0].targetLength = 400;
+    for (let t = 0; t < 10 * TICK_RATE; t++) {
       advanceSnake(s.snakes[0], 0, turnRight, cfg, 0, s.grid);
       expect(detectHit(s, 0, cfg)).toBeNull();
     }
-  });
-
-  it('hits its own tail when circling with a body longer than the circle', () => {
-    const s = playing();
-    s.snakes[0].targetLength = 400;
-    let hit: Hit | null = null;
-    for (let t = 0; t < 3 * TICK_RATE && !hit; t++) {
-      advanceSnake(s.snakes[0], 0, turnRight, cfg, 0, s.grid);
-      hit = detectHit(s, 0, cfg);
-    }
-    expect(hit).toEqual({ cause: 'self', killer: 0 });
   });
 });

@@ -24,7 +24,7 @@ function tick(s: MatchState, n: number, c: Config = cfg): SimEvent[] {
 describe('pickups', () => {
   it('picks kinds by weight and returns null when no weight is positive', () => {
     const rng = createRng(1);
-    const none = { bomb: 0, ghost: 0, shield: 0, reverse: 0, dozer: 0 };
+    const none = { bomb: 0, ghost: 0, shield: 0, dozer: 0 };
     expect(pickKind({ ...none, shield: 5 }, rng)).toBe('shield');
     expect(pickKind(none, rng)).toBeNull();
   });
@@ -106,7 +106,7 @@ describe('pickups', () => {
     a.items = [
       { kind: 'bomb', charges: 1 },
       { kind: 'ghost', charges: 1 },
-      { kind: 'reverse', charges: 1 },
+      { kind: 'dozer', charges: 1 },
     ];
     Object.assign(a, { x: 500, y: 500 });
     s.pickups = [{ id: 7, kind: 'bomb', x: 505, y: 500, ttl: 100 }];

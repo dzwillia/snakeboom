@@ -1,12 +1,14 @@
-import { TICK_RATE, type Config, type EffectName, type MatchState, type SnakeState } from '../sim';
+import { TICK_RATE, trailLength, type Config, type EffectName, type MatchState, type SnakeState } from '../sim';
 import { blinkOn } from './blink';
 import { PLAYER_NAMES, describeItem, formatClock } from './text';
 
-const EFFECT_ORDER: EffectName[] = ['dozer', 'ghost', 'reverse'];
+/** Body length that fills the bar. */
+const LENGTH_BAR_MAX = 1200;
+
+const EFFECT_ORDER: EffectName[] = ['dozer', 'ghost'];
 const EFFECT_LABELS: Record<EffectName, string> = {
   dozer: 'DOZER',
   ghost: 'GHOST',
-  reverse: 'REVERSED',
 };
 
 /** Numbers for the net readout, computed by the online match from the session's stats. */
@@ -130,7 +132,10 @@ export class Hud {
     state.snakes.forEach((s, i) => {
       const side = this.sides[i];
       if (!side) return;
-      side.fill.style.width = `${Math.round(s.boostMeter * 100)}%`;
+      // The bar is body length (boost fuel), dim once there is nothing left to burn.
+      const length = trailLength(s.trail);
+      side.fill.style.width = `${Math.round(Math.min(1, length / LENGTH_BAR_MAX) * 100)}%`;
+      side.fill.style.opacity = s.targetLength > cfg.minLength ? '1' : '0.35';
 
       const heartsKey = `${s.hearts}/${cfg.hearts}`;
       if (heartsKey !== side.lastHearts) {

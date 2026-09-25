@@ -22,8 +22,6 @@ export function describeDeath(d: DeathRecord, names: readonly string[] = PLAYER_
       return `${victim} hit the wall`;
     case 'obstacle':
       return `${victim} crashed into a block`;
-    case 'self':
-      return `${victim} hit their own tail`;
     case 'body':
       return `${victim} hit ${killer}'s body`;
     case 'headOn':
@@ -49,7 +47,7 @@ export function describeRound(
 }
 
 /** The order the Powers page lists pickups in: the same as the title screen's line. */
-export const POWER_ORDER: readonly PickupKind[] = ['bomb', 'ghost', 'shield', 'reverse', 'dozer'];
+export const POWER_ORDER: readonly PickupKind[] = ['bomb', 'ghost', 'shield', 'dozer'];
 
 export interface PowerInfo {
   name: string;
@@ -101,12 +99,6 @@ export function describePower(kind: PickupKind, cfg: Config): PowerInfo {
           `A bubble that takes your next hit so you keep the heart, then a moment of grace to get clear. ` +
           `It goes up the moment you collect it, stays until it takes a hit, never takes an item slot, and you can't carry two.`,
       };
-    case 'reverse':
-      return {
-        name: 'REVERSE',
-        stats: `${secs(cfg.reverseDuration)} · ${share}`,
-        detail: `Your opponent's left and right are swapped. Their snake flashes so they know, but knowing isn't the same as steering.`,
-      };
     case 'dozer':
       return {
         name: 'BULLDOZER',
@@ -128,8 +120,6 @@ export function describeItem(item: ItemState | null): string {
       return 'GHOST';
     case 'shield':
       return 'SHIELD';
-    case 'reverse':
-      return 'REVERSE';
     case 'dozer':
       return 'DOZER';
   }
