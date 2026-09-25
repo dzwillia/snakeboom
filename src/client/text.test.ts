@@ -19,11 +19,9 @@ const d = (player: number, cause: DeathCause, killer: number | null): DeathRecor
 describe('text', () => {
   it('describes every cause of death', () => {
     expect(describeDeath(d(1, 'body', 0))).toBe("PINK hit CYAN's body");
-    expect(describeDeath(d(0, 'self', 0))).toBe('CYAN hit their own tail');
     expect(describeDeath(d(0, 'wall', null))).toBe('CYAN hit the wall');
     expect(describeDeath(d(1, 'obstacle', null))).toBe('PINK crashed into a block');
-    expect(describeDeath(d(0, 'blast', 0))).toBe('CYAN blew themselves up');
-    expect(describeDeath(d(0, 'blast', 1))).toBe('CYAN got blasted by PINK');
+    expect(describeDeath(d(0, 'missile', 1))).toBe('CYAN was shot down by PINK');
     expect(describeDeath(d(0, 'headOn', 1))).toBe('Head-on collision');
   });
 
@@ -37,10 +35,9 @@ describe('text', () => {
 
   it('labels held items for the HUD', () => {
     expect(describeItem(null)).toBe('');
-    expect(describeItem({ kind: 'bomb', charges: 3 })).toBe('BOMB ×3');
+    expect(describeItem({ kind: 'missile', charges: 3 })).toBe('MISSILE ×3');
     expect(describeItem({ kind: 'ghost', charges: 1 })).toBe('GHOST');
     expect(describeItem({ kind: 'shield', charges: 1 })).toBe('SHIELD');
-    expect(describeItem({ kind: 'reverse', charges: 1 })).toBe('REVERSE');
     expect(describeItem({ kind: 'dozer', charges: 1 })).toBe('DOZER');
   });
 
@@ -63,15 +60,15 @@ describe('text', () => {
   });
 
   it('describes every power with the live tuning numbers', () => {
-    const bomb = describePower('bomb', DEFAULT_CONFIG);
-    expect(bomb.name).toBe('BOMB');
-    expect(bomb.stats).toContain(`×${DEFAULT_CONFIG.bombCharges} per pickup`);
-    expect(bomb.stats).toContain(`blast radius ${DEFAULT_CONFIG.blastRadius}`);
-    expect(bomb.detail).toContain(`goes off ${DEFAULT_CONFIG.bombFuse} s later`);
+    const missile = describePower('missile', DEFAULT_CONFIG);
+    expect(missile.name).toBe('MISSILE');
+    expect(missile.stats).toContain(`×${DEFAULT_CONFIG.missileCharges} per pickup`);
+    expect(missile.stats).toContain(`${DEFAULT_CONFIG.missileLife} s of flight`);
+    expect(missile.detail).toContain('homes on your opponent');
 
-    const tuned = { ...DEFAULT_CONFIG, ghostDuration: 7.5, reverseDuration: 2.5 };
+    const tuned = { ...DEFAULT_CONFIG, ghostDuration: 7.5, dozerDuration: 2.5 };
     expect(describePower('ghost', tuned).stats).toContain('7.5 s');
-    expect(describePower('reverse', tuned).stats).toContain('2.5 s');
+    expect(describePower('dozer', tuned).stats).toContain('2.5 s');
 
     for (const kind of POWER_ORDER) {
       const info = describePower(kind, DEFAULT_CONFIG);
@@ -82,11 +79,11 @@ describe('text', () => {
   });
 
   it('turns pickup weights into spawn percentages', () => {
-    const cfg = { ...DEFAULT_CONFIG, pickupWeights: { bomb: 50, ghost: 25, shield: 25, reverse: 0, dozer: 0 } };
-    expect(spawnShare('bomb', cfg)).toBe(50);
-    expect(spawnShare('reverse', cfg)).toBe(0);
-    const none = { ...cfg, pickupWeights: { ...cfg.pickupWeights, bomb: 0, ghost: 0, shield: 0 } };
-    expect(spawnShare('bomb', none)).toBe(0);
+    const cfg = { ...DEFAULT_CONFIG, pickupWeights: { missile: 50, ghost: 25, shield: 25, dozer: 0 } };
+    expect(spawnShare('missile', cfg)).toBe(50);
+    expect(spawnShare('dozer', cfg)).toBe(0);
+    const none = { ...cfg, pickupWeights: { ...cfg.pickupWeights, missile: 0, ghost: 0, shield: 0 } };
+    expect(spawnShare('missile', none)).toBe(0);
   });
 
   it('formats the round clock', () => {

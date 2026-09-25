@@ -45,24 +45,30 @@ describe('snake movement', () => {
     expect(t.ys[20]).toBeGreaterThan(500);
   });
 
-  it('boosts at boostMultiplier speed and drains the meter over boostMeterSeconds', () => {
+  it('boosts at boostMultiplier speed and burns body at boostBurnPerSecond', () => {
     const { s, starts } = run(TICK_RATE, { ...straight, boost: true });
     expect(s.x).toBeCloseTo(800 + cfg.baseSpeed * cfg.boostMultiplier, 6);
-    expect(s.boostMeter).toBeCloseTo(1 - 1 / cfg.boostMeterSeconds, 9);
+    expect(s.targetLength).toBeCloseTo(cfg.startLength - cfg.boostBurnPerSecond, 6);
     expect(starts).toBe(1);
   });
 
-  it('stops boosting when empty and refills only while the key is released', () => {
+  // M10 Review Focus 3: boost never takes you below minLength, and stops there.
+  it('stops boosting at minLength and moves at base speed from then on', () => {
     const s = createSnake(0, 100, 500, 0, cfg);
     const grid = createGrid(ARENA_WIDTH, ARENA_HEIGHT);
     const hold: PlayerInput = { ...straight, boost: true };
-    for (let i = 0; i < 125; i++) advanceSnake(s, 0, hold, cfg, 0, grid);
-    expect(s.boostMeter).toBe(0);
+    const ticksToBurn = Math.ceil(((cfg.startLength - cfg.minLength) / cfg.boostBurnPerSecond) * TICK_RATE);
+    for (let i = 0; i < ticksToBurn + 5; i++) advanceSnake(s, 0, hold, cfg, 0, grid);
+    expect(s.targetLength).toBe(cfg.minLength);
     expect(s.boosting).toBe(false);
+    const before = s.x;
     advanceSnake(s, 0, hold, cfg, 0, grid);
-    expect(s.boostMeter).toBe(0);
-    for (let i = 0; i < 3 * TICK_RATE; i++) advanceSnake(s, 0, straight, cfg, 0, grid);
-    expect(s.boostMeter).toBeCloseTo(3 / cfg.boostRefillSeconds, 9);
+    expect(s.x - before).toBeCloseTo(cfg.baseSpeed / TICK_RATE, 9);
+    // Growth builds the body back up, and boost returns with it.
+    for (let i = 0; i < TICK_RATE; i++) advanceSnake(s, 0, straight, cfg, 60, grid);
+    expect(s.targetLength).toBeGreaterThan(cfg.minLength);
+    advanceSnake(s, 0, hold, cfg, 60, grid);
+    expect(s.boosting).toBe(true);
   });
 
   it('grows at growthPerSecond, faster in overtime', () => {

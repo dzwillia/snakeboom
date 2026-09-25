@@ -5,6 +5,7 @@ export { cloneState, createMatch } from './state';
 export { rematch, step } from './step';
 export { checkInvariants } from './invariants';
 export { fnv1a, hashState } from './hash';
+export { trailLength } from './trail';
 export { PLOW_PUSH_LIMIT } from './dozer';
 export { botInput, createBot, type BotState } from './bots/simple-bot';
 export {

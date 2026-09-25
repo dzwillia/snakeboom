@@ -26,7 +26,7 @@ export function createMatch(cfg: Config, seed: number): MatchState {
     grid: createGrid(ARENA_WIDTH, ARENA_HEIGHT),
     deaths: [],
     pickups: [],
-    bombs: [],
+    missiles: [],
     pickupTimer: 0,
     nextId: 1,
   };
@@ -41,7 +41,7 @@ export function startRound(state: MatchState, cfg: Config): void {
   state.tilesVersion++;
   state.snakes = map.spawns.map((sp, i) => createSnake(i, sp.x, sp.y, sp.heading, cfg));
   state.pickups = [];
-  state.bombs = [];
+  state.missiles = [];
   state.pickupTimer = Math.max(1, Math.round(cfg.firstPickupDelay * TICK_RATE));
   rebuildGrid(state);
   state.phase = 'countdown';

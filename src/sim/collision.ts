@@ -34,8 +34,8 @@ export function isProtected(s: SnakeState): boolean {
 }
 
 /**
- * Checks one live head against heads, bodies, blocks and walls (blasts are resolved elsewhere).
- * Priority: headOn > body > self > obstacle > wall. Ties pick the lowest snake index, so the
+ * Checks one live head against heads, bodies, blocks and walls (missiles are resolved elsewhere).
+ * Priority: headOn > body > obstacle > wall. Ties pick the lowest snake index, so the
  * result never depends on grid visit order. A ghost's head (its newest 2r of path) is
  * intangible to others; the rest of its body is solid. A bulldozing head ignores blocks.
  */
@@ -55,19 +55,15 @@ export function detectHit(state: MatchState, idx: number, cfg: Config): Hit | nu
     }
     if (headOn >= 0) return { cause: 'headOn', killer: headOn };
 
-    const neckStart = headCum(me.trail) - cfg.neckLength;
     const ghostHeadFrom = state.snakes.map((o) => (o.effects.ghost > 0 ? headCum(o.trail) - touch : Infinity));
-    const found = { body: -1, self: false };
+    // Your own body never hurts you (hunt rules): only other snakes' points count.
+    const found = { body: -1 };
     forEachSolidPointNear(state, me.x, me.y, touch, (snake, i) => {
-      if (snake === idx) {
-        if (me.trail.cum[i] < neckStart) found.self = true;
-        return;
-      }
+      if (snake === idx) return;
       if (state.snakes[snake].trail.cum[i] >= ghostHeadFrom[snake]) return;
       if (found.body < 0 || snake < found.body) found.body = snake;
     });
     if (found.body >= 0) return { cause: 'body', killer: found.body };
-    if (found.self) return { cause: 'self', killer: idx };
     if (me.effects.dozer <= 0 && circleHitsTiles(state.tiles, me.x, me.y, r)) return { cause: 'obstacle', killer: null };
   }
 

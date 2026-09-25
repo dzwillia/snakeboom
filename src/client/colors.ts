@@ -9,16 +9,14 @@ export const PALETTE = {
   obstacle: 0xffb020,
   obstacleFill: 0x2a1a00,
   core: 0xffffff,
-  bomb: 0xff3030,
-  bombDim: 0x8a1010,
+  missile: 0xff3030,
   fuse: 0xffb020,
 };
 
 export const PICKUP_COLORS: Record<PickupKind, number> = {
-  bomb: 0xff4d2e,
+  missile: 0xff4d2e,
   ghost: 0xe8f4ff,
   shield: 0x3dff7a,
-  reverse: 0xb44dff,
   dozer: 0xff9f1c,
 };
 

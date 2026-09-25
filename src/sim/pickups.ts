@@ -27,7 +27,7 @@ export function pickKind(weights: Record<PickupKind, number>, rng: RngState): Pi
   return kinds[kinds.length - 1];
 }
 
-/** Clear of walls, blocks, bodies, bombs and other pickups, and far from every head. */
+/** Clear of walls, blocks, bodies and other pickups, and far from every head. */
 function isClear(state: MatchState, cfg: Config, x: number, y: number): boolean {
   const c = cfg.pickupClearance;
   if (circleHitsTiles(state.tiles, x, y, c)) return false;
@@ -36,7 +36,6 @@ function isClear(state: MatchState, cfg: Config, x: number, y: number): boolean 
     probe.body = true;
   });
   if (probe.body) return false;
-  for (const b of state.bombs) if (dist2(b, x, y) < c * c) return false;
   for (const p of state.pickups) if (dist2(p, x, y) < c * c) return false;
   const h = cfg.pickupMinHeadDistance;
   for (const s of state.snakes) if (s.alive && dist2(s, x, y) < h * h) return false;

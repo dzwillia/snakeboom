@@ -2,14 +2,13 @@ import { circleHitsWall, nearestSolidTilePoint } from './arena';
 import { forEachSolidPointNear } from './collision';
 import { ARENA_HEIGHT, ARENA_WIDTH, TICK_RATE, type Config } from './config';
 import { HALF_PI, PI, detAtan2, detCos, detSin } from './detmath';
-import { headCum } from './trail';
 import type { DeathCause, MatchState, SimEvent, SnakeState } from './types';
 
 /** tan(35°): how far a deflection off the moving border points inward. */
 const BORDER_TILT = 0.7;
 
 /**
- * Pops a Shield bubble to survive `cause`. A blast is simply absorbed; a wall turns the head to
+ * Pops a Shield bubble to survive `cause`. A missile is simply absorbed; a wall turns the head to
  * slide along it; anything else pushes the head clear and turns it along the surface. A head left
  * crossing a wall either way slides along it too. Grants shieldGrace. Returns false (changing nothing) when the snake holds no Shield.
  */
@@ -38,12 +37,12 @@ export function tryHeart(state: MatchState, idx: number, cause: DeathCause, cfg:
 }
 
 /**
- * Blasts leave you where you are and anything but a wall pushes you clear. Then, because grace never
- * covers walls, a head crossing one (hit by it, blasted against it, or pushed into it) slides along it.
+ * Missiles leave you where you are and anything but a wall pushes you clear. Then, because grace never
+ * covers walls, a head crossing one (hit by it, or pushed into it) slides along it.
  */
 function deflect(state: MatchState, idx: number, cause: DeathCause, cfg: Config): void {
   const s = state.snakes[idx];
-  if (cause !== 'wall' && cause !== 'blast') pushClear(state, idx, cause, cfg);
+  if (cause !== 'wall' && cause !== 'missile' && cause !== 'encircled') pushClear(state, idx, cause, cfg);
   if (cause === 'wall' || circleHitsWall(s.x, s.y, cfg.snakeRadius, state.inset)) slideAlongWall(s, cfg.snakeRadius, state.inset);
 }
 
@@ -74,12 +73,11 @@ export function contactPoint(
       const dy = o.y - me.y;
       if (j !== idx && o.alive && dx * dx + dy * dy < touch * touch) consider(o.x, o.y);
     });
-  } else if (cause === 'body' || cause === 'self') {
-    const neckStart = headCum(me.trail) - cfg.neckLength;
+  } else if (cause === 'body') {
     forEachSolidPointNear(state, me.x, me.y, touch, (snake, i) => {
+      if (snake === idx) return;
       const t = state.snakes[snake].trail;
-      const blocks = cause === 'self' ? snake === idx && t.cum[i] < neckStart : snake !== idx;
-      if (blocks) consider(t.xs[i], t.ys[i]);
+      consider(t.xs[i], t.ys[i]);
     });
   }
   return found.d < Infinity ? { x: found.x, y: found.y } : null;

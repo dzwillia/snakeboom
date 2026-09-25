@@ -62,7 +62,7 @@ describe('resetInPlace', () => {
     const live = structuredClone(DEFAULT_CONFIG);
     const weights = live.pickupWeights;
     live.baseSpeed = 999;
-    weights.bomb = 0;
+    weights.missile = 0;
     resetInPlace(live, DEFAULT_CONFIG);
     expect(live).toEqual(DEFAULT_CONFIG);
     expect(live.pickupWeights).toBe(weights);

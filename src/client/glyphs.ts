@@ -10,12 +10,11 @@ export function glyphSvg(kind: PickupKind): string {
 }
 
 const BG = 'var(--bg)';
-const FUSE = '#ffb020';
 
 const GLYPHS: Record<PickupKind, string> = {
-  bomb:
-    `<circle cx="-0.1" cy="0.15" r="0.7" fill="currentColor"/>` +
-    `<path d="M0.3 -0.4 L0.75 -0.9" stroke="${FUSE}" stroke-width="0.14" stroke-linecap="round" fill="none"/>`,
+  missile:
+    `<polygon points="0.95,0 -0.35,-0.5 -0.1,0 -0.35,0.5" fill="currentColor"/>` +
+    `<circle cx="-0.7" cy="0" r="0.18" fill="currentColor" opacity="0.6"/>`,
   ghost:
     `<circle cx="0" cy="-0.15" r="0.6" fill="currentColor"/>` +
     `<rect x="-0.6" y="-0.15" width="1.2" height="0.75" fill="currentColor"/>` +
@@ -23,10 +22,6 @@ const GLYPHS: Record<PickupKind, string> = {
   shield:
     `<polygon points="0,-0.9 0.75,-0.55 0.6,0.35 0,0.9 -0.6,0.35 -0.75,-0.55" fill="none" ` +
     `stroke="currentColor" stroke-width="0.16" stroke-linejoin="round"/>`,
-  reverse:
-    `<path d="M-0.7 -0.3 L0.45 -0.3 M0.7 0.3 L-0.45 0.3" stroke="currentColor" stroke-width="0.16" stroke-linecap="round" fill="none"/>` +
-    `<polygon points="0.8,-0.3 0.35,-0.62 0.35,0.02" fill="currentColor"/>` +
-    `<polygon points="-0.8,0.3 -0.35,-0.02 -0.35,0.62" fill="currentColor"/>`,
   dozer:
     `<rect x="-0.3" y="-0.75" width="0.65" height="0.55" fill="currentColor"/>` +
     `<polygon points="-0.85,-0.1 0.85,-0.1 0.65,0.55 -0.65,0.55" fill="currentColor"/>`,

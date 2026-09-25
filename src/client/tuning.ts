@@ -34,7 +34,6 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   move.add(cfg, 'baseSpeed', 60, 400, 5).name('speed');
   move.add(cfg, 'turnRate', 1, 8, 0.1).name('turn rate (rad/s)');
   move.add(cfg, 'snakeRadius', 3, 14, 0.5).name('thickness (radius)');
-  move.add(cfg, 'neckLength', 10, 60, 1).name('neck length');
 
   const growth = gui.addFolder('Growth');
   growth.add(cfg, 'startLength', 20, 600, 10).name('start length');
@@ -50,8 +49,8 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
 
   const boost = gui.addFolder('Boost');
   boost.add(cfg, 'boostMultiplier', 1, 3, 0.1).name('speed ×');
-  boost.add(cfg, 'boostMeterSeconds', 0.5, 6, 0.1).name('meter (s)');
-  boost.add(cfg, 'boostRefillSeconds', 1, 20, 0.5).name('refill (s)');
+  boost.add(cfg, 'boostBurnPerSecond', 0, 300, 5).name('burns body (units/s)');
+  boost.add(cfg, 'minLength', 20, 400, 10).name('min body to boost');
 
   const match = gui.addFolder('Match');
   match.add(cfg, 'winsToWin', 1, 10, 1).name('first to');
@@ -70,20 +69,21 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   pickups.add(cfg, 'pickupMinHeadDistance', 0, 400, 10).name('min distance from heads');
   pickups.add(cfg, 'pickupClearance', 10, 120, 5).name('clearance');
 
-  const bombs = gui.addFolder('Bombs');
-  bombs.add(cfg, 'bombCharges', 1, 10, 1).name('bombs per pickup');
-  bombs.add(cfg, 'bombThrowCooldown', 0, 2, 0.05).name('throw cooldown (s)');
-  bombs.add(cfg, 'bombFlightTime', 0.1, 2, 0.05).name('flight time (s)');
-  bombs.add(cfg, 'bombFuse', 0.2, 5, 0.1).name('fuse after landing (s)');
-  bombs.add(cfg, 'bombLeadFactor', 0, 2, 0.05).name('aim ahead ×');
-  bombs.add(cfg, 'blastRadius', 20, 200, 5).name('blast radius');
-  bombs.add(cfg, 'chainDelay', 0.02, 1, 0.02).name('chain delay (s)');
+  const missiles = gui.addFolder('Missiles');
+  missiles.add(cfg, 'missileCharges', 1, 10, 1).name('shots per pickup');
+  missiles.add(cfg, 'missileCooldown', 0, 2, 0.05).name('cooldown (s)');
+  missiles.add(cfg, 'missileSpeed', 100, 900, 10).name('speed');
+  missiles.add(cfg, 'missileTurnRate', 0.5, 12, 0.1).name('turn rate (rad/s)');
+  missiles.add(cfg, 'missileLife', 0.5, 6, 0.1).name('life (s)');
+  missiles.add(cfg, 'missileRadius', 4, 30, 1).name('radius');
+
+  const loops = gui.addFolder('Loops');
+  loops.add(cfg, 'loopIgnore', 8, 80, 2).name('own neck ignored (units)');
 
   const power = gui.addFolder('Power-ups');
   power.add(cfg, 'ghostDuration', 0.5, 10, 0.25).name('ghost (s)');
   power.add(cfg, 'effectWarning', 0, 10, 0.25).name('expiry warning (s)');
   power.add(cfg, 'shieldGrace', 0, 3, 0.1).name('shield grace (s)');
-  power.add(cfg, 'reverseDuration', 0.5, 15, 0.5).name('reverse (s)');
   power.add(cfg, 'dozerDuration', 0.5, 15, 0.5).name('bulldozer (s)');
 
   const mix = gui.addFolder('Pickup mix');

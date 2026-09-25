@@ -15,7 +15,6 @@ describe('match state', () => {
     expect(s.snakes.map((sn) => [sn.x, sn.y])).toEqual(MAPS[0].spawns.map((sp) => [sp.x, sp.y]));
     for (const sn of s.snakes) {
       expect(sn.alive).toBe(true);
-      expect(sn.boostMeter).toBe(1);
       expect(sn.targetLength).toBe(DEFAULT_CONFIG.startLength);
     }
   });

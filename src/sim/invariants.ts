@@ -12,10 +12,8 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
       ['y', s.y],
       ['heading', s.heading],
       ['targetLength', s.targetLength],
-      ['boostMeter', s.boostMeter],
     ];
     for (const [name, v] of values) if (!Number.isFinite(v)) problems.push(`snake ${i}: ${name} is ${v}`);
-    if (s.boostMeter < 0 || s.boostMeter > 1) problems.push(`snake ${i}: boostMeter ${s.boostMeter} outside 0..1`);
     // Grace covers the moving border, so a head may sit in the dead zone for a moment after a deflection.
     const excused = state.inset > 0 && s.effects.grace > 0;
     if (s.alive && !excused && circleHitsWall(s.x, s.y, cfg.snakeRadius, state.inset)) problems.push(`snake ${i}: alive outside the live area`);
@@ -48,9 +46,9 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
     if (circleHitsWall(p.x, p.y, 0, state.inset)) problems.push(`pickup ${p.id} outside the live area`);
     if (p.ttl <= 0) problems.push(`pickup ${p.id} outlived its lifetime`);
   }
-  for (const b of state.bombs) {
-    if (!Number.isFinite(b.x) || !Number.isFinite(b.y)) problems.push(`bomb ${b.id} has a non-finite position`);
-    if (b.fuse <= 0) problems.push(`bomb ${b.id} should have exploded`);
+  for (const m of state.missiles) {
+    if (!Number.isFinite(m.x) || !Number.isFinite(m.y) || !Number.isFinite(m.heading)) problems.push(`missile ${m.id} has a non-finite position`);
+    if (m.ttl <= 0) problems.push(`missile ${m.id} should have fizzled`);
   }
   if (state.tiles.some((v) => v !== 0 && v !== 1)) problems.push('tiles hold values other than 0 and 1');
   if (!Number.isFinite(state.inset) || state.inset < 0) problems.push(`inset is ${state.inset}`);

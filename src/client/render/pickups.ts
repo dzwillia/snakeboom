@@ -32,11 +32,9 @@ export class PickupView {
 
 function drawGlyph(g: Graphics, kind: PickupKind, x: number, y: number, s: number, color: number): void {
   switch (kind) {
-    case 'bomb':
-      g.circle(x - s * 0.1, y + s * 0.15, s * 0.7).fill({ color });
-      g.moveTo(x + s * 0.3, y - s * 0.4)
-        .lineTo(x + s * 0.75, y - s * 0.9)
-        .stroke({ width: 2, color: PALETTE.fuse, cap: 'round' });
+    case 'missile':
+      g.poly([x + s * 0.95, y, x - s * 0.35, y - s * 0.5, x - s * 0.1, y, x - s * 0.35, y + s * 0.5]).fill({ color });
+      g.circle(x - s * 0.7, y, s * 0.18).fill({ color, alpha: 0.6 });
       break;
     case 'ghost':
       g.circle(x, y - s * 0.15, s * 0.6).fill({ color });
@@ -50,15 +48,6 @@ function drawGlyph(g: Graphics, kind: PickupKind, x: number, y: number, s: numbe
         color,
         join: 'round',
       });
-      break;
-    case 'reverse':
-      g.moveTo(x - s * 0.7, y - s * 0.3)
-        .lineTo(x + s * 0.45, y - s * 0.3)
-        .moveTo(x + s * 0.7, y + s * 0.3)
-        .lineTo(x - s * 0.45, y + s * 0.3)
-        .stroke({ width: 2.5, color, cap: 'round' });
-      g.poly([x + s * 0.8, y - s * 0.3, x + s * 0.35, y - s * 0.62, x + s * 0.35, y + s * 0.02]).fill({ color });
-      g.poly([x - s * 0.8, y + s * 0.3, x - s * 0.35, y - s * 0.02, x - s * 0.35, y + s * 0.62]).fill({ color });
       break;
     case 'dozer':
       g.rect(x - s * 0.3, y - s * 0.75, s * 0.65, s * 0.55).fill({ color });

@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ARENA_HEIGHT, ARENA_WIDTH, DEFAULT_CONFIG, TICK_RATE, type Config, type PickupKind } from './config';
-import { detectHit } from './collision';
-import { createGrid } from './grid';
+import { DEFAULT_CONFIG, TICK_RATE, type Config, type PickupKind } from './config';
 import { createItem, tickItemTimers, useItem } from './items';
-import { advanceSnake, createSnake, snakeSpeed } from './snake';
+import { createSnake, snakeSpeed } from './snake';
 import { createMatch } from './state';
 import type { MatchState, SimEvent } from './types';
 
@@ -23,11 +21,8 @@ function use(s: MatchState, idx = 0): SimEvent[] {
 }
 
 describe('power-ups', () => {
-  it('Ghost affects the user; Reverse hits the opponent', () => {
-    for (const [kind, target] of [
-      ['ghost', 0],
-      ['reverse', 1],
-    ] as const) {
+  it('Ghost affects the user', () => {
+    for (const [kind, target] of [['ghost', 0]] as const) {
       const s = holding(kind);
       expect(use(s)).toEqual([
         { type: 'itemUsed', player: 0, kind },
@@ -39,17 +34,11 @@ describe('power-ups', () => {
   });
 
   it('Use with an empty queue does nothing, even while shielded', () => {
-    const s = holding('bomb');
+    const s = holding('missile');
     s.snakes[0].items = [];
     s.snakes[0].shield = true;
     expect(use(s)).toEqual([]);
     expect(s.snakes[0].shield).toBe(true);
-  });
-
-  it('Reverse skips dead opponents', () => {
-    const s = holding('reverse');
-    s.snakes[1].alive = false;
-    expect(use(s)).toEqual([{ type: 'itemUsed', player: 0, kind: 'reverse' }]);
   });
 
   it('effects wear off and report it; grace wears off silently', () => {
@@ -70,24 +59,4 @@ describe('power-ups', () => {
     expect(snakeSpeed(sn, cfg)).toBeCloseTo(cfg.baseSpeed * cfg.boostMultiplier, 9);
   });
 
-  it('Reverse swaps left and right', () => {
-    const grid = createGrid(ARENA_WIDTH, ARENA_HEIGHT);
-    const normal = createSnake(0, 800, 500, 0, cfg);
-    const reversed = createSnake(1, 800, 500, 0, cfg);
-    reversed.effects.reverse = 100;
-    advanceSnake(normal, 0, { turn: 1, boost: false, use: false }, cfg, 0, grid);
-    advanceSnake(reversed, 1, { turn: 1, boost: false, use: false }, cfg, 0, grid);
-    expect(normal.heading).toBeGreaterThan(0);
-    expect(reversed.heading).toBeCloseTo(-normal.heading, 12);
-  });
-
-  // The neck stays safe while turning at the maximum rate.
-  it('never clips its own neck while turning at the maximum rate', () => {
-    const s = holding('bomb');
-    const me = s.snakes[0];
-    for (let t = 0; t < 3 * TICK_RATE; t++) {
-      advanceSnake(me, 0, { turn: 1, boost: false, use: false }, cfg, 0, s.grid);
-      expect(detectHit(s, 0, cfg)).toBeNull();
-    }
-  });
 });

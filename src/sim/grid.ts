@@ -23,7 +23,7 @@ export function gridInsert(g: Grid, x: number, y: number, snake: number, seq: nu
 
 /**
  * Visits every entry in the cells overlapping the square around (x, y).
- * Entries can be stale (trimmed) or holes; callers filter and check exact distance.
+ * Entries can be stale (trimmed); callers filter and check exact distance.
  */
 export function gridQuery(
   g: Grid,

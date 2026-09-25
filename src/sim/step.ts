@@ -1,5 +1,6 @@
-import { updateBombs } from './bombs';
+import { updateMissiles } from './missiles';
 import { detectHit } from './collision';
+import { detectEncirclements } from './encircle';
 import { DT, TICK_RATE, type Config } from './config';
 import { borderSpeedAt, maxInset } from './border';
 import { tickItemTimers, useItem } from './items';
@@ -78,16 +79,18 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   });
 
   collectPickups(state, cfg, events);
-  const blasted = updateBombs(state, cfg, events);
+  const missiled = updateMissiles(state, cfg, events);
 
   // Everyone alive at the start of the tick is judged before anyone moves or dies, so
-  // simultaneous deaths are fair. Grace ignores blasts; a Shield, then a spare heart, turns a hit into a save.
-  const hits: DeathRecord[] = [];
+  // simultaneous deaths are fair. Grace ignores missiles; a Shield, then a spare heart, turns a hit into a save.
+  // Loops first: a head caught inside a loop that just closed is hit by that, whatever else is going on.
+  const hits: DeathRecord[] = detectEncirclements(state, cfg, events);
+  const looped = new Set(hits.map((h) => h.player));
   state.snakes.forEach((s, i) => {
-    if (!s.alive) return;
-    const bomber = blasted.get(i);
-    if (bomber !== undefined && s.effects.grace <= 0) {
-      hits.push({ player: i, cause: 'blast', killer: bomber, x: s.x, y: s.y });
+    if (!s.alive || looped.has(i)) return;
+    const shooter = missiled.get(i);
+    if (shooter !== undefined && s.effects.grace <= 0) {
+      hits.push({ player: i, cause: 'missile', killer: shooter, x: s.x, y: s.y });
       return;
     }
     const hit = detectHit(state, i, cfg);

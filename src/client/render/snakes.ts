@@ -57,7 +57,7 @@ export class SnakeView {
       }
     }
 
-    // Blasts punch holes anywhere along the body, so a new hole redraws every chunk once.
+    // A hole change redraws every chunk once (nothing makes holes any more, but the field stays).
     const holesChanged = s.holeVersion !== this.lastHoleVersion;
     this.lastHoleVersion = s.holeVersion;
     // The offset is rollback smoothing (online): the drawn head lags a correction for a few frames.
@@ -116,7 +116,7 @@ export class SnakeView {
     strokeRuns(chunk.core, runs, Math.max(1.5, radius * 0.7), PALETTE.core);
   }
 
-  /** The head plus status: ghost glow, shield ring, grace flash, reverse swirl, bulldozer blade. */
+  /** The head plus status: ghost glow, shield ring, grace flash, bulldozer blade. */
   private drawHead(s: SnakeState, x: number, y: number, cfg: Config, t: number): void {
     const g = this.head;
     const r = cfg.snakeRadius;
@@ -165,14 +165,6 @@ export class SnakeView {
     }
     if (e.grace > 0 && Math.floor(t * 16) % 2 === 0) {
       g.circle(x, y, r * 3.5).stroke({ width: 3, color: PALETTE.core });
-    }
-    if (shows(e.reverse)) {
-      const a = t * 8;
-      const cy = y - r * 3.8;
-      const sr = r * 1.4;
-      g.moveTo(x + Math.cos(a) * sr, cy + Math.sin(a) * sr)
-        .arc(x, cy, sr, a, a + Math.PI * 1.4)
-        .stroke({ width: 2.5, color: PICKUP_COLORS.reverse, cap: 'round' });
     }
   }
 }

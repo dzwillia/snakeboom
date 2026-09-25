@@ -1,20 +1,20 @@
 import type { Config, MatchState } from '../../sim';
 import { PLAYER_COLORS } from '../colors';
 import { ArenaView } from './arena';
-import { BombView } from './bombs';
+import { MissileView } from './missiles';
 import { PickupView } from './pickups';
 import { SnakeView } from './snakes';
 import type { World } from './world';
 
 /**
  * Draws a MatchState. A replaced tiles array marks a new round (views reset); tilesVersion
- * marks blasted blocks (tiles redrawn).
+ * marks crushed blocks (tiles redrawn).
  */
 export class Renderer {
   private readonly arena: ArenaView;
   private readonly pickups: PickupView;
   private readonly snakes: SnakeView[];
-  private readonly bombs: BombView;
+  private readonly missiles: MissileView;
   private lastTiles: readonly number[] | null = null;
   private lastTilesVersion = -1;
 
@@ -22,7 +22,7 @@ export class Renderer {
     this.arena = new ArenaView(world);
     this.pickups = new PickupView(world.glow);
     this.snakes = PLAYER_COLORS.map((color) => new SnakeView(world.glow, color));
-    this.bombs = new BombView(world.glow);
+    this.missiles = new MissileView(world.glow);
   }
 
   draw(state: MatchState | null, alpha: number, cfg: Config, timeSeconds = 0, offsets?: readonly { x: number; y: number }[]): void {
@@ -31,7 +31,7 @@ export class Renderer {
         this.arena.drawTiles([]);
         for (const view of this.snakes) view.reset();
         this.pickups.clear();
-        this.bombs.clear();
+        this.missiles.clear();
         this.lastTiles = null;
         this.lastTilesVersion = -1;
       }
@@ -58,6 +58,6 @@ export class Renderer {
       if (s.alive) view.update(s, state.phase === 'playing' ? alpha : 1, cfg, timeSeconds, offsets?.[i]);
       else view.hide();
     });
-    this.bombs.draw(state.bombs, cfg, timeSeconds);
+    this.missiles.draw(state.missiles, cfg, timeSeconds);
   }
 }

@@ -13,14 +13,14 @@ export type SoundName =
   | 'overtime'
   | 'pickupSpawn'
   | 'pickup'
-  | 'bombDrop'
-  | 'explosion'
+  | 'missileHit'
+  | 'missileFizzle'
   | 'tick'
-  | 'bombThrow'
+  | 'missileFire'
+  | 'snap'
   | 'ghost'
   | 'ghostEnd'
   | 'shield'
-  | 'reverse'
   | 'dozer'
   | 'scrape'
   | 'nearMiss'
@@ -40,14 +40,14 @@ const BANK: Record<SoundName, number[]> = {
   overtime: [0.6, 0, 880, 0, 0.25, 0.1, 0, 1, 0, 0, -220, 0.1, 0.2, 0, 8],
   pickupSpawn: [0.25, 0, 900, 0.01, 0.03, 0.12, 0, 1, 0, 0, 450, 0.04],
   pickup: [0.5, 0, 660, 0.01, 0.06, 0.18, 1, 1, 0, 0, 330, 0.05, 0.05],
-  bombDrop: [0.5, 0.05, 120, 0, 0.03, 0.12, 0, 1, -10, 0, 0, 0, 0, 0.3],
-  explosion: [1.3, 0.1, 62, 0.01, 0.22, 0.95, 4, 0.8, -1, 0, 0, 0, 0, 1.8, 0, 0.4, 0, 0.5, 0.25],
+  missileHit: [1.1, 0.1, 90, 0.01, 0.16, 0.6, 4, 0.9, -2, 0, 0, 0, 0, 1.4, 0, 0.3, 0, 0.6, 0.2],
+  missileFizzle: [0.4, 0.05, 220, 0.01, 0.05, 0.18, 0, 1, -20],
   tick: [0.3, 0, 1600, 0, 0.005, 0.03, 0],
-  bombThrow: [0.4, 0.05, 260, 0.02, 0.08, 0.16, 0, 1, 14],
+  missileFire: [0.6, 0.05, 320, 0.02, 0.12, 0.25, 0, 1.4, 60, 0, 0, 0, 0.2],
+  snap: [1.2, 0, 180, 0.01, 0.12, 0.35, 3, 1.6, -30, 0, 0, 0, 0, 1.2, 0, 0.3],
   ghost: [0.5, 0, 300, 0.05, 0.25, 0.3, 0, 1, 2, 0, 0, 0, 0, 0, 5],
   ghostEnd: [0.4, 0, 500, 0.01, 0.05, 0.15, 0, 1, -3],
   shield: [0.9, 0.05, 400, 0, 0.05, 0.3, 1, 2, 0, 0, 200, 0.02, 0, 0, 0, 0.1],
-  reverse: [0.6, 0, 440, 0.01, 0.3, 0.2, 1, 1, 0, 0, 0, 0, 0, 0, 12],
   dozer: [0.6, 0.05, 90, 0.05, 0.3, 0.2, 2, 1, 0, 0, 0, 0, 0, 0.2, 0, 0, 0, 1, 0, 0.3],
   scrape: [0.25, 0.2, 120, 0, 0.03, 0.06, 4, 1, 0, 0, 0, 0, 0, 2],
   nearMiss: [0.3, 0.05, 1100, 0, 0.02, 0.09, 0, 1, -24],
@@ -56,7 +56,7 @@ const BANK: Record<SoundName, number[]> = {
 
 /** Synthesized sound effects (no audio files). */
 export class Sound {
-  private readonly gate = new SoundGate({ scrape: 150, tick: 60, explosion: 45, nearMiss: 120 });
+  private readonly gate = new SoundGate({ scrape: 150, missileHit: 45, nearMiss: 120 });
 
   constructor(private readonly settings: ClientSettings) {}
 
@@ -66,7 +66,7 @@ export class Sound {
     if (ctx && ctx.state !== 'running') void ctx.resume().catch(() => {});
   }
 
-  /** `pitchScale` multiplies the base frequency (chain reactions climb in pitch). */
+  /** `pitchScale` multiplies the base frequency. */
   play(name: SoundName, volumeScale = 1, pitchScale = 1): void {
     if (this.settings.muted || this.settings.masterVolume <= 0) return;
     if (!this.gate.allow(name, performance.now())) return;

@@ -5,7 +5,7 @@ import { createTrail, trailPush, trailTrim } from './trail';
 import type { EffectTimers, Grid, PlayerInput, SnakeState } from './types';
 
 export function noEffects(): EffectTimers {
-  return { ghost: 0, reverse: 0, dozer: 0, grace: 0 };
+  return { ghost: 0, dozer: 0, grace: 0 };
 }
 
 export function createSnake(id: number, x: number, y: number, heading: number, cfg: Config): SnakeState {
@@ -20,7 +20,6 @@ export function createSnake(id: number, x: number, y: number, heading: number, c
     prevY: y,
     heading,
     targetLength: cfg.startLength,
-    boostMeter: 1,
     boosting: false,
     trail,
     items: [],
@@ -30,6 +29,7 @@ export function createSnake(id: number, x: number, y: number, heading: number, c
     holeVersion: 0,
     effects: noEffects(),
     nearMissCooldown: 0,
+    crossing: false,
   };
 }
 
@@ -44,9 +44,8 @@ export function snakeSpeed(s: SnakeState, cfg: Config): number {
 }
 
 /**
- * Advances a live snake by one tick: boost meter, steering
- * (Reverse swaps left and right), movement, a new trail point (indexed in the grid), growth
- * and tail trimming. Returns true on the tick boosting starts.
+ * Advances a live snake by one tick: boost (which burns body length), steering, movement, a new
+ * trail point (indexed in the grid), growth and tail trimming. Returns true on the tick boosting starts.
  */
 export function advanceSnake(
   s: SnakeState,
@@ -56,19 +55,14 @@ export function advanceSnake(
   growth: number,
   grid: Grid,
 ): boolean {
+  // Boost costs body: hold it as long as there is length to spend above minLength.
   const wasBoosting = s.boosting;
-  if (input.boost && s.boostMeter > 0) {
-    s.boosting = true;
-    s.boostMeter = Math.max(0, s.boostMeter - DT / cfg.boostMeterSeconds);
-  } else {
-    s.boosting = false;
-    if (!input.boost) s.boostMeter = Math.min(1, s.boostMeter + DT / cfg.boostRefillSeconds);
-  }
+  s.boosting = input.boost && s.targetLength > cfg.minLength;
+  if (s.boosting) s.targetLength = Math.max(cfg.minLength, s.targetLength - cfg.boostBurnPerSecond * DT);
 
   s.prevX = s.x;
   s.prevY = s.y;
-  const turn = s.effects.reverse > 0 ? -input.turn : input.turn;
-  s.heading = wrapAngle(s.heading + turn * cfg.turnRate * DT);
+  s.heading = wrapAngle(s.heading + input.turn * cfg.turnRate * DT);
   const dist = snakeSpeed(s, cfg) * DT;
   s.x += detCos(s.heading) * dist;
   s.y += detSin(s.heading) * dist;
