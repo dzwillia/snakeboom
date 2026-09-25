@@ -27,7 +27,9 @@ export function createMatch(cfg: Config, seed: number): MatchState {
     deaths: [],
     pickups: [],
     missiles: [],
+    wormholes: [],
     pickupTimer: 0,
+    wormholeTimer: 0,
     nextId: 1,
   };
   startRound(state, cfg);
@@ -42,7 +44,9 @@ export function startRound(state: MatchState, cfg: Config): void {
   state.snakes = map.spawns.map((sp, i) => createSnake(i, sp.x, sp.y, sp.heading, cfg));
   state.pickups = [];
   state.missiles = [];
+  state.wormholes = [];
   state.pickupTimer = Math.max(1, Math.round(cfg.firstPickupDelay * TICK_RATE));
+  state.wormholeTimer = Math.max(1, Math.round(cfg.wormholeInterval * TICK_RATE));
   rebuildGrid(state);
   state.phase = 'countdown';
   state.phaseTicks = Math.max(1, Math.round(cfg.countdownSeconds * TICK_RATE));

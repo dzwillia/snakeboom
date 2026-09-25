@@ -12,6 +12,12 @@ const LOOP_POINTS_FOR_EVENT = 64;
  * remembers that the head is touching its trail, so skimming along your own body doesn't close
  * a new loop every tick. Returns the hits for the caller to resolve with the collision hits.
  */
+/** A wormhole jump between `from` and the head: the "loop" would include a chord across the map. */
+function spansJump(solid: readonly boolean[], from: number): boolean {
+  for (let k = from; k < solid.length; k++) if (!solid[k]) return true;
+  return false;
+}
+
 export function detectEncirclements(state: MatchState, cfg: Config, events: SimEvent[]): DeathRecord[] {
   const hits: DeathRecord[] = [];
   const touch = 2 * cfg.snakeRadius;
@@ -26,7 +32,7 @@ export function detectEncirclements(state: MatchState, cfg: Config, events: SimE
       if (oldest < 0 || index < oldest) oldest = index;
     });
     const touching = oldest >= 0;
-    if (touching && !me.crossing) {
+    if (touching && !me.crossing && !spansJump(trail.solid, oldest)) {
       const poly: number[] = [];
       for (let k = oldest; k < trail.xs.length; k++) poly.push(trail.xs[k], trail.ys[k]);
       poly.push(me.x, me.y);

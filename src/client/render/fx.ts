@@ -106,6 +106,17 @@ export class Fx {
     this.addShake(10);
   }
 
+  /** A wormhole taking a head: a violet ring collapses at the portal and another bursts at the exit. */
+  warpBurst(fromX: number, fromY: number, x: number, y: number, color: number): void {
+    this.ring(fromX, fromY, 50, 0.35, PALETTE.wormhole);
+    for (let k = 0; k < 20; k++) this.spark(fromX, fromY, k % 2 === 0 ? PALETTE.wormhole : color, 60 + Math.random() * 120, 0.25 + Math.random() * 0.3, 2);
+    this.flashes.push({ x, y, r: 40, life: 0.14, maxLife: 0.14 });
+    this.ring(x, y, 70, 0.45, PALETTE.wormhole);
+    this.ring(x, y, 36, 0.3, 0xffffff);
+    for (let k = 0; k < 30; k++) this.spark(x, y, k % 2 === 0 ? PALETTE.wormhole : color, 100 + Math.random() * 220, 0.3 + Math.random() * 0.4, 2 + Math.random() * 2);
+    this.addShake(4);
+  }
+
   /** Amber rubble from blocks that were blown up or crushed. */
   debris(tiles: readonly number[]): void {
     for (const index of tiles) {

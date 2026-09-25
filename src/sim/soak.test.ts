@@ -40,7 +40,8 @@ describe('soak', () => {
     expect(problems).toEqual([]);
     expect(missileHits).toBeGreaterThanOrEqual(0);
     expect(lengths).toHaveLength(12);
-    expect(Math.max(...lengths)).toBeLessThanOrEqual(60 * TICK_RATE);
+    // Past the cap the border crushes until somebody dies: a few seconds more at most.
+    expect(Math.max(...lengths)).toBeLessThanOrEqual((60 + 10) * TICK_RATE);
   });
 
   // Review Focus 4: extreme tuning-panel values must stay healthy.

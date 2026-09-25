@@ -22,6 +22,19 @@ export function trailPush(t: Trail, x: number, y: number): number {
   return t.baseSeq + n;
 }
 
+/**
+ * Appends a jump: the head moved to (x, y) without laying body. The point has no path length and
+ * is not solid, so nothing can collide with, cut or draw the chord to it. Returns its sequence number.
+ */
+export function trailJump(t: Trail, x: number, y: number): number {
+  const n = t.xs.length;
+  t.xs.push(x);
+  t.ys.push(y);
+  t.cum.push(n > 0 ? t.cum[n - 1] : 0);
+  t.solid.push(false);
+  return t.baseSeq + n;
+}
+
 export function headCum(t: Trail): number {
   return t.cum[t.xs.length - 1];
 }

@@ -78,6 +78,16 @@ export interface Config {
   winsToWin: number;
   countdownSeconds: number;
   roundOverSeconds: number;
+  /** Seconds between wormholes (one at a time); 0 or less means none. */
+  wormholeInterval: number;
+  /** Seconds a wormhole stays open. */
+  wormholeLifetime: number;
+  /** Portal radius: a head within this plus its own radius goes through. */
+  wormholeRadius: number;
+  /** The exit is at least this far from the portal. */
+  wormholeMinJump: number;
+  /** Seconds after a warp before a wormhole can take that head again. */
+  portalCooldown: number;
 }
 
 /**
@@ -126,6 +136,11 @@ export const DEFAULT_CONFIG: Config = {
   winsToWin: 5,
   countdownSeconds: 3,
   roundOverSeconds: 2.5,
+  wormholeInterval: 12,
+  wormholeLifetime: 10,
+  wormholeRadius: 30,
+  wormholeMinJump: 800,
+  portalCooldown: 1,
 };
 
 /** The v0.7.0 feel (three hearts, slower and longer rounds), for side-by-side tuning sessions. Not a game mode. */
@@ -146,4 +161,5 @@ export const CLASSIC_CONFIG: Config = {
   effectWarning: 3,
   dozerDuration: 5,
   hearts: 3,
+  wormholeInterval: 0,
 };

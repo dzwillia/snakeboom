@@ -1,7 +1,7 @@
 import { circleHitsTiles, circleHitsWall } from '../arena';
 import { insetAt } from '../border';
 import { forEachSolidPointNear } from '../collision';
-import { ARENA_HEIGHT, ARENA_WIDTH, DT, TILE_COLS, TILE_ROWS, TILE_SIZE, type Config } from '../config';
+import { ARENA_HEIGHT, ARENA_WIDTH, DT, TICK_RATE, TILE_COLS, TILE_ROWS, TILE_SIZE, type Config } from '../config';
 import { detAtan2, detCos, detSin, wrapAngle } from '../detmath';
 import { createRng, rngInt, rngNext, type RngState } from '../rng';
 import { headCum } from '../trail';
@@ -219,6 +219,8 @@ export function opponentInput(bot: OpponentState, state: MatchState, idx: number
   // A deflection (heart or Shield) moved and turned us: whatever we were doing no longer applies.
   if (me.effects.grace > bot.lastGrace) bot.cooldown = 0;
   bot.lastGrace = me.effects.grace;
+  // A wormhole just moved us across the map: the same.
+  if (me.portalCooldown === Math.max(1, Math.round(cfg.portalCooldown * TICK_RATE))) bot.cooldown = 0;
   if (bot.cooldown > 0 && p.panicSteps > 0) {
     const held = rollout(ctx, [bot.turn], [], speed, p.panicSteps);
     if (held.steps < p.panicSteps) bot.cooldown = 0;

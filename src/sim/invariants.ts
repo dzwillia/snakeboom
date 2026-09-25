@@ -36,6 +36,7 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
     for (const [name, v] of Object.entries(s.effects)) {
       if (!Number.isInteger(v) || v < 0) problems.push(`snake ${i}: effect ${name} is ${v}`);
     }
+    if (!Number.isInteger(s.portalCooldown) || s.portalCooldown < 0) problems.push(`snake ${i}: portal cooldown ${s.portalCooldown}`);
   });
   const points = state.scores.reduce((a, b) => a + b, 0);
   if (points > state.round) problems.push(`${points} points after ${state.round} rounds`);
@@ -49,6 +50,11 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
   for (const m of state.missiles) {
     if (!Number.isFinite(m.x) || !Number.isFinite(m.y) || !Number.isFinite(m.heading)) problems.push(`missile ${m.id} has a non-finite position`);
     if (m.ttl <= 0) problems.push(`missile ${m.id} should have fizzled`);
+  }
+  if (state.wormholes.length > 1) problems.push(`${state.wormholes.length} wormholes open at once`);
+  for (const w of state.wormholes) {
+    if (w.ttl <= 0) problems.push(`wormhole ${w.id} outlived its lifetime`);
+    if (circleHitsWall(w.x, w.y, 0, state.inset) || circleHitsWall(w.exitX, w.exitY, 0, state.inset)) problems.push(`wormhole ${w.id} outside the live area`);
   }
   if (state.tiles.some((v) => v !== 0 && v !== 1)) problems.push('tiles hold values other than 0 and 1');
   if (!Number.isFinite(state.inset) || state.inset < 0) problems.push(`inset is ${state.inset}`);

@@ -4,6 +4,7 @@ import { ArenaView } from './arena';
 import { MissileView } from './missiles';
 import { PickupView } from './pickups';
 import { SnakeView } from './snakes';
+import { WormholeView } from './wormholes';
 import type { World } from './world';
 
 /**
@@ -15,6 +16,7 @@ export class Renderer {
   private readonly pickups: PickupView;
   private readonly snakes: SnakeView[];
   private readonly missiles: MissileView;
+  private readonly wormholes: WormholeView;
   private lastTiles: readonly number[] | null = null;
   private lastTilesVersion = -1;
 
@@ -23,6 +25,7 @@ export class Renderer {
     this.pickups = new PickupView(world.glow);
     this.snakes = PLAYER_COLORS.map((color) => new SnakeView(world.glow, color));
     this.missiles = new MissileView(world.glow);
+    this.wormholes = new WormholeView(world.glow);
   }
 
   draw(state: MatchState | null, alpha: number, cfg: Config, timeSeconds = 0, offsets?: readonly { x: number; y: number }[]): void {
@@ -32,6 +35,7 @@ export class Renderer {
         for (const view of this.snakes) view.reset();
         this.pickups.clear();
         this.missiles.clear();
+        this.wormholes.clear();
         this.lastTiles = null;
         this.lastTilesVersion = -1;
       }
@@ -51,6 +55,7 @@ export class Renderer {
     }
     this.arena.setInset(state.phase === 'playing' || state.phase === 'roundOver' ? state.inset : 0, timeSeconds);
     this.arena.setAlert(state.overtime && state.phase === 'playing', timeSeconds);
+    this.wormholes.draw(state.wormholes, cfg, timeSeconds);
     this.pickups.draw(state.pickups, cfg, timeSeconds);
     state.snakes.forEach((s, i) => {
       const view = this.snakes[i];

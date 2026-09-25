@@ -11,6 +11,7 @@ import { detectNearMisses } from './nearMiss';
 import { collectPickups, updatePickups } from './pickups';
 import { createRng } from './rng';
 import { advanceSnake, growthRate } from './snake';
+import { enterWormholes, updateWormholes } from './wormholes';
 import { tryHeart, tryShield } from './shield';
 import { pickNextMap, startRound } from './state';
 import { NO_INPUT, type DeathRecord, type MatchState, type PlayerInput, type SimEvent } from './types';
@@ -79,6 +80,7 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
     }
   });
 
+  enterWormholes(state, cfg, events);
   collectPickups(state, cfg, events);
   applyScissors(state, cfg, events);
   const missiled = updateMissiles(state, cfg, events);
@@ -113,6 +115,7 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   if (alive.length === 0) return endRound(state, cfg, events, null);
   detectNearMisses(state, cfg, events);
   updatePickups(state, cfg, events);
+  updateWormholes(state, cfg, events);
 }
 
 /**

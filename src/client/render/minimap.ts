@@ -36,7 +36,11 @@ export class Minimap {
       const i = state.inset * s;
       g.rect(0, 0, w, i).rect(0, h - i, w, i).rect(0, i, i, h - 2 * i).rect(w - i, i, i, h - 2 * i).fill({ color: 0xff3b3b, alpha: 0.35 });
     }
-    // Blocks are skipped on purpose: the map is about the action. Hazards are added with them (M12 Tasks 2 and 3).
+    // Blocks are skipped on purpose: the map is about the action.
+    for (const w of state.wormholes) {
+      g.circle(w.x * s, w.y * s, 3).fill({ color: PALETTE.wormhole });
+      g.circle(w.exitX * s, w.exitY * s, 3).stroke({ width: 1, color: PALETTE.wormhole });
+    }
     state.snakes.forEach((sn, i) => {
       if (!sn.alive) return;
       g.circle(sn.x * s, sn.y * s, 3).fill({ color: PLAYER_COLORS[i] ?? 0xffffff });

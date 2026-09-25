@@ -30,6 +30,7 @@ export function createSnake(id: number, x: number, y: number, heading: number, c
     effects: noEffects(),
     nearMissCooldown: 0,
     crossing: false,
+    portalCooldown: 0,
   };
 }
 

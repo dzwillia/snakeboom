@@ -154,7 +154,10 @@ async function boot(): Promise<void> {
       if (!s) target = { cx: ARENA_WIDTH / 2, cy: ARENA_HEIGHT / 2, zoom: 1 };
       else if (online && online.localPlayer >= 0 && s.snakes[online.localPlayer]?.alive) target = followView(s.snakes[online.localPlayer], ARENA_WIDTH, ARENA_HEIGHT);
       else target = fitView(heads, ARENA_WIDTH, ARENA_HEIGHT);
-      world.view = easeView(world.view, target, frameSeconds);
+      // A wormhole moves a head across the map: no easing there, the camera snaps with it.
+      const snap = sink.warped !== null && (!online || sink.warped === online.localPlayer);
+      sink.warped = null;
+      world.view = easeView(world.view, target, frameSeconds, snap);
       renderer.draw(s, alpha, activeCfg(), performance.now() / 1000, online?.offsets);
       minimap.draw(s, world.view);
       fx.update(frameSeconds);
@@ -170,6 +173,7 @@ async function boot(): Promise<void> {
     hud.setPing(null, false);
     fx.clear();
     sink.beat = null;
+    sink.warped = null;
     loop.timeScale = 1;
     if (location.pathname !== '/') history.replaceState(null, '', '/');
     showTitle();

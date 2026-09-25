@@ -27,9 +27,8 @@ export function pickKind(weights: Record<PickupKind, number>, rng: RngState): Pi
   return kinds[kinds.length - 1];
 }
 
-/** Clear of walls, blocks, bodies and other pickups, and far from every head. */
-function isClear(state: MatchState, cfg: Config, x: number, y: number): boolean {
-  const c = cfg.pickupClearance;
+/** Clear of walls, blocks, bodies, other pickups and wormholes, and far from every head. */
+function isClear(state: MatchState, cfg: Config, x: number, y: number, c: number): boolean {
   if (circleHitsTiles(state.tiles, x, y, c)) return false;
   const probe = { body: false };
   forEachSolidPointNear(state, x, y, c, () => {
@@ -37,19 +36,23 @@ function isClear(state: MatchState, cfg: Config, x: number, y: number): boolean 
   });
   if (probe.body) return false;
   for (const p of state.pickups) if (dist2(p, x, y) < c * c) return false;
+  const wc = c + cfg.wormholeRadius;
+  for (const w of state.wormholes) {
+    if (dist2(w, x, y) < wc * wc || dist2({ x: w.exitX, y: w.exitY }, x, y) < wc * wc) return false;
+  }
   const h = cfg.pickupMinHeadDistance;
   for (const s of state.snakes) if (s.alive && dist2(s, x, y) < h * h) return false;
   return true;
 }
 
-/** A random legal spot for a pickup, or null after SPAWN_TRIES misses. */
-export function findSpawnPoint(state: MatchState, cfg: Config): { x: number; y: number } | null {
-  const c = cfg.pickupClearance + state.inset;
+/** A random spot with `clearance` (pickupClearance by default) around it, or null after SPAWN_TRIES misses. */
+export function findSpawnPoint(state: MatchState, cfg: Config, clearance = cfg.pickupClearance): { x: number; y: number } | null {
+  const c = clearance + state.inset;
   if (ARENA_WIDTH - 2 * c <= 0 || ARENA_HEIGHT - 2 * c <= 0) return null;
   for (let t = 0; t < SPAWN_TRIES; t++) {
     const x = rngRange(state.rng, c, ARENA_WIDTH - c);
     const y = rngRange(state.rng, c, ARENA_HEIGHT - c);
-    if (isClear(state, cfg, x, y)) return { x, y };
+    if (isClear(state, cfg, x, y, clearance)) return { x, y };
   }
   return null;
 }
