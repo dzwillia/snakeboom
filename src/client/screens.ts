@@ -3,7 +3,14 @@ import { PLAYER_CSS } from './colors';
 import { glyphSvg } from './glyphs';
 import type { MenuRow } from './menu';
 import type { OpponentMode } from './settings';
+import { normalizeRoomName, ROOM_NAME_MAX, ROOM_NAME_MIN, roomNameProblem } from '../net/names';
 import { describeOpponent, describePower, PLAYER_NAMES, POWER_ORDER } from './text';
+
+/** The relay's rule applied to what's in the box; an empty box is fine (a random code). */
+function roomNameProblemFor(raw: string): string | null {
+  const name = normalizeRoomName(raw);
+  return name === '' ? null : roomNameProblem(name);
+}
 
 type ScreenKind = 'none' | 'title' | 'countdown' | 'banner' | 'matchOver' | 'paused' | 'lobby' | 'form' | 'notice' | 'powers';
 
@@ -123,6 +130,48 @@ export class Screens {
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') onSubmit(input.value);
       else if (e.key === 'Escape') onSubmit(null);
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    input.focus();
+    input.select();
+  }
+
+  /**
+   * Asks the host for an optional room name before creating a room. Enter submits ('' for a random
+   * code) once the name passes the relay's rule, Escape cancels with null. `problem` is shown first
+   * when the relay refused the last attempt (for example, the name is taken).
+   */
+  roomNameBox(current: string, problem: string | null, onSubmit: (name: string | null) => void): void {
+    const rule = `${ROOM_NAME_MIN} TO ${ROOM_NAME_MAX} LETTERS, DIGITS AND DASHES · LEAVE IT EMPTY FOR A RANDOM CODE`;
+    this.show(
+      `
+      <div class="panel form">
+        <div class="banner-detail">ROOM NAME <span class="dim">(OPTIONAL)</span></div>
+        <input class="name-input room-name-input" maxlength="${ROOM_NAME_MAX}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="random code" value="${escapeHtml(current)}" />
+        <div class="small rule">${rule}</div>
+        <div class="small problem"></div>
+        <div class="hint">ENTER TO CREATE · ESC TO CANCEL</div>
+      </div>`,
+      'form',
+    );
+    const input = this.root.querySelector<HTMLInputElement>('.room-name-input');
+    const problemLine = this.root.querySelector<HTMLElement>('.form .problem');
+    if (!input) return;
+    const showProblem = (text: string | null) => {
+      if (problemLine) problemLine.textContent = text ? text.toUpperCase() : '';
+      input.classList.toggle('invalid', text !== null);
+    };
+    showProblem(problem);
+    input.addEventListener('input', () => showProblem(roomNameProblemFor(input.value)));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const name = normalizeRoomName(input.value);
+        const bad = roomNameProblemFor(input.value);
+        if (bad) showProblem(bad);
+        else onSubmit(name);
+      } else if (e.key === 'Escape') onSubmit(null);
       else return;
       e.preventDefault();
       e.stopPropagation();

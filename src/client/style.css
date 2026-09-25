@@ -351,6 +351,32 @@ kbd {
   box-shadow: 0 0 14px rgba(34, 243, 255, 0.35);
 }
 
+/* Room names are lowercase, like the link they end up in. */
+.room-name-input {
+  text-transform: lowercase;
+}
+
+.room-name-input::placeholder {
+  color: var(--dim);
+  opacity: 0.6;
+}
+
+.name-input.invalid {
+  border-color: var(--red);
+  box-shadow: 0 0 14px rgba(255, 59, 59, 0.35);
+}
+
+.form .dim {
+  color: var(--dim);
+  font-size: 0.7em;
+}
+
+/* Why the name in the box won't do; empty while it's fine. */
+.form .problem {
+  min-height: 1.4em;
+  color: var(--red);
+}
+
 .lobby .code {
   font-weight: 900;
   font-size: 1.4em;
