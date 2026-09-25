@@ -175,6 +175,8 @@ interface Ctx {
   /** Ticks during which bodies, blocks and heads can't hurt (Ghost or grace). */
   protectedTicks: number;
   dozerTicks: number;
+  /** Ticks during which the opponent's body is a thing to cut, not to die on. */
+  scissorTicks: number;
   opp: SnakeState | null;
   /** The opponent's predicted head position at each step, holding course. */
   oppX: number[];
@@ -275,6 +277,7 @@ function buildCtx(state: MatchState, idx: number, cfg: Config, look: number): Ct
     // Blocks shoved along by the plow end up right in front of the head, so stop trusting the
     // Bulldozer a beat before it runs out.
     dozerTicks: Math.max(0, me.effects.dozer - DOZER_MARGIN),
+    scissorTicks: Math.max(0, me.effects.scissors - DOZER_MARGIN),
     opp,
     oppX,
     oppY,
@@ -320,12 +323,14 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
     if (circleHitsWall(x, y, r + 1, insetAt(state, cfg, tick))) return fail();
     if (tick > ctx.protectedTicks) {
       if (tick > ctx.dozerTicks && circleHitsTiles(state.tiles, x, y, r + 2)) return fail();
-      // Own body is safe (hunt rules): only the opponent's points block.
-      probe.blocked = false;
-      forEachSolidPointNear(state, x, y, bodyReach, (snake) => {
-        if (snake !== idx) probe.blocked = true;
-      });
-      if (probe.blocked) return fail();
+      // Own body is safe (hunt rules): only the opponent's points block, and not while the scissors are out.
+      if (tick > ctx.scissorTicks) {
+        probe.blocked = false;
+        forEachSolidPointNear(state, x, y, bodyReach, (snake) => {
+          if (snake !== idx) probe.blocked = true;
+        });
+        if (probe.blocked) return fail();
+      }
       // The opponent's head, and the trail it will have laid by the time we get there.
       const upto = Math.min(k + 2, ctx.oppX.length - 1);
       for (let j = 0; j <= upto; j++) if (dist2(ctx.oppX[j], ctx.oppY[j], x, y) < headReach2) return fail();
@@ -602,6 +607,9 @@ function wantUse(ctx: Ctx, bot: OpponentState, best: Plan): boolean {
     }
     case 'ghost':
       return boxed || unclog;
+    case 'scissors':
+      // Cut through when boxed, or when the opponent's body is right ahead and worth shortening.
+      return boxed || (opp !== null && oppDist < 260 && rngNext(bot.rng) < 0.04 * p.itemSkill) || unclog;
     case 'dozer':
       return boxed || unclog;
   }

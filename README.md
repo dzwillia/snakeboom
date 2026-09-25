@@ -41,6 +41,7 @@ The AI lives in the rules engine (`src/sim/bots/opponent.ts`), so it is determin
 | Item | What it does |
 |---|---|
 | **Missile ×3** | Fires from your head and homes on your opponent for 2 s. It turns, but not on a dime: a hard cut at the right moment or a boost outruns it, a Shield eats it, and it never hits you. |
+| **Scissors** | For 3 s, running your head across your opponent's body cuts it: everything from there back to their tail falls off, and you pass through. They lose length, boost fuel and any loop they were drawing. Heads, walls, missiles and loops still kill you. |
 | **Ghost** | For 2 s your head slips through bodies, heads and blocks, and a closing loop can't catch you. Walls and missiles still hit. |
 | **Shield** | A bubble that takes your next hit so you keep your heart. It never takes a slot. |
 | **Bulldozer** | For 3 s your plow shoves blocks (and crushes the ones it can't move), straight into your opponent if you aim well. |

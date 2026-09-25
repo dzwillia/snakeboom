@@ -1,7 +1,7 @@
 import { TICK_RATE, type Config, type PickupKind } from './config';
 import type { EffectName, ItemState, MatchState, SimEvent } from './types';
 
-const ANNOUNCED: EffectName[] = ['ghost', 'dozer'];
+const ANNOUNCED: EffectName[] = ['ghost', 'scissors', 'dozer'];
 
 export function createItem(kind: PickupKind, cfg: Config): ItemState {
   return { kind, charges: kind === 'missile' ? Math.max(1, Math.round(cfg.missileCharges)) : 1 };
@@ -61,6 +61,9 @@ export function useItem(state: MatchState, idx: number, cfg: Config, events: Sim
     }
     case 'ghost':
       startEffect(state, idx, 'ghost', cfg.ghostDuration, events);
+      break;
+    case 'scissors':
+      startEffect(state, idx, 'scissors', cfg.scissorsDuration, events);
       break;
     case 'dozer':
       startEffect(state, idx, 'dozer', cfg.dozerDuration, events);

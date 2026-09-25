@@ -36,6 +36,15 @@ function drawGlyph(g: Graphics, kind: PickupKind, x: number, y: number, s: numbe
       g.poly([x + s * 0.95, y, x - s * 0.35, y - s * 0.5, x - s * 0.1, y, x - s * 0.35, y + s * 0.5]).fill({ color });
       g.circle(x - s * 0.7, y, s * 0.18).fill({ color, alpha: 0.6 });
       break;
+    case 'scissors':
+      g.moveTo(x - s * 0.75, y - s * 0.8)
+        .lineTo(x + s * 0.55, y + s * 0.35)
+        .moveTo(x - s * 0.75, y + s * 0.8)
+        .lineTo(x + s * 0.55, y - s * 0.35)
+        .stroke({ width: 2.5, color, cap: 'round' });
+      g.circle(x + s * 0.7, y + s * 0.5, s * 0.26).stroke({ width: 2, color });
+      g.circle(x + s * 0.7, y - s * 0.5, s * 0.26).stroke({ width: 2, color });
+      break;
     case 'ghost':
       g.circle(x, y - s * 0.15, s * 0.6).fill({ color });
       g.rect(x - s * 0.6, y - s * 0.15, s * 1.2, s * 0.75).fill({ color });

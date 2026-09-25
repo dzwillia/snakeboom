@@ -149,6 +149,19 @@ export class SnakeView {
         .stroke({ width: 1.5, color: PALETTE.core, alpha: 0.6 });
     }
 
+    if (shows(e.scissors)) {
+      // Two blades scissoring ahead of the head.
+      const hx = Math.cos(s.heading);
+      const hy = Math.sin(s.heading);
+      const open = 0.35 + 0.3 * Math.abs(Math.sin(t * 14));
+      for (const side of [-1, 1]) {
+        const ax = hx * Math.cos(open * side) - hy * Math.sin(open * side);
+        const ay = hx * Math.sin(open * side) + hy * Math.cos(open * side);
+        g.moveTo(x + hx * r * 0.6, y + hy * r * 0.6).lineTo(x + ax * r * 3.2, y + ay * r * 3.2);
+      }
+      g.stroke({ width: 3, color: PICKUP_COLORS.scissors, cap: 'round' });
+    }
+
     if (shows(e.ghost)) {
       g.circle(x, y, r * 2).fill({ color: PICKUP_COLORS.ghost, alpha: 0.25 });
       g.circle(x, y, r * 0.9).fill({ color: PICKUP_COLORS.ghost, alpha: 0.75 });

@@ -15,6 +15,10 @@ const GLYPHS: Record<PickupKind, string> = {
   missile:
     `<polygon points="0.95,0 -0.35,-0.5 -0.1,0 -0.35,0.5" fill="currentColor"/>` +
     `<circle cx="-0.7" cy="0" r="0.18" fill="currentColor" opacity="0.6"/>`,
+  scissors:
+    `<path d="M-0.75 -0.8 L0.55 0.35 M-0.75 0.8 L0.55 -0.35" stroke="currentColor" stroke-width="0.18" stroke-linecap="round" fill="none"/>` +
+    `<circle cx="0.7" cy="0.5" r="0.26" fill="none" stroke="currentColor" stroke-width="0.14"/>` +
+    `<circle cx="0.7" cy="-0.5" r="0.26" fill="none" stroke="currentColor" stroke-width="0.14"/>`,
   ghost:
     `<circle cx="0" cy="-0.15" r="0.6" fill="currentColor"/>` +
     `<rect x="-0.6" y="-0.15" width="1.2" height="0.75" fill="currentColor"/>` +

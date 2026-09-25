@@ -79,6 +79,15 @@ export class Fx {
     this.addShake(14);
   }
 
+  /** A cut body falls away: sparks along the dropped segment in the victim's colour. */
+  cutBurst(segment: number[], color: number): void {
+    for (let i = 0; i + 1 < segment.length; i += 2) {
+      this.spark(segment[i], segment[i + 1], color, 60 + Math.random() * 120, 0.35 + Math.random() * 0.4, 2 + Math.random() * 2);
+      if (i % 6 === 0) this.spark(segment[i], segment[i + 1], 0xffffff, 40 + Math.random() * 80, 0.3, 1.5);
+    }
+    this.addShake(4);
+  }
+
   /** A loop that just caught someone: the polygon flares in the looper's colour and fades. */
   loopSnap(points: number[], color: number, _victim: number): void {
     this.loops.push({ points, color, life: 0.7, maxLife: 0.7 });

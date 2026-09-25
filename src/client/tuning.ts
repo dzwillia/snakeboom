@@ -85,6 +85,7 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   power.add(cfg, 'effectWarning', 0, 10, 0.25).name('expiry warning (s)');
   power.add(cfg, 'shieldGrace', 0, 3, 0.1).name('shield grace (s)');
   power.add(cfg, 'dozerDuration', 0.5, 15, 0.5).name('bulldozer (s)');
+  power.add(cfg, 'scissorsDuration', 0.5, 15, 0.5).name('scissors (s)');
 
   const mix = gui.addFolder('Pickup mix');
   for (const kind of Object.keys(cfg.pickupWeights) as PickupKind[]) mix.add(cfg.pickupWeights, kind, 0, 100, 1);

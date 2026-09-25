@@ -5,9 +5,10 @@ import { PLAYER_NAMES, describeItem, formatClock } from './text';
 /** Body length that fills the bar. */
 const LENGTH_BAR_MAX = 1200;
 
-const EFFECT_ORDER: EffectName[] = ['dozer', 'ghost'];
+const EFFECT_ORDER: EffectName[] = ['dozer', 'scissors', 'ghost'];
 const EFFECT_LABELS: Record<EffectName, string> = {
   dozer: 'DOZER',
+  scissors: 'SCISSORS',
   ghost: 'GHOST',
 };
 
