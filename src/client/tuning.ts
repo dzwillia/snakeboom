@@ -60,13 +60,13 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   match.add(cfg, 'roundOverSeconds', 1, 6, 0.5).name('round banner (s)');
 
   const pickups = gui.addFolder('Pickups');
-  pickups.add(cfg, 'maxPickups', 0, 10, 1).name('max on field');
+  pickups.add(cfg, 'maxPickups', 0, 20, 1).name('max on field');
   pickups.add(cfg, 'itemSlots', 1, 5, 1).name('item slots');
   pickups.add(cfg, 'firstPickupDelay', 0, 20, 0.5).name('first spawn (s)');
-  pickups.add(cfg, 'pickupInterval', 1, 30, 0.5).name('spawn every (s)');
+  pickups.add(cfg, 'pickupInterval', 0.5, 30, 0.5).name('spawn every (s)');
   pickups.add(cfg, 'pickupLifetime', 3, 60, 1).name('lifetime (s)');
   pickups.add(cfg, 'pickupRadius', 6, 30, 1).name('size');
-  pickups.add(cfg, 'pickupMinHeadDistance', 0, 400, 10).name('min distance from heads');
+  pickups.add(cfg, 'pickupMinHeadDistance', 0, 800, 10).name('min distance from heads');
   pickups.add(cfg, 'pickupClearance', 10, 120, 5).name('clearance');
 
   const missiles = gui.addFolder('Missiles');
@@ -76,6 +76,18 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   missiles.add(cfg, 'missileTurnRate', 0.5, 12, 0.1).name('turn rate (rad/s)');
   missiles.add(cfg, 'missileLife', 0.5, 6, 0.1).name('life (s)');
   missiles.add(cfg, 'missileRadius', 4, 30, 1).name('radius');
+
+  const hazards = gui.addFolder('Hazards');
+  hazards.add(cfg, 'wormholeInterval', 0, 60, 1).name('wormhole every (s, 0 = none)');
+  hazards.add(cfg, 'wormholeLifetime', 1, 60, 1).name('wormhole open for (s)');
+  hazards.add(cfg, 'wormholeRadius', 10, 80, 2).name('portal radius');
+  hazards.add(cfg, 'wormholeMinJump', 0, 3000, 50).name('min jump (units)');
+  hazards.add(cfg, 'portalCooldown', 0, 5, 0.1).name('re-entry cooldown (s)');
+  hazards.add(cfg, 'sawInterval', 0, 60, 1).name('saw every (s, 0 = none)');
+  hazards.add(cfg, 'sawLifetime', 1, 60, 1).name('saw roves for (s)');
+  hazards.add(cfg, 'sawRadius', 10, 80, 2).name('saw radius');
+  hazards.add(cfg, 'sawSpeed', 0, 600, 10).name('saw speed');
+  hazards.add(cfg, 'sawMinHeadDistance', 0, 1000, 20).name('saw min distance from heads');
 
   const loops = gui.addFolder('Loops');
   loops.add(cfg, 'loopIgnore', 8, 80, 2).name('own neck ignored (units)');

@@ -4,7 +4,7 @@ import type { RngState } from './rng';
 export type Phase = 'countdown' | 'playing' | 'roundOver' | 'matchOver';
 
 /** Listed in reporting priority order (spec 3.3). */
-export type DeathCause = 'missile' | 'encircled' | 'headOn' | 'body' | 'obstacle' | 'wall';
+export type DeathCause = 'missile' | 'encircled' | 'saw' | 'headOn' | 'body' | 'obstacle' | 'wall';
 
 export interface PlayerInput {
   turn: -1 | 0 | 1;
@@ -79,6 +79,29 @@ export interface MissileState {
   ttl: number;
 }
 
+/** A wormhole: a portal that sends any head touching it to the exit, for a while. */
+export interface WormholeState {
+  id: number;
+  x: number;
+  y: number;
+  exitX: number;
+  exitY: number;
+  /** Ticks until it closes. */
+  ttl: number;
+}
+
+/** A roving circular saw: it drifts in a straight line, bounces off the border and blocks, and cuts what it touches. */
+export interface SawState {
+  id: number;
+  x: number;
+  y: number;
+  /** Units per second. */
+  vx: number;
+  vy: number;
+  /** Ticks until it disappears. */
+  ttl: number;
+}
+
 export interface SnakeState {
   id: number;
   alive: boolean;
@@ -107,6 +130,8 @@ export interface SnakeState {
   nearMissCooldown: number;
   /** True while the head is touching its own trail (a loop closes on the tick this turns true). */
   crossing: boolean;
+  /** Ticks until a wormhole can take this head again. */
+  portalCooldown: number;
 }
 
 export interface DeathRecord {
@@ -147,8 +172,14 @@ export interface MatchState {
   deaths: DeathRecord[];
   pickups: PickupState[];
   missiles: MissileState[];
+  wormholes: WormholeState[];
+  saws: SawState[];
   /** Ticks until the next pickup spawn attempt. */
   pickupTimer: number;
+  /** Ticks until the next wormhole opens. */
+  wormholeTimer: number;
+  /** Ticks until the next saw appears. */
+  sawTimer: number;
   /** Next id for pickups and missiles. */
   nextId: number;
 }
@@ -169,9 +200,15 @@ export type SimEvent =
   | { type: 'missileFired'; id: number; player: number; x: number; y: number; heading: number }
   | { type: 'missileHit'; id: number; player: number; x: number; y: number }
   | { type: 'missileFizzled'; id: number; x: number; y: number }
+  | { type: 'wormholeOpened'; id: number; x: number; y: number; exitX: number; exitY: number }
+  | { type: 'wormholeClosed'; id: number }
+  /** `player`'s head went in at (fromX, fromY) and came out at (x, y). */
+  | { type: 'warped'; player: number; id: number; fromX: number; fromY: number; x: number; y: number }
   /** `player` was caught inside a loop `by` just closed; `loop` is the polygon, flat and thinned. */
   | { type: 'encircled'; player: number; by: number; loop: number[] }
-  /** `by` cut `player`'s body at (x, y): `dropped` units fell off; `segment` is the dropped path, thinned. */
+  | { type: 'sawSpawned'; id: number; x: number; y: number; vx: number; vy: number }
+  | { type: 'sawGone'; id: number }
+  /** `by` cut `player`'s body at (x, y): `dropped` units fell off; `segment` is the dropped path, thinned. `by` is -1 for the saw. */
   | { type: 'cut'; player: number; by: number; x: number; y: number; dropped: number; segment: number[] }
   | { type: 'itemUsed'; player: number; kind: PickupKind }
   | { type: 'effectStarted'; player: number; effect: EffectName }

@@ -1,6 +1,7 @@
 import { Application, Container } from 'pixi.js';
 import { AdvancedBloomFilter } from 'pixi-filters';
 import { ARENA_HEIGHT, ARENA_WIDTH } from '../../sim';
+import type { View } from '../camera';
 import { PALETTE } from '../colors';
 import type { ClientSettings } from '../settings';
 
@@ -16,7 +17,10 @@ export interface World {
   /** Layers that bloom (border, blocks, snakes, effects). */
   glow: Container;
   bloom: AdvancedBloomFilter;
+  /** The letterboxed fit of the whole arena: zoom 1. Fx composes the view, the punch and shake on top. */
   base: { x: number; y: number; scale: number };
+  /** What the player is looking at; set every frame by the game. */
+  view: View;
 }
 
 export async function createWorld(host: HTMLElement, settings: ClientSettings): Promise<World> {
@@ -38,7 +42,7 @@ export async function createWorld(host: HTMLElement, settings: ClientSettings): 
   app.stage.addChild(root);
 
   const bloom = new AdvancedBloomFilter({ threshold: 0.2, bloomScale: 1.5, brightness: 1, blur: 8, quality: 6 });
-  const world: World = { app, root, bg, glow, bloom, base: { x: 0, y: 0, scale: 1 } };
+  const world: World = { app, root, bg, glow, bloom, base: { x: 0, y: 0, scale: 1 }, view: { cx: ARENA_WIDTH / 2, cy: ARENA_HEIGHT / 2, zoom: 1 } };
   applyBloom(world, settings);
 
   const layout = () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, TICK_RATE, type Config } from './config';
 import { PI } from './detmath';
+import { MAPS } from './maps';
 import { createMatch } from './state';
 import { rematch, step } from './step';
 import { NO_INPUT, type MatchState, type PlayerInput, type SimEvent } from './types';
@@ -51,7 +52,7 @@ describe('step: playing', () => {
     const s = toPlaying();
     run(s, TICK_RATE);
     expect(s.roundTicks).toBe(TICK_RATE);
-    expect(s.snakes[0].x).toBeCloseTo(260 + cfg.baseSpeed, 6);
+    expect(s.snakes[0].x).toBeCloseTo(MAPS[0].spawns[0].x + cfg.baseSpeed, 6);
   });
 
   it('awards the round to the survivor and reports the death', () => {

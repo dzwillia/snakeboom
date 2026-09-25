@@ -40,7 +40,7 @@ describe('match state', () => {
     gridClear(s.grid);
     rebuildGrid(s);
     const seen: Array<[number, number]> = [];
-    gridQuery(s.grid, 260, 220, 1, (snake, seq) => seen.push([snake, seq]));
+    gridQuery(s.grid, MAPS[0].spawns[0].x, MAPS[0].spawns[0].y, 1, (snake, seq) => seen.push([snake, seq]));
     expect(seen).toEqual([[0, 0]]);
   });
 

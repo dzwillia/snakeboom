@@ -1,7 +1,7 @@
 import { circleHitsTiles, circleHitsWall } from '../arena';
 import { insetAt } from '../border';
 import { forEachSolidPointNear } from '../collision';
-import { DT, TILE_COLS, TILE_ROWS, TILE_SIZE, type Config } from '../config';
+import { ARENA_HEIGHT, ARENA_WIDTH, DT, TICK_RATE, TILE_COLS, TILE_ROWS, TILE_SIZE, type Config } from '../config';
 import { detAtan2, detCos, detSin, wrapAngle } from '../detmath';
 import { createRng, rngInt, rngNext, type RngState } from '../rng';
 import { headCum } from '../trail';
@@ -134,6 +134,10 @@ const STICK_W = 4;
 const CUT_MIN = 4;
 const CUT_MAX = 12;
 const SEEK_RANGE = 520;
+/** Ticks ahead that a saw counts as a hazard in rollouts (0.8 s). */
+const SAW_HORIZON = 48;
+/** How close to the moving border a head can be before the middle becomes its only goal. */
+const BORDER_BAND = 320;
 const INTERCEPT_RANGE = 700;
 /** Ticks before the Bulldozer runs out during which blocks count as solid again. */
 const DOZER_MARGIN = 20;
@@ -181,6 +185,8 @@ interface Ctx {
   graceTicks: number;
   /** Live missiles that can hit me: where they are, where they point, how long they have. */
   missiles: { x: number; y: number; heading: number; ttl: number }[];
+  /** Roving saws, taken to keep their velocity (bounces are not predicted). */
+  saws: { x: number; y: number; vx: number; vy: number; ttl: number }[];
   opp: SnakeState | null;
   /** The opponent's predicted head position at each step, holding course. */
   oppX: number[];
@@ -217,6 +223,8 @@ export function opponentInput(bot: OpponentState, state: MatchState, idx: number
   // A deflection (heart or Shield) moved and turned us: whatever we were doing no longer applies.
   if (me.effects.grace > bot.lastGrace) bot.cooldown = 0;
   bot.lastGrace = me.effects.grace;
+  // A wormhole just moved us across the map: the same.
+  if (me.portalCooldown === Math.max(1, Math.round(cfg.portalCooldown * TICK_RATE))) bot.cooldown = 0;
   if (bot.cooldown > 0 && p.panicSteps > 0) {
     const held = rollout(ctx, [bot.turn], [], speed, p.panicSteps);
     if (held.steps < p.panicSteps) bot.cooldown = 0;
@@ -284,6 +292,7 @@ function buildCtx(state: MatchState, idx: number, cfg: Config, look: number): Ct
     scissorTicks: Math.max(0, me.effects.scissors - DOZER_MARGIN),
     graceTicks: me.effects.grace,
     missiles: state.missiles.filter((m) => m.owner !== idx).map((m) => ({ x: m.x, y: m.y, heading: m.heading, ttl: m.ttl })),
+    saws: state.saws.map((s) => ({ x: s.x, y: s.y, vx: s.vx, vy: s.vy, ttl: s.ttl })),
     opp,
     oppX,
     oppY,
@@ -316,6 +325,8 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
   const missileTurn = cfg.missileTurnRate * DT * STEP_TICKS;
   const missileReach = cfg.missileRadius + r + 8;
   const missileReach2 = missileReach * missileReach;
+  const sawReach = cfg.sawRadius + r + 8;
+  const sawReach2 = sawReach * sawReach;
   let seg = 0;
   let segEnd = holds.length > 0 ? holds[0] : Infinity;
   const probe = { blocked: false };
@@ -343,6 +354,17 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
       mx[m] += detCos(mh[m]) * missileStep;
       my[m] += detSin(mh[m]) * missileStep;
       if (tick > ctx.graceTicks && dist2(mx[m], my[m], x, y) < missileReach2) return fail();
+    }
+    // Saws: straight lines bouncing off the border, and only for the next SAW_HORIZON ticks; further
+    // out the plan gets replaced long before the saw gets there, and a long sweep would wall off half the map.
+    if (tick <= SAW_HORIZON && tick > ctx.graceTicks) {
+      for (const saw of ctx.saws) {
+        if (saw.ttl < tick) continue;
+        const inset = insetAt(state, cfg, tick) + cfg.sawRadius;
+        const sx = bounce(saw.x + saw.vx * DT * tick, inset, ARENA_WIDTH - inset);
+        const sy = bounce(saw.y + saw.vy * DT * tick, inset, ARENA_HEIGHT - inset);
+        if (dist2(sx, sy, x, y) < sawReach2) return fail();
+      }
     }
     if (tick > ctx.protectedTicks) {
       if (tick > ctx.dozerTicks && circleHitsTiles(state.tiles, x, y, r + 2)) return fail();
@@ -375,12 +397,18 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
 
 function pickGoal(ctx: Ctx, p: OpponentProfile): Goal | null {
   const { me, cfg, opp } = ctx;
+  // While the border moves, nothing near it is worth having: a head in the outer band makes for
+  // the middle before anything else, and pickups the border will have swallowed are skipped.
+  const ahead = insetAt(ctx.state, cfg, ctx.look * STEP_TICKS);
+  const closing = ahead > ctx.state.inset;
+  if (closing && edgeMargin(me.x, me.y) - ahead < BORDER_BAND) return { x: ARENA_WIDTH / 2, y: ARENA_HEIGHT / 2, weight: 1 };
   if (p.greed > 0 && me.items.length < cfg.itemSlots) {
     let target: { x: number; y: number } | null = null;
     let best = SEEK_RANGE * SEEK_RANGE;
     for (const pk of ctx.state.pickups) {
-      // Skip pickups about to vanish before we could plausibly get there.
+      // Skip pickups about to vanish before we could plausibly get there, or that the border will take.
       const d = dist2(pk.x, pk.y, me.x, me.y);
+      if (closing && edgeMargin(pk.x, pk.y) < ahead + BORDER_BAND / 2) continue;
       if (d < best && pk.ttl * cfg.baseSpeed * DT > Math.sqrt(d) * 0.8) {
         best = d;
         target = pk;
@@ -398,6 +426,20 @@ function pickGoal(ctx: Ctx, p: OpponentProfile): Goal | null {
     }
   }
   return null;
+}
+
+/** Folds a coordinate back inside [lo, hi] as if it had bounced off those edges. */
+function bounce(v: number, lo: number, hi: number): number {
+  const span = hi - lo;
+  if (span <= 0) return lo;
+  let t = (v - lo) % (2 * span);
+  if (t < 0) t += 2 * span;
+  return lo + (t <= span ? t : 2 * span - t);
+}
+
+/** Distance from a point to the nearest arena edge (before any border inset). */
+function edgeMargin(x: number, y: number): number {
+  return Math.min(x, y, ARENA_WIDTH - x, ARENA_HEIGHT - y);
 }
 
 /** Scores the basic plan set, and the escape set too when nothing basic stays clear to the horizon. */
@@ -478,10 +520,15 @@ function evaluateEnd(ctx: Ctx, r: Rollout): { space: number; territory: number }
   return { space, territory };
 }
 
+/** The territory field runs on 40-unit cells (80×50 on the big arena), the same cost as the old tile grid. */
+const FIELD_CELL = 40;
+const FIELD_COLS = ARENA_WIDTH / FIELD_CELL;
+const FIELD_ROWS = ARENA_HEIGHT / FIELD_CELL;
+
 /** The tile map plus the opponent's distance field, computed once per decision. */
 function buildField(ctx: Ctx): Field {
-  const occ = buildOccupancy(ctx.state);
-  const size = TILE_COLS * TILE_ROWS;
+  const occ = buildOccupancy(ctx.state, insetAt(ctx.state, ctx.cfg, ctx.look * STEP_TICKS));
+  const size = FIELD_COLS * FIELD_ROWS;
   const queue = new Int32Array(size);
   const myDist = new Int16Array(size);
   let oppDist: Int16Array | null = null;
@@ -503,15 +550,15 @@ function buildField(ctx: Ctx): Field {
 
 /** Marks the tile under (x, y) and its eight neighbours, remembering which were free before. */
 function stamp(occ: Uint8Array, x: number, y: number, marked: number[]): void {
-  const cx = Math.floor(x / TILE_SIZE);
-  const cy = Math.floor(y / TILE_SIZE);
+  const cx = Math.floor(x / FIELD_CELL);
+  const cy = Math.floor(y / FIELD_CELL);
   for (let dy = -1; dy <= 1; dy++) {
     const ty = cy + dy;
-    if (ty < 0 || ty >= TILE_ROWS) continue;
+    if (ty < 0 || ty >= FIELD_ROWS) continue;
     for (let dx = -1; dx <= 1; dx++) {
       const tx = cx + dx;
-      if (tx < 0 || tx >= TILE_COLS) continue;
-      const cell = ty * TILE_COLS + tx;
+      if (tx < 0 || tx >= FIELD_COLS) continue;
+      const cell = ty * FIELD_COLS + tx;
       if (!occ[cell]) {
         occ[cell] = 1;
         marked.push(cell);
@@ -521,22 +568,22 @@ function stamp(occ: Uint8Array, x: number, y: number, marked: number[]): void {
 }
 
 function tileAt(x: number, y: number): number {
-  const cx = Math.floor(x / TILE_SIZE);
-  const cy = Math.floor(y / TILE_SIZE);
-  return cx >= 0 && cy >= 0 && cx < TILE_COLS && cy < TILE_ROWS ? cy * TILE_COLS + cx : -1;
+  const cx = Math.floor(x / FIELD_CELL);
+  const cy = Math.floor(y / FIELD_CELL);
+  return cx >= 0 && cy >= 0 && cx < FIELD_COLS && cy < FIELD_ROWS ? cy * FIELD_COLS + cx : -1;
 }
 
 /** The tile under (x, y), or a free 4-neighbour of it when a body point shares that tile; -1 if none. */
 function freeTileNear(occ: Uint8Array, x: number, y: number): number {
-  const cell = tileAt(Math.min(Math.max(x, 0), TILE_COLS * TILE_SIZE - 1), Math.min(Math.max(y, 0), TILE_ROWS * TILE_SIZE - 1));
+  const cell = tileAt(Math.min(Math.max(x, 0), FIELD_COLS * FIELD_CELL - 1), Math.min(Math.max(y, 0), FIELD_ROWS * FIELD_CELL - 1));
   if (cell < 0) return -1;
   if (!occ[cell]) return cell;
-  const cx = cell % TILE_COLS;
-  const cy = (cell - cx) / TILE_COLS;
+  const cx = cell % FIELD_COLS;
+  const cy = (cell - cx) / FIELD_COLS;
   if (cx > 0 && !occ[cell - 1]) return cell - 1;
-  if (cx < TILE_COLS - 1 && !occ[cell + 1]) return cell + 1;
-  if (cy > 0 && !occ[cell - TILE_COLS]) return cell - TILE_COLS;
-  if (cy < TILE_ROWS - 1 && !occ[cell + TILE_COLS]) return cell + TILE_COLS;
+  if (cx < FIELD_COLS - 1 && !occ[cell + 1]) return cell + 1;
+  if (cy > 0 && !occ[cell - FIELD_COLS]) return cell - FIELD_COLS;
+  if (cy < FIELD_ROWS - 1 && !occ[cell + FIELD_COLS]) return cell + FIELD_COLS;
   return -1;
 }
 
@@ -550,39 +597,54 @@ function bfs(occ: Uint8Array, start: number, dist: Int16Array, queue: Int32Array
   while (head < tail) {
     const cell = queue[head++];
     const d = dist[cell] + 1;
-    const cx = cell % TILE_COLS;
-    const cy = (cell - cx) / TILE_COLS;
+    const cx = cell % FIELD_COLS;
+    const cy = (cell - cx) / FIELD_COLS;
     if (cx > 0 && dist[cell - 1] < 0 && !occ[cell - 1]) {
       dist[cell - 1] = d;
       queue[tail++] = cell - 1;
     }
-    if (cx < TILE_COLS - 1 && dist[cell + 1] < 0 && !occ[cell + 1]) {
+    if (cx < FIELD_COLS - 1 && dist[cell + 1] < 0 && !occ[cell + 1]) {
       dist[cell + 1] = d;
       queue[tail++] = cell + 1;
     }
-    if (cy > 0 && dist[cell - TILE_COLS] < 0 && !occ[cell - TILE_COLS]) {
-      dist[cell - TILE_COLS] = d;
-      queue[tail++] = cell - TILE_COLS;
+    if (cy > 0 && dist[cell - FIELD_COLS] < 0 && !occ[cell - FIELD_COLS]) {
+      dist[cell - FIELD_COLS] = d;
+      queue[tail++] = cell - FIELD_COLS;
     }
-    if (cy < TILE_ROWS - 1 && dist[cell + TILE_COLS] < 0 && !occ[cell + TILE_COLS]) {
-      dist[cell + TILE_COLS] = d;
-      queue[tail++] = cell + TILE_COLS;
+    if (cy < FIELD_ROWS - 1 && dist[cell + FIELD_COLS] < 0 && !occ[cell + FIELD_COLS]) {
+      dist[cell + FIELD_COLS] = d;
+      queue[tail++] = cell + FIELD_COLS;
     }
   }
   return tail;
 }
 
-/** Tile-resolution map of what a head can't pass: blocks and every solid body point. */
-function buildOccupancy(state: MatchState): Uint8Array {
-  const occ = new Uint8Array(TILE_COLS * TILE_ROWS);
-  for (let i = 0; i < occ.length; i++) if (state.tiles[i] === 1) occ[i] = 1;
+/**
+ * Field-resolution map of what a head can't pass: blocks, every solid body point, and the floor
+ * the border will have taken by `inset` (so territory near the edge counts for nothing).
+ */
+function buildOccupancy(state: MatchState, inset: number): Uint8Array {
+  const occ = new Uint8Array(FIELD_COLS * FIELD_ROWS);
+  const per = FIELD_CELL / TILE_SIZE;
+  const dead = Math.floor(inset / FIELD_CELL);
+  for (let cy = 0; cy < FIELD_ROWS; cy++) {
+    for (let cx = 0; cx < FIELD_COLS; cx++) {
+      const gone = cx < dead || cy < dead || cx >= FIELD_COLS - dead || cy >= FIELD_ROWS - dead;
+      if (gone) occ[cy * FIELD_COLS + cx] = 1;
+    }
+  }
+  for (let ty = 0; ty < TILE_ROWS; ty++) {
+    for (let tx = 0; tx < TILE_COLS; tx++) {
+      if (state.tiles[ty * TILE_COLS + tx] === 1) occ[Math.floor(ty / per) * FIELD_COLS + Math.floor(tx / per)] = 1;
+    }
+  }
   for (const s of state.snakes) {
     const t = s.trail;
     for (let i = t.start; i < t.xs.length; i++) {
       if (!t.solid[i]) continue;
-      const cx = Math.floor(t.xs[i] / TILE_SIZE);
-      const cy = Math.floor(t.ys[i] / TILE_SIZE);
-      if (cx >= 0 && cy >= 0 && cx < TILE_COLS && cy < TILE_ROWS) occ[cy * TILE_COLS + cx] = 1;
+      const cx = Math.floor(t.xs[i] / FIELD_CELL);
+      const cy = Math.floor(t.ys[i] / FIELD_CELL);
+      if (cx >= 0 && cy >= 0 && cx < FIELD_COLS && cy < FIELD_ROWS) occ[cy * FIELD_COLS + cx] = 1;
     }
   }
   return occ;

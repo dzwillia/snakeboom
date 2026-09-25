@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CONFIG, TICK_RATE, type Config } from './config';
+import { DEFAULT_CONFIG, TICK_RATE, TILE_COLS, TILE_SIZE, type Config } from './config';
 import { hashState } from './hash';
 import { createItem, useItem } from './items';
 import { updateMissiles } from './missiles';
@@ -111,7 +111,7 @@ describe('missiles', () => {
     expect(events).toEqual([{ type: 'missileFizzled', id: 7, x: expect.any(Number), y: 500 }]);
     expect(s.missiles).toEqual([]);
 
-    s.tiles[Math.floor(500 / 20) * 80 + Math.floor(400 / 20)] = 1;
+    s.tiles[Math.floor(500 / TILE_SIZE) * TILE_COLS + Math.floor(400 / TILE_SIZE)] = 1;
     s.missiles.push({ id: 8, owner: 0, x: 380, y: 510, heading: 0, ttl: 100 });
     const more: SimEvent[] = [];
     for (let t = 0; t < 10 && s.missiles.length; t++) updateMissiles(s, cfg, more);

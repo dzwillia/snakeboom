@@ -11,6 +11,8 @@ import { detectNearMisses } from './nearMiss';
 import { collectPickups, updatePickups } from './pickups';
 import { createRng } from './rng';
 import { advanceSnake, growthRate } from './snake';
+import { cutBySaws, moveSaws, sawHeads, updateSaws } from './saws';
+import { enterWormholes, updateWormholes } from './wormholes';
 import { tryHeart, tryShield } from './shield';
 import { pickNextMap, startRound } from './state';
 import { NO_INPUT, type DeathRecord, type MatchState, type PlayerInput, type SimEvent } from './types';
@@ -64,6 +66,7 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   }
 
   closeBorder(state, cfg, events);
+  moveSaws(state, cfg);
   tickItemTimers(state, events);
   state.snakes.forEach((s, i) => {
     if (s.alive && (inputs[i] ?? NO_INPUT).use) useItem(state, i, cfg, events);
@@ -79,9 +82,12 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
     }
   });
 
+  enterWormholes(state, cfg, events);
   collectPickups(state, cfg, events);
   applyScissors(state, cfg, events);
+  cutBySaws(state, cfg, events);
   const missiled = updateMissiles(state, cfg, events);
+  const sawn = sawHeads(state, cfg);
 
   // Everyone alive at the start of the tick is judged before anyone moves or dies, so
   // simultaneous deaths are fair. Grace ignores missiles; a Shield, then a spare heart, turns a hit into a save.
@@ -93,6 +99,11 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
     const shooter = missiled.get(i);
     if (shooter !== undefined && s.effects.grace <= 0) {
       hits.push({ player: i, cause: 'missile', killer: shooter, x: s.x, y: s.y });
+      return;
+    }
+    // The saw cuts through Ghosts too; only grace (a Shield or heart just spent) ignores it.
+    if (sawn.has(i) && s.effects.grace <= 0) {
+      hits.push({ player: i, cause: 'saw', killer: null, x: s.x, y: s.y });
       return;
     }
     const hit = detectHit(state, i, cfg);
@@ -113,6 +124,8 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   if (alive.length === 0) return endRound(state, cfg, events, null);
   detectNearMisses(state, cfg, events);
   updatePickups(state, cfg, events);
+  updateWormholes(state, cfg, events);
+  updateSaws(state, cfg, events);
 }
 
 /**

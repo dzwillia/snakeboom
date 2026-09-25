@@ -11,7 +11,8 @@ function soak(cfg: Config, rounds: number, seed: number) {
   const problems: string[] = [];
   const lengths: number[] = [];
   let missileHits = 0;
-  const limit = rounds * (Math.round((cfg.roundMaxSeconds + cfg.countdownSeconds + cfg.roundOverSeconds) * TICK_RATE) + 10);
+  // Past the cap the border crushes until someone dies, which takes a few more seconds per round.
+  const limit = rounds * (Math.round((cfg.roundMaxSeconds + 10 + cfg.countdownSeconds + cfg.roundOverSeconds) * TICK_RATE) + 10);
   for (let t = 0; t < limit && lengths.length < rounds; t++) {
     const events = step(state, bots.map((b, i) => botInput(b, state, i, cfg)), cfg);
     for (const e of events) {
@@ -39,7 +40,8 @@ describe('soak', () => {
     expect(problems).toEqual([]);
     expect(missileHits).toBeGreaterThanOrEqual(0);
     expect(lengths).toHaveLength(12);
-    expect(Math.max(...lengths)).toBeLessThanOrEqual(60 * TICK_RATE);
+    // Past the cap the border crushes until somebody dies: a few seconds more at most.
+    expect(Math.max(...lengths)).toBeLessThanOrEqual((60 + 10) * TICK_RATE);
   });
 
   // Review Focus 4: extreme tuning-panel values must stay healthy.

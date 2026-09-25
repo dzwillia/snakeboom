@@ -35,6 +35,8 @@ export interface EventSinkDeps {
 export class EventSink {
   /** The running death beat, if any; the render loop reads it. */
   beat: DeathBeat | null = null;
+  /** The player a wormhole just moved, for the camera to snap to; the render loop clears it. */
+  warped: number | null = null;
 
   constructor(private readonly deps: EventSinkDeps) {}
 
@@ -109,6 +111,25 @@ export class EventSink {
         case 'missileFizzled':
           fx.pickupBurst(e.x, e.y, PALETTE.missile);
           sound.play('missileFizzle', 0.6);
+          break;
+        case 'wormholeOpened':
+          fx.ring(e.x, e.y, 60, 0.6, PALETTE.wormhole);
+          fx.ring(e.exitX, e.exitY, 40, 0.6, PALETTE.wormhole);
+          sound.play('portal', 0.7);
+          break;
+        case 'wormholeClosed':
+          break;
+        case 'sawSpawned':
+          fx.ring(e.x, e.y, 80, 0.5, PALETTE.saw);
+          fx.ring(e.x, e.y, 40, 0.3, 0xffffff);
+          sound.play('saw');
+          break;
+        case 'sawGone':
+          break;
+        case 'warped':
+          fx.warpBurst(e.fromX, e.fromY, e.x, e.y, PLAYER_COLORS[e.player]);
+          sound.play('warp');
+          this.warped = e.player;
           break;
         case 'itemUsed': {
           const name = ITEM_SOUNDS[e.kind];

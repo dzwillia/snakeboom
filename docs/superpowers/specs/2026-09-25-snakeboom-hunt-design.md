@@ -40,6 +40,17 @@
 
 The pace defaults from M9 (speed 280, growth 40, 45 s rounds, the border) stay.
 
+## 3a. M12 addendum: the big map (2026-09-25)
+
+Shipped as v0.14.0 after this spec. See the M12 plan for the reasoning; the rules as built:
+
+- **Arena** 3200×2000 (`MAP_CELL` 80: the 40×25 map sources are unchanged, every block is 80 units). Tiles stay 20 units. Local play fits every live head in view (zoom 1 = the whole arena, 2 = the old apparent size); online the camera follows your own head at zoom 2. A 200 px minimap sits bottom-right.
+- **Tuning that scales:** `borderCloseSpeed` 24 (was 12), `borderCrushSpeed` stays 120 (240 made the endgame a coin flip: hard AI fell to parity with normal), `maxPickups` 12, `pickupInterval` 1 s, `pickupMinHeadDistance` 300.
+- **Wormhole** (`wormholeInterval` 12 s, `wormholeLifetime` 10 s, `wormholeRadius` 30, `wormholeMinJump` 800, `portalCooldown` 1 s): one at a time; a head within radius + r + 2 of the portal appears at the exit with its heading. The trail gets a **jump point**: zero path length, not solid, not drawn. Nothing can collide with, cut or draw the chord; a loop whose polygon would include a jump is not a loop. The border swallowing either end closes it. Missiles ignore it. Pickups keep clear of both ends. The AI treats it as floor and replans after a jump.
+- **Saw** (`sawInterval` 15 s, `sawLifetime` 12 s, `sawRadius` 34, `sawSpeed` 180, `sawMinHeadDistance` 400): one at a time; spawned at a clear spot with a seeded random heading; moves one axis at a time and flips that axis's velocity when the live border or a block is in the way (deterministic, no trig after spawn). A head within radius + r + 2 dies with cause `saw` (priority after `encircled`, before `headOn`); a Shield or spare heart pushes the head clear of the disc and grants grace; grace ignores it; Ghost does not. Any solid body point within reach is cut through the shared `cutTrail`, with a `cut` event whose `by` is -1. The border swallowing it removes it. In rollouts the AI predicts it as a straight line bouncing off the border for 0.8 s only.
+- **Events:** `wormholeOpened` / `wormholeClosed` / `warped`, `sawSpawned` / `sawGone`. All cosmetic for the net gate (played once, predicted).
+- **Classic preset:** both hazards off (`wormholeInterval` 0, `sawInterval` 0).
+
 ## 4. Feel
 
 - **Encirclement:** the loop flashes in the looper's colour and shrinks onto the victim over the death beat, with a "snap" sound. The banner reads "CYAN ENCIRCLED PINK".

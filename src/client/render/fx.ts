@@ -2,7 +2,7 @@ import { Graphics } from 'pixi.js';
 import { ARENA_HEIGHT, ARENA_WIDTH, TILE_COLS, TILE_SIZE, type SnakeState } from '../../sim';
 import { PALETTE, PICKUP_COLORS } from '../colors';
 import type { ClientSettings } from '../settings';
-import type { World } from './world';
+import { HUD_HEIGHT, type World } from './world';
 
 interface Particle {
   x: number;
@@ -104,6 +104,17 @@ export class Fx {
       this.spark(x, y, c, 150 + Math.random() * 350, 0.3 + Math.random() * 0.5, 2 + Math.random() * 3);
     }
     this.addShake(10);
+  }
+
+  /** A wormhole taking a head: a violet ring collapses at the portal and another bursts at the exit. */
+  warpBurst(fromX: number, fromY: number, x: number, y: number, color: number): void {
+    this.ring(fromX, fromY, 50, 0.35, PALETTE.wormhole);
+    for (let k = 0; k < 20; k++) this.spark(fromX, fromY, k % 2 === 0 ? PALETTE.wormhole : color, 60 + Math.random() * 120, 0.25 + Math.random() * 0.3, 2);
+    this.flashes.push({ x, y, r: 40, life: 0.14, maxLife: 0.14 });
+    this.ring(x, y, 70, 0.45, PALETTE.wormhole);
+    this.ring(x, y, 36, 0.3, 0xffffff);
+    for (let k = 0; k < 30; k++) this.spark(x, y, k % 2 === 0 ? PALETTE.wormhole : color, 100 + Math.random() * 220, 0.3 + Math.random() * 0.4, 2 + Math.random() * 2);
+    this.addShake(4);
   }
 
   /** Amber rubble from blocks that were blown up or crushed. */
@@ -234,11 +245,16 @@ export class Fx {
     const b = this.world.base;
     const shake = calm ? 0 : this.shake;
     const jitter = () => (shake > 0.3 ? (Math.random() * 2 - 1) * shake * b.scale : 0);
+    // The view (centre + zoom) first, then the death punch around its own point, then shake.
+    const view = this.world.view;
+    const s1 = b.scale * view.zoom;
+    const screen = this.world.app.screen;
+    const centerX = screen.width / 2;
+    const centerY = HUD_HEIGHT + (screen.height - HUD_HEIGHT) / 2;
+    const px0 = centerX - view.cx * s1;
+    const py0 = centerY - view.cy * s1;
     const zoom = calm ? 1 : this.camera.zoom;
-    this.world.root.scale.set(b.scale * zoom);
-    this.world.root.position.set(
-      b.x + this.camera.x * b.scale * (1 - zoom) + jitter(),
-      b.y + this.camera.y * b.scale * (1 - zoom) + jitter(),
-    );
+    this.world.root.scale.set(s1 * zoom);
+    this.world.root.position.set(px0 + this.camera.x * s1 * (1 - zoom) + jitter(), py0 + this.camera.y * s1 * (1 - zoom) + jitter());
   }
 }

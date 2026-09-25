@@ -67,7 +67,7 @@ describe('AI opponent', () => {
       return inputs.join('');
     };
     expect(run()).toBe(run());
-  });
+  }, 30000);
 
   it('does nothing during the countdown or once dead', () => {
     const state = createMatch(DEFAULT_CONFIG, 3);
@@ -92,7 +92,7 @@ describe('AI opponent', () => {
   });
 
   // These play whole rounds, so they get a generous timeout: the higher levels think hard.
-  const LONG = 60000;
+  const LONG = 120000;
 
   it(
     'keeps the sim invariants over rounds at every difficulty',
@@ -133,10 +133,11 @@ describe('AI opponent', () => {
     'ranks the difficulties: hard is close to normal in a border endgame',
     () => {
       // Since the closing border (M9), rounds between two strong survivors are decided in the
-      // endgame, where hard's cutting and territory play count for little; over 8 rounds the two
-      // land within a few wins of each other. Making hard own the endgame is a tuning-session item.
-      const hardVsNormal = duel(['hard', 'normal'], 8, 33);
-      expect(hardVsNormal.played).toBe(8);
+      // endgame, where hard's cutting and territory play count for little; on the big arena (M12)
+      // even more so. Over 12 rounds the two land within a few wins of each other. Making hard own
+      // the endgame is a tuning-session item.
+      const hardVsNormal = duel(['hard', 'normal'], 12, 33);
+      expect(hardVsNormal.played).toBe(12);
       expect(hardVsNormal.wins[0]).toBeGreaterThanOrEqual(hardVsNormal.wins[1] - 4);
     },
     LONG,

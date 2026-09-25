@@ -157,6 +157,11 @@ export class OnlineMatch {
     return this.phase === 'playing';
   }
 
+  /** Which seat this machine plays, or −1 before the room answers. */
+  get localPlayer(): number {
+    return this.me;
+  }
+
   /** Visual offsets for the drawn heads (rollback smoothing). */
   get offsets(): readonly { x: number; y: number }[] {
     return this.smoothing.offsets;

@@ -2,6 +2,7 @@ import { circleHitsWall, nearestSolidTilePoint } from './arena';
 import { forEachSolidPointNear } from './collision';
 import { ARENA_HEIGHT, ARENA_WIDTH, TICK_RATE, type Config } from './config';
 import { HALF_PI, PI, detAtan2, detCos, detSin } from './detmath';
+import { SAW_TOUCH } from './saws';
 import type { DeathCause, MatchState, SimEvent, SnakeState } from './types';
 
 /** tan(35°): how far a deflection off the moving border points inward. */
@@ -57,6 +58,19 @@ export function contactPoint(
   const touch = 2 * cfg.snakeRadius;
   if (cause === 'obstacle') return nearestSolidTilePoint(state.tiles, me.x, me.y, cfg.snakeRadius);
   const found = { x: 0, y: 0, d: Infinity };
+  if (cause === 'saw') {
+    for (const saw of state.saws) {
+      const dx = saw.x - me.x;
+      const dy = saw.y - me.y;
+      const d = dx * dx + dy * dy;
+      if (d < found.d) {
+        found.x = saw.x;
+        found.y = saw.y;
+        found.d = d;
+      }
+    }
+    return found.d < Infinity ? { x: found.x, y: found.y } : null;
+  }
   const consider = (x: number, y: number) => {
     const dx = x - me.x;
     const dy = y - me.y;
@@ -125,7 +139,7 @@ function pushClear(state: MatchState, idx: number, cause: DeathCause, cfg: Confi
       nx = -detCos(s.heading);
       ny = -detSin(s.heading);
     }
-    const clearance = (cause === 'obstacle' ? r : 2 * r) + 0.5;
+    const clearance = (cause === 'obstacle' ? r : cause === 'saw' ? cfg.sawRadius + r + SAW_TOUCH : 2 * r) + 0.5;
     s.x = c.x + nx * clearance;
     s.y = c.y + ny * clearance;
     // Slide along the surface: of the two tangents, take the one closest to the old heading.

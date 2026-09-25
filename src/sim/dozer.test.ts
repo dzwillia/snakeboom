@@ -50,9 +50,9 @@ describe('bulldozer', () => {
     for (let tx = 29; tx <= 29 + PLOW_PUSH_LIMIT; tx++) setTile(long.tiles, tx, 25, true);
     expect(plow(long, 0, cfg)).toEqual({ moved: 0, crushed: [25 * TILE_COLS + 29] });
 
-    const edge = dozing(1575, 510, 0);
-    setTile(edge.tiles, 79, 25, true); // the last column
-    expect(plow(edge, 0, cfg)).toEqual({ moved: 0, crushed: [25 * TILE_COLS + 79] });
+    const edge = dozing(TILE_COLS * 20 - 25, 510, 0);
+    setTile(edge.tiles, TILE_COLS - 1, 25, true); // the last column
+    expect(plow(edge, 0, cfg)).toEqual({ moved: 0, crushed: [25 * TILE_COLS + TILE_COLS - 1] });
   });
 
   it('makes the head immune to blocks, but not to walls or bodies', () => {
