@@ -79,6 +79,10 @@ function setup(latencyMs: number, jitterMs: number, inputDelay: number, seed = 1
   return { run, link, sessions, bots, gates };
 }
 
+// Each of these simulates thousands of frames of two sessions with bots, 1–2 s on a laptop and
+// several times that on a shared CI runner, so they get a timeout to match.
+const RELAY_TEST_TIMEOUT = 60000;
+
 describe('NetSession through a fake relay', () => {
   it('agrees on every confirmed hash at 40 ms ± 20 ms with two ticks of input delay', () => {
     const { run, link, sessions, bots, gates } = setup(40, 20, 2);
@@ -95,14 +99,14 @@ describe('NetSession through a fake relay', () => {
       expect(s.stats.receivedLate).toBeGreaterThanOrEqual(s.stats.rollbacks);
       expect(s.stats.maxRollbackDepth).toBeGreaterThan(0);
     }
-  });
+  }, RELAY_TEST_TIMEOUT);
 
   it('still agrees when packets overtake each other at 100 ms ± 60 ms', () => {
     const { run, link, sessions, bots, gates } = setup(100, 60, 3, 9);
     runFrames(link, sessions, bots, 3000, run, gates);
     expectAgreement(run, 30);
     for (const s of sessions) expect(s.stats.maxRollbackDepth).toBeLessThanOrEqual(s.maxRollback);
-  });
+  }, RELAY_TEST_TIMEOUT);
 
   // M8 Review Focus 1: a hotspot (150 ± 60 ms one-way with 300 ms spikes) must not stall.
   it('rides out hotspot jitter spikes without stalling, within the rollback window', () => {
@@ -114,14 +118,14 @@ describe('NetSession through a fake relay', () => {
       expect(s.stats.maxRollbackDepth).toBeLessThanOrEqual(s.maxRollback);
       expect(s.stats.maxRollbackDepth).toBeGreaterThan(12);
     }
-  });
+  }, RELAY_TEST_TIMEOUT);
 
   it('survives TCP-style holds (packets bunched and released in order) with agreeing hashes', () => {
     const { run, link, sessions, bots, gates } = setup(80, 20, 2, 12, { holdMs: 250, holdEveryMs: 4000 });
     runFrames(link, sessions, bots, 3000, run, gates);
     expectAgreement(run, 30);
     for (const s of sessions) expect(s.stats.maxRollbackDepth).toBeLessThanOrEqual(s.maxRollback);
-  });
+  }, RELAY_TEST_TIMEOUT);
 
   it('never rolls back or stalls when inputs arrive before they are needed', () => {
     const { run, link, sessions, bots, gates } = setup(0, 0, 2);
@@ -131,7 +135,7 @@ describe('NetSession through a fake relay', () => {
       expect(s.stats.rollbacks).toBe(0);
       expect(s.stats.stalledTicks).toBe(0);
     }
-  });
+  }, RELAY_TEST_TIMEOUT);
 
   // Review Focus 3: a quiet remote stalls the game within the rollback window, and play resumes cleanly.
   it('stalls while one side is silent, resumes, and sends each local tick exactly once', () => {
@@ -154,7 +158,7 @@ describe('NetSession through a fake relay', () => {
     // time sync (slowing the side with a positive lead) is what closes that gap, not the session.
     expect(sessions[1].tick).toBeGreaterThan(sessions[0].tick);
     expect(sessions[1].lead(2)).toBeGreaterThanOrEqual(1);
-  });
+  }, RELAY_TEST_TIMEOUT);
 
   // Review Focus 2: flow events reach the gate once, and only when confirmed.
   it('lets each round end through the gate exactly once', () => {
@@ -162,7 +166,7 @@ describe('NetSession through a fake relay', () => {
     runFrames(link, sessions, bots, 3000, run, gates);
     expect(run.roundOvers[0]).toBeGreaterThan(0);
     expect(run.gated).toEqual(run.roundOvers);
-  });
+  }, RELAY_TEST_TIMEOUT);
 });
 
 describe('NetSession bookkeeping', () => {
