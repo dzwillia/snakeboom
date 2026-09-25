@@ -59,6 +59,10 @@ export class EventSink {
           sound.play('overtime');
           screens.flash(`OVERTIME · GROWTH ×${cfg.overtimeGrowthMultiplier}`, 'var(--red)', 1600);
           break;
+        case 'borderClosing':
+          sound.play('overtime');
+          screens.flash('THE BORDER IS CLOSING', 'var(--red)', 1400);
+          break;
         case 'death':
           fx.deathBurst(state.snakes[e.player], PLAYER_COLORS[e.player]);
           sound.play('death');

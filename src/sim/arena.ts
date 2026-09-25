@@ -14,8 +14,9 @@ export function tileSolid(tiles: number[], tx: number, ty: number): boolean {
 }
 
 /** True when a circle crosses the arena border (or its position is NaN). */
-export function circleHitsWall(x: number, y: number, r: number): boolean {
-  return !(x - r >= 0 && y - r >= 0 && x + r <= ARENA_WIDTH && y + r <= ARENA_HEIGHT);
+/** True when the circle crosses the live border: the arena edge, moved inward by `inset` on every side. */
+export function circleHitsWall(x: number, y: number, r: number, inset = 0): boolean {
+  return !(x - r >= inset && y - r >= inset && x + r <= ARENA_WIDTH - inset && y + r <= ARENA_HEIGHT - inset);
 }
 
 /** Visits each solid tile a circle touches, in ascending index order; stop early by returning true. */

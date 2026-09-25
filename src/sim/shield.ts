@@ -5,6 +5,9 @@ import { HALF_PI, PI, detAtan2, detCos, detSin } from './detmath';
 import { headCum } from './trail';
 import type { DeathCause, MatchState, SimEvent, SnakeState } from './types';
 
+/** tan(35°): how far a deflection off the moving border points inward. */
+const BORDER_TILT = 0.7;
+
 /**
  * Pops a Shield bubble to survive `cause`. A blast is simply absorbed; a wall turns the head to
  * slide along it; anything else pushes the head clear and turns it along the surface. A head left
@@ -41,7 +44,7 @@ export function tryHeart(state: MatchState, idx: number, cause: DeathCause, cfg:
 function deflect(state: MatchState, idx: number, cause: DeathCause, cfg: Config): void {
   const s = state.snakes[idx];
   if (cause !== 'wall' && cause !== 'blast') pushClear(state, idx, cause, cfg);
-  if (cause === 'wall' || circleHitsWall(s.x, s.y, cfg.snakeRadius)) slideAlongWall(s, cfg.snakeRadius);
+  if (cause === 'wall' || circleHitsWall(s.x, s.y, cfg.snakeRadius, state.inset)) slideAlongWall(s, cfg.snakeRadius, state.inset);
 }
 
 /** The nearest point that blocks the head for `cause` (a head, trail point or block edge), or null. */
@@ -82,23 +85,29 @@ export function contactPoint(
   return found.d < Infinity ? { x: found.x, y: found.y } : null;
 }
 
-function clampInside(s: SnakeState, r: number): void {
-  const m = r + 0.5;
+function clampInside(s: SnakeState, r: number, inset: number): void {
+  const m = r + 0.5 + inset;
   s.x = Math.min(Math.max(s.x, m), ARENA_WIDTH - m);
   s.y = Math.min(Math.max(s.y, m), ARENA_HEIGHT - m);
 }
 
-function slideAlongWall(s: SnakeState, r: number): void {
-  const left = s.x - r < 0;
-  const right = s.x + r > ARENA_WIDTH;
-  const top = s.y - r < 0;
-  const bottom = s.y + r > ARENA_HEIGHT;
-  clampInside(s, r);
+function slideAlongWall(s: SnakeState, r: number, inset: number): void {
+  const left = s.x - r < inset;
+  const right = s.x + r > ARENA_WIDTH - inset;
+  const top = s.y - r < inset;
+  const bottom = s.y + r > ARENA_HEIGHT - inset;
+  clampInside(s, r, inset);
   const hx = detCos(s.heading);
   const hy = detSin(s.heading);
   if ((left || right) && (top || bottom)) s.heading = detAtan2(top ? 1 : -1, left ? 1 : -1);
   else if (left || right) s.heading = hy >= 0 ? HALF_PI : -HALF_PI;
   else if (top || bottom) s.heading = hx >= 0 ? 0 : PI;
+  // Off a moving border, sliding along it means being hit again in moments: angle inward instead.
+  if (inset > 0 && !((left || right) && (top || bottom))) {
+    const nx = left ? 1 : right ? -1 : 0;
+    const ny = top ? 1 : bottom ? -1 : 0;
+    s.heading = detAtan2(detSin(s.heading) + BORDER_TILT * ny, detCos(s.heading) + BORDER_TILT * nx);
+  }
   s.prevX = s.x;
   s.prevY = s.y;
 }

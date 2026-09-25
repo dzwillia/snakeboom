@@ -24,7 +24,14 @@ export interface Config {
   growthPerSecond: number;
   overtimeAt: number;
   overtimeGrowthMultiplier: number;
+  /** The border starts closing this long before the cap; after the cap it closes fast until someone dies. */
   roundMaxSeconds: number;
+  /** Seconds before roundMaxSeconds at which the border starts moving in. */
+  borderCloseSeconds: number;
+  /** Units per second, per side, while closing before the cap. */
+  borderCloseSpeed: number;
+  /** Units per second, per side, after the cap. */
+  borderCrushSpeed: number;
   boostMultiplier: number;
   /** Seconds of boosting that empty a full meter. */
   boostMeterSeconds: number;
@@ -87,6 +94,9 @@ export const DEFAULT_CONFIG: Config = {
   overtimeAt: 180,
   overtimeGrowthMultiplier: 3,
   roundMaxSeconds: 90,
+  borderCloseSeconds: 15,
+  borderCloseSpeed: 12,
+  borderCrushSpeed: 120,
   boostMultiplier: 2,
   boostMeterSeconds: 2,
   boostRefillSeconds: 6,

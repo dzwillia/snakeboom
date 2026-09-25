@@ -1,4 +1,5 @@
 import { circleHitsTiles, circleHitsWall } from '../arena';
+import { insetAt } from '../border';
 import { forEachSolidPointNear } from '../collision';
 import { DT, TICK_RATE, TILE_COLS, TILE_ROWS, TILE_SIZE, type Config } from '../config';
 import { detCos, detSin } from '../detmath';
@@ -355,7 +356,7 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
     const fail = () => ({ turns, holds, steps: k - 1, x: px[k - 1], y: py[k - 1], pathLen: (k - 1) * stepDist, px, py, cut });
 
     // Walls are exact, and a deflection leaves the head only half a pixel clear of one.
-    if (circleHitsWall(x, y, r + 1)) return fail();
+    if (circleHitsWall(x, y, r + 1, insetAt(state, cfg, tick))) return fail();
     if (tick > ctx.protectedTicks) {
       if (tick > ctx.dozerTicks && circleHitsTiles(state.tiles, x, y, r + 2)) return fail();
       // Own points count once they're past the neck, which moves along with the head.
@@ -676,7 +677,7 @@ function straightClear(ctx: Ctx, s: SnakeState, limit: number): number {
   for (let k = 1; k <= limit; k++) {
     const x = s.x + cx * k;
     const y = s.y + cy * k;
-    if (circleHitsWall(x, y, r + 2) || circleHitsTiles(state.tiles, x, y, r + 2)) return k - 1;
+    if (circleHitsWall(x, y, r + 2, insetAt(state, cfg, k * STEP_TICKS)) || circleHitsTiles(state.tiles, x, y, r + 2)) return k - 1;
     probe.blocked = false;
     forEachSolidPointNear(state, x, y, 2 * r + 3, (snake, i) => {
       if (snake !== s.id || s.trail.cum[i] < ignoreFrom) probe.blocked = true;

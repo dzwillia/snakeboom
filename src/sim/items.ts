@@ -46,7 +46,7 @@ export function throwTarget(state: MatchState, idx: number, cfg: Config): { x: n
     }
   });
   const lead = snakeSpeed(target, cfg) * (cfg.bombFlightTime + cfg.bombFuse) * cfg.bombLeadFactor;
-  const r = cfg.snakeRadius;
+  const r = cfg.snakeRadius + state.inset;
   const x = target.x + detCos(target.heading) * lead;
   const y = target.y + detSin(target.heading) * lead;
   return { x: Math.min(Math.max(x, r), ARENA_WIDTH - r), y: Math.min(Math.max(y, r), ARENA_HEIGHT - r) };

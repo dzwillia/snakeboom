@@ -15,9 +15,9 @@ function drive(state: MatchState, bots: BotState[], ticks: number): void {
 /**
  * Seed 2024, the simple bots, 4000 ticks. Any intentional rule or tuning change updates this
  * constant (run the test and paste the new value); an unintended change is a determinism regression.
- * Updated 2026-09-25 when Turbo and Slow were removed (M9 Task 1).
+ * Updated 2026-09-25 when Turbo and Slow were removed (M9 Task 1) and again for the closing border (M9 Task 2).
  */
-const GOLDEN_HASH = 0xa2c269;
+const GOLDEN_HASH = 0x837bc270;
 
 describe('determinism', () => {
   it('produces the golden hash for a fixed seed and input script', () => {

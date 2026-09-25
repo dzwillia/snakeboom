@@ -45,7 +45,7 @@ export function describeRound(
     if (!lines.includes(line)) lines.push(line);
   }
   if (lines.length > 0) return { title, detail: lines.join(' · ') };
-  return { title, detail: winner === null ? 'Time ran out' : `Time's up · ${names[winner]} had more hearts` };
+  return { title, detail: winner === null ? 'Nobody survived' : `${names[winner]} outlasted the border` };
 }
 
 /** The order the Powers page lists pickups in: the same as the title screen's line. */

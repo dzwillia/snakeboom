@@ -30,7 +30,12 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   growth.add(cfg, 'growthPerSecond', 0, 200, 5).name('growth per second');
   growth.add(cfg, 'overtimeAt', 10, 300, 5).name('overtime at (s)');
   growth.add(cfg, 'overtimeGrowthMultiplier', 1, 10, 0.5).name('overtime growth ×');
-  growth.add(cfg, 'roundMaxSeconds', 30, 600, 10).name('round cap (s)');
+  growth.add(cfg, 'roundMaxSeconds', 20, 600, 5).name('round cap (s)');
+
+  const border = gui.addFolder('Border');
+  border.add(cfg, 'borderCloseSeconds', 0, 60, 1).name('closes from (s before cap)');
+  border.add(cfg, 'borderCloseSpeed', 0, 100, 1).name('close speed (units/s)');
+  border.add(cfg, 'borderCrushSpeed', 0, 400, 10).name('crush speed after cap');
 
   const boost = gui.addFolder('Boost');
   boost.add(cfg, 'boostMultiplier', 1, 3, 0.1).name('speed ×');

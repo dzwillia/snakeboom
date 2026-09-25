@@ -36,6 +36,7 @@ export class Renderer {
         this.lastTilesVersion = -1;
       }
       for (const view of this.snakes) view.hide();
+      this.arena.setInset(0, timeSeconds);
       this.arena.setAlert(false, timeSeconds);
       return;
     }
@@ -48,6 +49,7 @@ export class Renderer {
       this.arena.drawTiles(state.tiles);
       this.lastTilesVersion = state.tilesVersion;
     }
+    this.arena.setInset(state.phase === 'playing' || state.phase === 'roundOver' ? state.inset : 0, timeSeconds);
     this.arena.setAlert(state.overtime && state.phase === 'playing', timeSeconds);
     this.pickups.draw(state.pickups, cfg, timeSeconds);
     state.snakes.forEach((s, i) => {

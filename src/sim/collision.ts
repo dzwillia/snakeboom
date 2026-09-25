@@ -71,6 +71,11 @@ export function detectHit(state: MatchState, idx: number, cfg: Config): Hit | nu
     if (me.effects.dozer <= 0 && circleHitsTiles(state.tiles, me.x, me.y, r)) return { cause: 'obstacle', killer: null };
   }
 
-  if (circleHitsWall(me.x, me.y, r)) return { cause: 'wall', killer: null };
+  // The real wall ignores grace. The moving border doesn't: a deflection off it would otherwise cost
+  // every heart in three ticks, since the border keeps coming while the head slides along it.
+  if (circleHitsWall(me.x, me.y, r, state.inset)) {
+    if (state.inset > 0 && me.effects.grace > 0) return null;
+    return { cause: 'wall', killer: null };
+  }
   return null;
 }

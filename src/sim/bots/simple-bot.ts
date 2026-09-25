@@ -110,7 +110,7 @@ function clearSteps(state: MatchState, idx: number, turn: -1 | 0 | 1, cfg: Confi
     h += stepTurn;
     x += detCos(h) * stepDist;
     y += detSin(h) * stepDist;
-    if (circleHitsWall(x, y, r + 2) || circleHitsTiles(state.tiles, x, y, r + 2)) return k - 1;
+    if (circleHitsWall(x, y, r + 2, state.inset) || circleHitsTiles(state.tiles, x, y, r + 2)) return k - 1;
     probe.blocked = false;
     forEachSolidPointNear(state, x, y, 2 * r + 3, (snake, i) => {
       if (snake !== idx || me.trail.cum[i] < ignoreOwnFrom) probe.blocked = true;
