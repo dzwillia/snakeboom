@@ -6,6 +6,7 @@ export const FLOW_EVENTS: ReadonlySet<SimEvent['type']> = new Set<SimEvent['type
   'countdown',
   'go',
   'overtime',
+  'borderClosing',
   'death',
   'roundOver',
   'matchOver',

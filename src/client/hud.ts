@@ -2,12 +2,10 @@ import { TICK_RATE, type Config, type EffectName, type MatchState, type SnakeSta
 import { blinkOn } from './blink';
 import { PLAYER_NAMES, describeItem, formatClock } from './text';
 
-const EFFECT_ORDER: EffectName[] = ['dozer', 'ghost', 'turbo', 'slow', 'reverse'];
+const EFFECT_ORDER: EffectName[] = ['dozer', 'ghost', 'reverse'];
 const EFFECT_LABELS: Record<EffectName, string> = {
   dozer: 'DOZER',
   ghost: 'GHOST',
-  turbo: 'TURBO',
-  slow: 'SLOWED',
   reverse: 'REVERSED',
 };
 
@@ -160,13 +158,18 @@ export class Hud {
       }
     });
 
+    // While the border closes, the clock counts down to the cap in red; past it, it shows how long the crush has run.
+    const capTicks = Math.round(cfg.roundMaxSeconds * TICK_RATE);
+    const closing = state.phase !== 'countdown' && state.inset > 0;
     const clock = state.overtime
       ? `OVERTIME ${formatClock(state.roundTicks, TICK_RATE)}`
-      : formatClock(state.roundTicks, TICK_RATE);
+      : closing && state.roundTicks < capTicks
+        ? formatClock(capTicks - state.roundTicks, TICK_RATE)
+        : formatClock(state.roundTicks, TICK_RATE);
     if (clock !== this.lastClock) {
       this.lastClock = clock;
       this.clock.textContent = clock;
-      this.clock.classList.toggle('overtime', state.overtime);
+      this.clock.classList.toggle('overtime', state.overtime || closing);
     }
   }
 }

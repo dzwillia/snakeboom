@@ -1,6 +1,7 @@
 import { updateBombs } from './bombs';
 import { detectHit } from './collision';
-import { TICK_RATE, type Config } from './config';
+import { DT, TICK_RATE, type Config } from './config';
+import { borderSpeedAt, maxInset } from './border';
 import { tickItemTimers, useItem } from './items';
 import { MAPS } from './maps';
 import { plow } from './dozer';
@@ -10,7 +11,7 @@ import { createRng } from './rng';
 import { advanceSnake, growthRate } from './snake';
 import { tryHeart, tryShield } from './shield';
 import { pickNextMap, startRound } from './state';
-import { NO_INPUT, type DeathRecord, type MatchState, type PlayerInput, type SimEvent, type SnakeState } from './types';
+import { NO_INPUT, type DeathRecord, type MatchState, type PlayerInput, type SimEvent } from './types';
 
 /** Advances the match by one tick, mutating `state`, and returns what happened. */
 export function step(state: MatchState, inputs: readonly PlayerInput[], cfg: Config): SimEvent[] {
@@ -60,6 +61,7 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
     events.push({ type: 'overtime' });
   }
 
+  closeBorder(state, cfg, events);
   tickItemTimers(state, events);
   state.snakes.forEach((s, i) => {
     if (s.alive && (inputs[i] ?? NO_INPUT).use) useItem(state, i, cfg, events);
@@ -100,20 +102,23 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
     events.push({ type: 'death', ...d });
   }
 
+  // Time never ends a round: past the cap the border closes fast until somebody dies.
   const alive = state.snakes.filter((s) => s.alive);
-  const timeUp = state.roundTicks >= Math.round(cfg.roundMaxSeconds * TICK_RATE);
   if (alive.length === 1) return endRound(state, cfg, events, alive[0].id);
   if (alive.length === 0) return endRound(state, cfg, events, null);
-  if (timeUp) return endRound(state, cfg, events, mostHearts(alive));
   detectNearMisses(state, cfg, events);
   updatePickups(state, cfg, events);
 }
 
-/** When time runs out: the snake with strictly the most hearts left, or null on a tie. */
-function mostHearts(snakes: SnakeState[]): number | null {
-  const top = Math.max(...snakes.map((s) => s.hearts));
-  const leaders = snakes.filter((s) => s.hearts === top);
-  return leaders.length === 1 ? leaders[0].id : null;
+/**
+ * The closing border: still until borderCloseSeconds before the cap, then in at borderCloseSpeed,
+ * then at borderCrushSpeed past the cap. Capped so the live area never drops below 4r on either axis.
+ */
+function closeBorder(state: MatchState, cfg: Config, events: SimEvent[]): void {
+  const speed = borderSpeedAt(state.roundTicks, cfg);
+  if (speed <= 0) return;
+  if (state.inset === 0) events.push({ type: 'borderClosing' });
+  state.inset = Math.min(maxInset(cfg), state.inset + speed * DT);
 }
 
 function endRound(state: MatchState, cfg: Config, events: SimEvent[], winner: number | null): void {

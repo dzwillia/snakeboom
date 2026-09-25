@@ -1,5 +1,6 @@
 import { circleHitsTiles } from './arena';
 import { forEachSolidPointNear } from './collision';
+import { circleHitsWall } from './arena';
 import { ARENA_HEIGHT, ARENA_WIDTH, TICK_RATE, type Config, type PickupKind } from './config';
 import { createItem } from './items';
 import { rngNext, rngRange, type RngState } from './rng';
@@ -44,7 +45,8 @@ function isClear(state: MatchState, cfg: Config, x: number, y: number): boolean 
 
 /** A random legal spot for a pickup, or null after SPAWN_TRIES misses. */
 export function findSpawnPoint(state: MatchState, cfg: Config): { x: number; y: number } | null {
-  const c = cfg.pickupClearance;
+  const c = cfg.pickupClearance + state.inset;
+  if (ARENA_WIDTH - 2 * c <= 0 || ARENA_HEIGHT - 2 * c <= 0) return null;
   for (let t = 0; t < SPAWN_TRIES; t++) {
     const x = rngRange(state.rng, c, ARENA_WIDTH - c);
     const y = rngRange(state.rng, c, ARENA_HEIGHT - c);
@@ -55,7 +57,11 @@ export function findSpawnPoint(state: MatchState, cfg: Config): { x: number; y: 
 
 /** Ages and expires pickups, and spawns a new one every pickupInterval. Call once per playing tick. */
 export function updatePickups(state: MatchState, cfg: Config, events: SimEvent[]): void {
-  for (const p of state.pickups) p.ttl--;
+  // Ageing, plus anything the closing border has swallowed.
+  for (const p of state.pickups) {
+    p.ttl--;
+    if (state.inset > 0 && circleHitsWall(p.x, p.y, cfg.pickupRadius, state.inset)) p.ttl = 0;
+  }
   if (state.pickups.some((p) => p.ttl <= 0)) {
     for (const p of state.pickups) if (p.ttl <= 0) events.push({ type: 'pickupExpired', id: p.id });
     state.pickups = state.pickups.filter((p) => p.ttl > 0);

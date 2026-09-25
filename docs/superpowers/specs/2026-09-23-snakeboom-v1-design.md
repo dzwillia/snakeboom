@@ -366,37 +366,36 @@ Because the engine is deterministic and each player's input per tick is tiny (ab
 
 ## 6. Tunable defaults
 
-These are the v0.7.0 defaults, taken from a playtest tuning session.
+These are the v0.12.0 "pace" defaults (M9). The v0.7.0 values are kept as `CLASSIC_CONFIG` and as a preset in the tuning panel.
 
 | Group | Setting | Default |
 |---|---|---|
 | Arena | `arenaWidth` × `arenaHeight` · `tileSize` · map cell | 1600 × 1000 · 20 · 40 (fixed in v1) |
 | Snake | `snakeRadius` (r) | 8 |
-| | `baseSpeed` | 240 units/s |
-| | `turnRate` | 5.4 rad/s (~309°/s, ~44-unit turning radius) |
-| | `neckLength` | 30 units |
-| Growth | `startLength` | 60 units |
-| | `growthPerSecond` | 20 units/s |
-| | `overtimeAt` · `overtimeGrowthMultiplier` | 180 s · ×3 |
-| | `roundMaxSeconds` (time limit) | 90 s |
+| | `baseSpeed` | 280 units/s |
+| | `turnRate` | 6.3 rad/s (~361°/s, ~44-unit turning radius) |
+| | `neckLength` | 35 units |
+| Growth | `startLength` | 120 units |
+| | `growthPerSecond` | 40 units/s |
+| | `overtimeAt` · `overtimeGrowthMultiplier` | 9999 s (off; the border replaced it) · ×3 |
+| | `roundMaxSeconds` (the cap) | 45 s |
+| Border | `borderCloseSeconds` · `borderCloseSpeed` · `borderCrushSpeed` | 15 s · 12 units/s per side · 120 units/s per side |
 | Boost | `boostMultiplier` | 2 |
 | | `boostMeterSeconds` (full → empty) | 2.0 s |
 | | `boostRefillSeconds` (empty → full, key released) | 6.0 s |
-| Pickups | `maxPickups` · `firstPickupDelay` · `pickupInterval` | 4 · 1 s · 2.5 s |
+| Pickups | `maxPickups` · `firstPickupDelay` · `pickupInterval` | 6 · 0.5 s · 1.5 s |
 | | `pickupLifetime` · `pickupRadius` | 12 s · 14 |
 | | `pickupMinHeadDistance` · `pickupClearance` | 150 · 40 |
-| | Weights | bomb 25 · ghost 13 · shield 20 · turbo 20 · slow 20 · reverse 12.5 · dozer 35 |
+| | Weights | bomb 40 · ghost 15 · shield 15 · reverse 10 · dozer 20 |
 | | `itemSlots` | 3 |
 | Bombs | `bombCharges` · `bombThrowCooldown` · `bombFlightTime` | 3 · 0.5 s · 0.45 s |
 | | `bombFuse` (after landing) · `blastRadius` · `chainDelay` · `bombLeadFactor` | 1 s · 70 · 0.12 s · 1 |
-| Items | `ghostDuration` | 3 s |
-| | `effectWarning` (specials flash before they run out) | 3 s |
+| Items | `ghostDuration` | 2 s |
+| | `effectWarning` (specials flash before they run out) | 1 s |
 | | `shieldGrace` | 0.5 s |
-| | `turboDuration` | 4 s |
-| | `slowDuration` · `slowFactor` | 4 s · 0.6 |
-| | `reverseDuration` | 4 s |
-| | `dozerDuration` | 5 s |
-| Hearts | `hearts` · `heartGrace` | 3 · 1 s |
+| | `reverseDuration` | 2 s |
+| | `dozerDuration` | 3 s |
+| Hearts | `hearts` · `heartGrace` | 2 · 1 s |
 | Match | `winsToWin` · `countdownSeconds` · `roundOverSeconds` | 5 · 3 s · 2.5 s |
 | Effects (client) | bloom on · strength · threshold | on · 1.5 · 0.2 |
 | | `shakeScale` · `hitStopSeconds` · `slowMoScale` · `slowMoSeconds` | 2.0 · 0.12 s · 0.3 · 0.8 s |
@@ -517,4 +516,5 @@ Playtest focus: the "one more match" test.
 
 - **v0.4.0.** Bombs are thrown, not dropped. The old drop-at-your-head bomb felt random. A thrown bomb lands where the opponent is heading, shows a reticle over its blast zone, and gives them about 1.45 s to react. More pickups spawn: up to 4 on the field, the first after 1 s, then one every 2.5 s, each lasting 12 s. Power-ups have more weight relative to bombs.
 - **v0.5.0.** Snakes carry up to 3 items in a queue, and Use fires the oldest. A Shield becomes a bubble that never takes a slot. There's a new **Bulldozer** power-up: for 5 s your plow shoves blocks, pushing rows of up to 4 and crushing any it can't move. It can shove a block into your opponent's head.
+- **v0.12.0 (M9, pace).** Turbo and Slow are gone: Turbo was invisible and Slow made the other player's turn duller. Two hearts, not three. Rounds are 45 s and always end in a kill: the border closes in over the last 15 s and, past the cap, crushes until someone dies; there are no time-up draws or hearts-count wins. Snakes are faster with the same turning circle, start twice as long and grow twice as fast. Effects are moments (Ghost 2 s, Reverse 2 s, Bulldozer 3 s, 1 s warning). Pickups come every 1.5 s, up to 6, with bombs heavier in the mix. The old feel stays as the Classic preset.
 - **v0.7.0.** Each snake has 3 **hearts** per round. A hit costs a heart instead of killing: the snake deflects as if it had a Shield and gets 1 s of grace, and only a hit on the last heart kills. A Shield is still spent before a heart. Timed specials flash on and off for their last `effectWarning` seconds (3 s), on the snake and on the HUD, where each running special now shows its seconds left. Rounds end after 90 s; the snake with more hearts left wins, and equal hearts is a draw. The defaults come from a playtest tuning session: faster, tighter-turning snakes that start shorter and grow more slowly (speed 240, turn rate 5.4, start length 60, growth 20/s), boost ×2, a bigger head (r = 8), more Bulldozers, Shields, Turbos and Slows, double screen shake, and volume 0.8.

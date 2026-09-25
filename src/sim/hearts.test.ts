@@ -100,26 +100,22 @@ describe('hearts', () => {
     expect([a.hearts, b.hearts]).toEqual([2, 2]);
   });
 
-  it('when time runs out, more hearts wins the round', () => {
-    const c = { ...cfg, roundMaxSeconds: 1 };
+  it('when time runs out, nobody wins on hearts: the border closes until someone dies', () => {
+    const c = { ...cfg, roundMaxSeconds: 1, borderCloseSeconds: 0 };
     const s = toPlaying(c);
     s.snakes[1].hearts = 2;
-    const events = run(s, TICK_RATE, c);
-    expect(events.find((e) => e.type === 'roundOver')).toEqual({ type: 'roundOver', winner: 0, deaths: [] });
-  });
-
-  it('when time runs out with equal hearts, the round is a draw', () => {
-    const c = { ...cfg, roundMaxSeconds: 1 };
-    const s = toPlaying(c);
-    const events = run(s, TICK_RATE, c);
-    expect(events.find((e) => e.type === 'roundOver')).toEqual({ type: 'roundOver', winner: null, deaths: [] });
+    const events = run(s, TICK_RATE + 5, c);
+    expect(events.find((e) => e.type === 'roundOver')).toBeUndefined();
+    expect(s.phase).toBe('playing');
+    expect(s.inset).toBeGreaterThan(0);
   });
 
   it('refills hearts at the start of every round', () => {
     const c = { ...cfg, roundMaxSeconds: 1 };
     const s = toPlaying(c);
     s.snakes[0].hearts = 1;
-    run(s, TICK_RATE + Math.round(c.roundOverSeconds * TICK_RATE), c);
+    s.snakes[1].alive = false;
+    run(s, 1 + Math.round(c.roundOverSeconds * TICK_RATE), c);
     expect(s.round).toBe(2);
     expect(s.snakes.map((sn) => sn.hearts)).toEqual([3, 3]);
   });

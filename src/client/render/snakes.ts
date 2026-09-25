@@ -116,7 +116,7 @@ export class SnakeView {
     strokeRuns(chunk.core, runs, Math.max(1.5, radius * 0.7), PALETTE.core);
   }
 
-  /** The head plus status: turbo streaks, slow halo, ghost glow, shield ring, grace flash, reverse swirl. */
+  /** The head plus status: ghost glow, shield ring, grace flash, reverse swirl, bulldozer blade. */
   private drawHead(s: SnakeState, x: number, y: number, cfg: Config, t: number): void {
     const g = this.head;
     const r = cfg.snakeRadius;
@@ -126,19 +126,6 @@ export class SnakeView {
     // Every timed special flashes during its last cfg.effectWarning seconds.
     const shows = (ticks: number) => ticks > 0 && blinkOn(ticks / TICK_RATE, cfg.effectWarning, t);
 
-    if (shows(e.turbo)) {
-      const bx = -Math.cos(s.heading);
-      const by = -Math.sin(s.heading);
-      for (const side of [-0.8, 0, 0.8]) {
-        const ox = -by * side * r;
-        const oy = bx * side * r;
-        g.moveTo(x + ox + bx * r * 1.5, y + oy + by * r * 1.5).lineTo(x + ox + bx * r * 4.5, y + oy + by * r * 4.5);
-      }
-      g.stroke({ width: 2.5, color: PICKUP_COLORS.turbo, cap: 'round' });
-    }
-    if (shows(e.slow)) {
-      g.circle(x, y, r * 2.7).stroke({ width: 3, color: PICKUP_COLORS.slow, alpha: 0.55 + 0.3 * Math.sin(t * 10) });
-    }
 
     if (shows(e.dozer)) {
       // Bulldozer blade across the front of the head.

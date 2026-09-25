@@ -47,8 +47,6 @@ export interface ItemState {
 /** Timed effects on a snake, in ticks remaining (0 = off). */
 export interface EffectTimers {
   ghost: number;
-  turbo: number;
-  slow: number;
   reverse: number;
   /** Bulldozer: the plow shoves blocks and the head ignores them. */
   dozer: number;
@@ -57,7 +55,7 @@ export interface EffectTimers {
 }
 
 /** Effects announced by effectStarted/effectEnded events (grace is internal). */
-export type EffectName = 'ghost' | 'turbo' | 'slow' | 'reverse' | 'dozer';
+export type EffectName = 'ghost' | 'reverse' | 'dozer';
 
 export interface PickupState {
   id: number;
@@ -137,6 +135,8 @@ export interface MatchState {
   /** Ticks since GO in the current round. */
   roundTicks: number;
   overtime: boolean;
+  /** How far the deadly border has moved in from every side this round, in units. */
+  inset: number;
   scores: number[];
   matchWinner: number | null;
   lastRoundWinner: number | null;
@@ -164,6 +164,8 @@ export type SimEvent =
   | { type: 'countdown'; n: number }
   | { type: 'go' }
   | { type: 'overtime' }
+  /** Once per round, when the border starts moving in. */
+  | { type: 'borderClosing' }
   | { type: 'boostStarted'; player: number }
   | ({ type: 'death' } & DeathRecord)
   | { type: 'roundOver'; winner: number | null; deaths: DeathRecord[] }

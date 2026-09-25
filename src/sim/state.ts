@@ -13,6 +13,7 @@ export function createMatch(cfg: Config, seed: number): MatchState {
     round: 1,
     roundTicks: 0,
     overtime: false,
+    inset: 0,
     scores: [0, 0],
     matchWinner: null,
     lastRoundWinner: null,
@@ -47,6 +48,7 @@ export function startRound(state: MatchState, cfg: Config): void {
   state.phaseTicks = Math.max(1, Math.round(cfg.countdownSeconds * TICK_RATE));
   state.roundTicks = 0;
   state.overtime = false;
+  state.inset = 0;
   state.deaths = [];
 }
 

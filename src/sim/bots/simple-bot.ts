@@ -56,16 +56,12 @@ export function botInput(bot: BotState, state: MatchState, idx: number, cfg: Con
     case 'bomb':
       use = rngNext(bot.rng) < (state.snakes.some((o, j) => j !== idx && o.alive) ? 0.03 : 0);
       break;
-    case 'slow':
     case 'reverse':
       use = rngNext(bot.rng) < (near ? 0.08 : 0.005);
       break;
     case 'ghost':
       // Escape when boxed in; otherwise use it eventually so it doesn't block the queue.
       use = best < LOOK_STEPS / 3 || rngNext(bot.rng) < 0.005;
-      break;
-    case 'turbo':
-      use = best === LOOK_STEPS && rngNext(bot.rng) < 0.01;
       break;
     case 'dozer':
       use = best < LOOK_STEPS / 2 || rngNext(bot.rng) < 0.005;
@@ -114,7 +110,7 @@ function clearSteps(state: MatchState, idx: number, turn: -1 | 0 | 1, cfg: Confi
     h += stepTurn;
     x += detCos(h) * stepDist;
     y += detSin(h) * stepDist;
-    if (circleHitsWall(x, y, r + 2) || circleHitsTiles(state.tiles, x, y, r + 2)) return k - 1;
+    if (circleHitsWall(x, y, r + 2, state.inset) || circleHitsTiles(state.tiles, x, y, r + 2)) return k - 1;
     probe.blocked = false;
     forEachSolidPointNear(state, x, y, 2 * r + 3, (snake, i) => {
       if (snake !== idx || me.trail.cum[i] < ignoreOwnFrom) probe.blocked = true;

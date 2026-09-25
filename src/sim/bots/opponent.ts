@@ -1,4 +1,5 @@
 import { circleHitsTiles, circleHitsWall } from '../arena';
+import { insetAt } from '../border';
 import { forEachSolidPointNear } from '../collision';
 import { DT, TICK_RATE, TILE_COLS, TILE_ROWS, TILE_SIZE, type Config } from '../config';
 import { detCos, detSin } from '../detmath';
@@ -219,9 +220,7 @@ export function opponentInput(bot: OpponentState, state: MatchState, idx: number
   }
   const p = bot.profile;
   const ctx = buildCtx(state, idx, cfg, p.lookSteps);
-  // Turbo makes boosting free, so plan at boost speed and hold boost whenever the line is clear.
-  const turbo = me.effects.turbo > 0;
-  const speed = cruiseSpeed(me, cfg, turbo);
+  const speed = cruiseSpeed(cfg, false);
 
   let use = false;
   if (bot.cooldown > 0) bot.cooldown--;
@@ -239,8 +238,8 @@ export function opponentInput(bot: OpponentState, state: MatchState, idx: number
     const best = choosePlan(bot, plans);
     bot.turn = best.turns[0];
     bot.lastSteps = best.steps;
-    bot.boost = turbo ? best.steps === ctx.look : wantBoost(ctx, bot, best, goal);
-    use = wantUse(ctx, bot, best, goal);
+    bot.boost = wantBoost(ctx, bot, best, goal);
+    use = wantUse(ctx, bot, best);
   }
 
   // The sim flips left and right while Reversed; a bot that has noticed steers the other way.
@@ -252,8 +251,8 @@ export function opponentInput(bot: OpponentState, state: MatchState, idx: number
   return { turn, boost: bot.boost, use };
 }
 
-function cruiseSpeed(me: SnakeState, cfg: Config, boosting: boolean): number {
-  return cfg.baseSpeed * (boosting ? cfg.boostMultiplier : 1) * (me.effects.slow > 0 ? cfg.slowFactor : 1);
+function cruiseSpeed(cfg: Config, boosting: boolean): number {
+  return cfg.baseSpeed * (boosting ? cfg.boostMultiplier : 1);
 }
 
 function dist2(ax: number, ay: number, bx: number, by: number): number {
@@ -279,7 +278,7 @@ function buildCtx(state: MatchState, idx: number, cfg: Config, look: number): Ct
   const oppX: number[] = [];
   const oppY: number[] = [];
   if (opp) {
-    const stepDist = cruiseSpeed(opp, cfg, opp.boosting) * DT * STEP_TICKS;
+    const stepDist = cruiseSpeed(cfg, opp.boosting) * DT * STEP_TICKS;
     const cx = detCos(opp.heading) * stepDist;
     const cy = detSin(opp.heading) * stepDist;
     for (let k = 0; k <= look; k++) {
@@ -357,7 +356,7 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
     const fail = () => ({ turns, holds, steps: k - 1, x: px[k - 1], y: py[k - 1], pathLen: (k - 1) * stepDist, px, py, cut });
 
     // Walls are exact, and a deflection leaves the head only half a pixel clear of one.
-    if (circleHitsWall(x, y, r + 1)) return fail();
+    if (circleHitsWall(x, y, r + 1, insetAt(state, cfg, tick))) return fail();
     if (tick > ctx.protectedTicks) {
       if (tick > ctx.dozerTicks && circleHitsTiles(state.tiles, x, y, r + 2)) return fail();
       // Own points count once they're past the neck, which moves along with the head.
@@ -412,8 +411,8 @@ function pickGoal(ctx: Ctx, p: OpponentProfile): Goal | null {
     const d = Math.sqrt(dist2(opp.x, opp.y, me.x, me.y));
     if (d < INTERCEPT_RANGE) {
       // Pursuit: aim where the opponent will be by the time we could get there, holding course.
-      const mySpeed = cruiseSpeed(me, cfg, false);
-      const lead = Math.min(320, Math.max(60, cruiseSpeed(opp, cfg, opp.boosting) * (d / mySpeed) * 0.8));
+      const mySpeed = cruiseSpeed(cfg, false);
+      const lead = Math.min(320, Math.max(60, cruiseSpeed(cfg, opp.boosting) * (d / mySpeed) * 0.8));
       return { x: opp.x + detCos(opp.heading) * lead, y: opp.y + detSin(opp.heading) * lead, weight: p.aggression };
     }
   }
@@ -626,10 +625,10 @@ function wantBoost(ctx: Ctx, bot: OpponentState, best: Plan, goal: Goal | null):
   }
   if (!reason || rngNext(bot.rng) >= p.boostUse) return false;
   // Only if the same line is still clear at boost speed.
-  return rollout(ctx, best.turns, best.holds, cruiseSpeed(me, cfg, true), ctx.look).steps === ctx.look;
+  return rollout(ctx, best.turns, best.holds, cruiseSpeed(cfg, true), ctx.look).steps === ctx.look;
 }
 
-function wantUse(ctx: Ctx, bot: OpponentState, best: Plan, goal: Goal | null): boolean {
+function wantUse(ctx: Ctx, bot: OpponentState, best: Plan): boolean {
   const { me, cfg, opp, state, idx } = ctx;
   const p = bot.profile;
   const item = me.items[0];
@@ -647,7 +646,7 @@ function wantUse(ctx: Ctx, bot: OpponentState, best: Plan, goal: Goal | null): b
       // Never blast ourselves: where will we be when it goes off, holding course?
       const at = throwTarget(state, idx, cfg);
       const ticks = Math.round((cfg.bombFlightTime + cfg.bombFuse) * TICK_RATE);
-      const travel = cruiseSpeed(me, cfg, me.boosting) * DT * ticks;
+      const travel = cruiseSpeed(cfg, me.boosting) * DT * ticks;
       const mx = me.x + detCos(me.heading) * travel;
       const my = me.y + detSin(me.heading) * travel;
       const safe = cfg.blastRadius + 3 * cfg.snakeRadius + 20;
@@ -659,9 +658,6 @@ function wantUse(ctx: Ctx, bot: OpponentState, best: Plan, goal: Goal | null): b
       return boxed || unclog;
     case 'dozer':
       return boxed || unclog;
-    case 'turbo':
-      return (best.steps === ctx.look && goal !== null && rngNext(bot.rng) < 0.05 * p.itemSkill) || unclog;
-    case 'slow':
     case 'reverse': {
       if (!opp) return unclog;
       const chance = oppBoxed ? 0.3 : oppDist < 350 ? 0.1 : 0.005;
@@ -673,7 +669,7 @@ function wantUse(ctx: Ctx, bot: OpponentState, best: Plan, goal: Goal | null): b
 /** How many steps the other snake can hold course before hitting something static. */
 function straightClear(ctx: Ctx, s: SnakeState, limit: number): number {
   const { state, cfg, r } = ctx;
-  const stepDist = cruiseSpeed(s, cfg, false) * DT * STEP_TICKS;
+  const stepDist = cruiseSpeed(cfg, false) * DT * STEP_TICKS;
   const cx = detCos(s.heading) * stepDist;
   const cy = detSin(s.heading) * stepDist;
   const ignoreFrom = headCum(s.trail) - cfg.neckLength - 2 * r;
@@ -681,7 +677,7 @@ function straightClear(ctx: Ctx, s: SnakeState, limit: number): number {
   for (let k = 1; k <= limit; k++) {
     const x = s.x + cx * k;
     const y = s.y + cy * k;
-    if (circleHitsWall(x, y, r + 2) || circleHitsTiles(state.tiles, x, y, r + 2)) return k - 1;
+    if (circleHitsWall(x, y, r + 2, insetAt(state, cfg, k * STEP_TICKS)) || circleHitsTiles(state.tiles, x, y, r + 2)) return k - 1;
     probe.blocked = false;
     forEachSolidPointNear(state, x, y, 2 * r + 3, (snake, i) => {
       if (snake !== s.id || s.trail.cum[i] < ignoreFrom) probe.blocked = true;

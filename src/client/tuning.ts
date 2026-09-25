@@ -1,5 +1,5 @@
 import GUI from 'lil-gui';
-import { DEFAULT_CONFIG, type Config, type PickupKind } from '../sim';
+import { CLASSIC_CONFIG, DEFAULT_CONFIG, type Config, type PickupKind } from '../sim';
 import { DEFAULT_SETTINGS, OPPONENT_MODES, resetInPlace, type ClientSettings } from './settings';
 import { describeOpponent } from './text';
 
@@ -13,6 +13,17 @@ export interface TuningPanel {
 /** Live sliders for every M1 tunable. The sim reads `cfg` each tick, so changes apply at once. */
 export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: { onChange(): void }): TuningPanel {
   const gui = new GUI({ title: 'SnakeBoom tuning  ( ` to hide )' });
+
+  // Presets: the current defaults, or the v0.7.0 feel for a side-by-side.
+  const presets = {
+    preset: 'pace',
+    apply() {
+      resetInPlace(cfg, presets.preset === 'classic' ? CLASSIC_CONFIG : DEFAULT_CONFIG);
+      refresh();
+      hooks.onChange();
+    },
+  };
+  gui.add(presets, 'preset', { 'Pace (default)': 'pace', 'Classic (v0.7)': 'classic' }).name('preset').onChange(() => presets.apply());
 
   const opponent = gui.addFolder('Opponent');
   opponent
@@ -30,7 +41,12 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   growth.add(cfg, 'growthPerSecond', 0, 200, 5).name('growth per second');
   growth.add(cfg, 'overtimeAt', 10, 300, 5).name('overtime at (s)');
   growth.add(cfg, 'overtimeGrowthMultiplier', 1, 10, 0.5).name('overtime growth ×');
-  growth.add(cfg, 'roundMaxSeconds', 30, 600, 10).name('round cap (s)');
+  growth.add(cfg, 'roundMaxSeconds', 20, 600, 5).name('round cap (s)');
+
+  const border = gui.addFolder('Border');
+  border.add(cfg, 'borderCloseSeconds', 0, 60, 1).name('closes from (s before cap)');
+  border.add(cfg, 'borderCloseSpeed', 0, 100, 1).name('close speed (units/s)');
+  border.add(cfg, 'borderCrushSpeed', 0, 400, 10).name('crush speed after cap');
 
   const boost = gui.addFolder('Boost');
   boost.add(cfg, 'boostMultiplier', 1, 3, 0.1).name('speed ×');
@@ -67,9 +83,6 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   power.add(cfg, 'ghostDuration', 0.5, 10, 0.25).name('ghost (s)');
   power.add(cfg, 'effectWarning', 0, 10, 0.25).name('expiry warning (s)');
   power.add(cfg, 'shieldGrace', 0, 3, 0.1).name('shield grace (s)');
-  power.add(cfg, 'turboDuration', 0.5, 15, 0.5).name('turbo (s)');
-  power.add(cfg, 'slowDuration', 0.5, 15, 0.5).name('slow (s)');
-  power.add(cfg, 'slowFactor', 0.1, 1, 0.05).name('slow speed ×');
   power.add(cfg, 'reverseDuration', 0.5, 15, 0.5).name('reverse (s)');
   power.add(cfg, 'dozerDuration', 0.5, 15, 0.5).name('bulldozer (s)');
 
@@ -91,7 +104,9 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   audio.add(settings, 'muted');
 
   for (const folder of gui.folders.slice(1)) folder.close();
-  const refresh = () => gui.controllersRecursive().forEach((c) => c.updateDisplay());
+  function refresh(): void {
+    gui.controllersRecursive().forEach((c) => c.updateDisplay());
+  }
   const actions = {
     reset: () => {
       resetInPlace(cfg, DEFAULT_CONFIG);

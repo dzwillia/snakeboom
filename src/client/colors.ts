@@ -18,8 +18,6 @@ export const PICKUP_COLORS: Record<PickupKind, number> = {
   bomb: 0xff4d2e,
   ghost: 0xe8f4ff,
   shield: 0x3dff7a,
-  turbo: 0xffe14d,
-  slow: 0x4d7cff,
   reverse: 0xb44dff,
   dozer: 0xff9f1c,
 };

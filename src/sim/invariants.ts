@@ -16,7 +16,9 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
     ];
     for (const [name, v] of values) if (!Number.isFinite(v)) problems.push(`snake ${i}: ${name} is ${v}`);
     if (s.boostMeter < 0 || s.boostMeter > 1) problems.push(`snake ${i}: boostMeter ${s.boostMeter} outside 0..1`);
-    if (s.alive && circleHitsWall(s.x, s.y, cfg.snakeRadius)) problems.push(`snake ${i}: alive outside the arena`);
+    // Grace covers the moving border, so a head may sit in the dead zone for a moment after a deflection.
+    const excused = state.inset > 0 && s.effects.grace > 0;
+    if (s.alive && !excused && circleHitsWall(s.x, s.y, cfg.snakeRadius, state.inset)) problems.push(`snake ${i}: alive outside the live area`);
     const t = s.trail;
     if (t.ys.length !== t.xs.length || t.cum.length !== t.xs.length || t.solid.length !== t.xs.length) {
       problems.push(`snake ${i}: trail arrays out of sync`);
@@ -43,7 +45,7 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
     problems.push(`${state.pickups.length} pickups on the field (max ${cfg.maxPickups})`);
   }
   for (const p of state.pickups) {
-    if (circleHitsWall(p.x, p.y, 0)) problems.push(`pickup ${p.id} outside the arena`);
+    if (circleHitsWall(p.x, p.y, 0, state.inset)) problems.push(`pickup ${p.id} outside the live area`);
     if (p.ttl <= 0) problems.push(`pickup ${p.id} outlived its lifetime`);
   }
   for (const b of state.bombs) {
@@ -51,5 +53,6 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
     if (b.fuse <= 0) problems.push(`bomb ${b.id} should have exploded`);
   }
   if (state.tiles.some((v) => v !== 0 && v !== 1)) problems.push('tiles hold values other than 0 and 1');
+  if (!Number.isFinite(state.inset) || state.inset < 0) problems.push(`inset is ${state.inset}`);
   return problems;
 }

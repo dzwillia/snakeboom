@@ -75,12 +75,14 @@ describe('step: playing', () => {
     expect(s.scores).toEqual([0, 0]);
   });
 
-  it('declares a draw when the round reaches roundMaxSeconds', () => {
-    const c = { ...cfg, roundMaxSeconds: 1 };
+  it('keeps playing past roundMaxSeconds, with the border closing fast', () => {
+    const c = { ...cfg, roundMaxSeconds: 1, borderCloseSeconds: 0 };
     const s = toPlaying(c);
-    const events = run(s, TICK_RATE, c);
-    expect(events.find((e) => e.type === 'roundOver')).toEqual({ type: 'roundOver', winner: null, deaths: [] });
-    expect(s.phase).toBe('roundOver');
+    const events = run(s, TICK_RATE + 30, c);
+    expect(events.find((e) => e.type === 'roundOver')).toBeUndefined();
+    expect(events.filter((e) => e.type === 'borderClosing')).toHaveLength(1);
+    expect(s.phase).toBe('playing');
+    expect(s.inset).toBeCloseTo((c.borderCrushSpeed * 30) / TICK_RATE, 6);
   });
 
   it('enters overtime once, at overtimeAt', () => {

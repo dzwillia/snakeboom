@@ -23,10 +23,6 @@ const GLYPHS: Record<PickupKind, string> = {
   shield:
     `<polygon points="0,-0.9 0.75,-0.55 0.6,0.35 0,0.9 -0.6,0.35 -0.75,-0.55" fill="none" ` +
     `stroke="currentColor" stroke-width="0.16" stroke-linejoin="round"/>`,
-  turbo: `<polygon points="0.15,-0.95 -0.55,0.1 -0.05,0.1 -0.2,0.95 0.55,-0.15 0.05,-0.15" fill="currentColor"/>`,
-  slow:
-    `<polygon points="-0.55,-0.8 0.55,-0.8 0,0" fill="currentColor"/>` +
-    `<polygon points="-0.55,0.8 0.55,0.8 0,0" fill="currentColor"/>`,
   reverse:
     `<path d="M-0.7 -0.3 L0.45 -0.3 M0.7 0.3 L-0.45 0.3" stroke="currentColor" stroke-width="0.16" stroke-linecap="round" fill="none"/>` +
     `<polygon points="0.8,-0.3 0.35,-0.62 0.35,0.02" fill="currentColor"/>` +

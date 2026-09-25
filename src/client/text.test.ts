@@ -31,8 +31,8 @@ describe('text', () => {
     expect(describeRound(0, [d(1, 'wall', null)])).toEqual({ title: 'CYAN SCORES', detail: 'PINK hit the wall' });
     expect(describeRound(null, [d(0, 'headOn', 1), d(1, 'headOn', 0)])).toEqual({ title: 'DRAW', detail: 'Head-on collision' });
     expect(describeRound(null, [d(0, 'wall', null), d(1, 'wall', null)]).detail).toBe('CYAN hit the wall · PINK hit the wall');
-    expect(describeRound(null, [])).toEqual({ title: 'DRAW', detail: 'Time ran out' });
-    expect(describeRound(0, [])).toEqual({ title: 'CYAN SCORES', detail: "Time's up · CYAN had more hearts" });
+    expect(describeRound(null, [])).toEqual({ title: 'DRAW', detail: 'Nobody survived' });
+    expect(describeRound(0, [])).toEqual({ title: 'CYAN SCORES', detail: 'CYAN outlasted the border' });
   });
 
   it('labels held items for the HUD', () => {
@@ -40,8 +40,6 @@ describe('text', () => {
     expect(describeItem({ kind: 'bomb', charges: 3 })).toBe('BOMB ×3');
     expect(describeItem({ kind: 'ghost', charges: 1 })).toBe('GHOST');
     expect(describeItem({ kind: 'shield', charges: 1 })).toBe('SHIELD');
-    expect(describeItem({ kind: 'turbo', charges: 1 })).toBe('TURBO');
-    expect(describeItem({ kind: 'slow', charges: 1 })).toBe('SLOW');
     expect(describeItem({ kind: 'reverse', charges: 1 })).toBe('REVERSE');
     expect(describeItem({ kind: 'dozer', charges: 1 })).toBe('DOZER');
   });
@@ -71,9 +69,9 @@ describe('text', () => {
     expect(bomb.stats).toContain(`blast radius ${DEFAULT_CONFIG.blastRadius}`);
     expect(bomb.detail).toContain(`goes off ${DEFAULT_CONFIG.bombFuse} s later`);
 
-    const tuned = { ...DEFAULT_CONFIG, ghostDuration: 7.5, slowFactor: 0.25 };
+    const tuned = { ...DEFAULT_CONFIG, ghostDuration: 7.5, reverseDuration: 2.5 };
     expect(describePower('ghost', tuned).stats).toContain('7.5 s');
-    expect(describePower('slow', tuned).stats).toContain('25% speed');
+    expect(describePower('reverse', tuned).stats).toContain('2.5 s');
 
     for (const kind of POWER_ORDER) {
       const info = describePower(kind, DEFAULT_CONFIG);
@@ -84,9 +82,9 @@ describe('text', () => {
   });
 
   it('turns pickup weights into spawn percentages', () => {
-    const cfg = { ...DEFAULT_CONFIG, pickupWeights: { bomb: 50, ghost: 25, shield: 25, turbo: 0, slow: 0, reverse: 0, dozer: 0 } };
+    const cfg = { ...DEFAULT_CONFIG, pickupWeights: { bomb: 50, ghost: 25, shield: 25, reverse: 0, dozer: 0 } };
     expect(spawnShare('bomb', cfg)).toBe(50);
-    expect(spawnShare('turbo', cfg)).toBe(0);
+    expect(spawnShare('reverse', cfg)).toBe(0);
     const none = { ...cfg, pickupWeights: { ...cfg.pickupWeights, bomb: 0, ghost: 0, shield: 0 } };
     expect(spawnShare('bomb', none)).toBe(0);
   });
