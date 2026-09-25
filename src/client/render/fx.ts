@@ -78,20 +78,16 @@ export class Fx {
     this.addShake(14);
   }
 
-  /** A bomb going off. Chain links grow: bigger flash, more sparks, wider rings, more shake. */
-  explosion(x: number, y: number, radius: number, chainDepth: number, tiles: readonly number[]): void {
-    const depth = Math.min(chainDepth, 6);
-    const grow = 1 + 0.12 * depth;
-    this.flashes.push({ x, y, r: radius * grow, life: 0.18, maxLife: 0.18 });
-    this.ring(x, y, radius * 1.15 * grow, 0.45, 0xffffff);
-    this.ring(x, y, radius * 0.8 * grow, 0.32, depth >= 2 ? 0xff3030 : PALETTE.fuse);
-    for (let k = 0; k < 70 + 20 * depth; k++) {
-      const c = k % 4 === 0 ? 0xffffff : k % 2 === 0 ? PALETTE.bomb : PALETTE.fuse;
-      this.spark(x, y, c, 150 + Math.random() * 380 * grow, 0.3 + Math.random() * 0.6, 2 + Math.random() * 3);
+  /** A missile finding its mark: a flash, two rings and a fan of sparks in the victim's colour. */
+  missileHit(x: number, y: number, color: number): void {
+    this.flashes.push({ x, y, r: 60, life: 0.16, maxLife: 0.16 });
+    this.ring(x, y, 70, 0.4, 0xffffff);
+    this.ring(x, y, 45, 0.3, PALETTE.missile);
+    for (let k = 0; k < 60; k++) {
+      const c = k % 3 === 0 ? 0xffffff : k % 3 === 1 ? PALETTE.missile : color;
+      this.spark(x, y, c, 150 + Math.random() * 350, 0.3 + Math.random() * 0.5, 2 + Math.random() * 3);
     }
-    this.debris(tiles);
-    this.addShake(8 + 4 * Math.min(chainDepth, 4));
-    if (depth >= 2) this.chainFlash = Math.max(this.chainFlash, Math.min(0.18, 0.04 + 0.025 * depth));
+    this.addShake(10);
   }
 
   /** Amber rubble from blocks that were blown up or crushed. */

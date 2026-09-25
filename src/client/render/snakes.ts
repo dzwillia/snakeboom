@@ -57,7 +57,7 @@ export class SnakeView {
       }
     }
 
-    // Blasts punch holes anywhere along the body, so a new hole redraws every chunk once.
+    // A hole change redraws every chunk once (nothing makes holes any more, but the field stays).
     const holesChanged = s.holeVersion !== this.lastHoleVersion;
     this.lastHoleVersion = s.holeVersion;
     // The offset is rollback smoothing (online): the drawn head lags a correction for a few frames.

@@ -5,7 +5,7 @@
   --text: #e8f4ff;
   --dim: #7d8db0;
   --red: #ff3b3b;
-  --bomb: #ff4d2e;
+  --missile: #ff4d2e;
   --ghost: #e8f4ff;
   --shield: #3dff7a;
   --dozer: #ff9f1c;
@@ -538,8 +538,8 @@ kbd {
   letter-spacing: 0.02em;
 }
 
-.power[data-kind='bomb'] {
-  color: var(--bomb);
+.power[data-kind='missile'] {
+  color: var(--missile);
 }
 
 .power[data-kind='ghost'] {
@@ -607,8 +607,8 @@ kbd {
   text-shadow: 0 0 8px currentColor;
 }
 
-.slot[data-kind='bomb'] {
-  color: var(--bomb);
+.slot[data-kind='missile'] {
+  color: var(--missile);
 }
 
 .slot[data-kind='ghost'] {

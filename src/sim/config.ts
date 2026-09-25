@@ -10,7 +10,7 @@ export const TICK_RATE = 60;
 export const DT = 1 / TICK_RATE;
 
 /** What a pickup can contain. */
-export type PickupKind = 'bomb' | 'ghost' | 'shield' | 'dozer';
+export type PickupKind = 'missile' | 'ghost' | 'shield' | 'dozer';
 
 /** Tunable gameplay values. Seconds and world units unless noted. */
 export interface Config {
@@ -42,28 +42,23 @@ export interface Config {
   pickupRadius: number;
   /** Pickups never spawn closer than this to a head. */
   pickupMinHeadDistance: number;
-  /** Pickups spawn at least this far from walls, blocks, bodies, bombs and other pickups. */
+  /** Pickups spawn at least this far from walls, blocks, bodies and other pickups. */
   pickupClearance: number;
   /** Relative spawn chance per kind. */
   pickupWeights: Record<PickupKind, number>;
   /** Items a snake can carry at once, used oldest first (a Shield is a bubble and never takes a slot). */
   itemSlots: number;
-  /** Bombs in one bomb pickup. */
-  bombCharges: number;
-  /** Seconds between throws. */
-  bombThrowCooldown: number;
-  /** Seconds a thrown bomb spends in the air before it lands. */
-  bombFlightTime: number;
-  /** Seconds from landing to the blast. */
-  bombFuse: number;
-  /**
-   * Where a bomb lands: 1 aims at the spot the opponent will reach, holding course, by the time it
-   * blasts; 0 lands it on their head; values in between lead them partway.
-   */
-  bombLeadFactor: number;
-  blastRadius: number;
-  /** Fuse given to a bomb caught in another bomb's blast. */
-  chainDelay: number;
+  /** Shots in one missile pickup. */
+  missileCharges: number;
+  /** Seconds between shots. */
+  missileCooldown: number;
+  /** Units per second. */
+  missileSpeed: number;
+  /** Radians per second it can turn toward its target. */
+  missileTurnRate: number;
+  /** Seconds before it fizzles. */
+  missileLife: number;
+  missileRadius: number;
   ghostDuration: number;
   /** Timed specials (Ghost, Bulldozer) flash for this many seconds before they run out. */
   effectWarning: number;
@@ -107,15 +102,14 @@ export const DEFAULT_CONFIG: Config = {
   pickupRadius: 14,
   pickupMinHeadDistance: 150,
   pickupClearance: 40,
-  pickupWeights: { bomb: 45, ghost: 20, shield: 20, dozer: 15 },
+  pickupWeights: { missile: 45, ghost: 20, shield: 20, dozer: 15 },
   itemSlots: 3,
-  bombCharges: 3,
-  bombThrowCooldown: 0.5,
-  bombFlightTime: 0.45,
-  bombFuse: 1,
-  bombLeadFactor: 1,
-  blastRadius: 70,
-  chainDelay: 0.12,
+  missileCharges: 3,
+  missileCooldown: 0.4,
+  missileSpeed: 420,
+  missileTurnRate: 3,
+  missileLife: 2,
+  missileRadius: 10,
   ghostDuration: 2,
   effectWarning: 1,
   shieldGrace: 0.5,
@@ -140,7 +134,7 @@ export const CLASSIC_CONFIG: Config = {
   maxPickups: 4,
   firstPickupDelay: 1,
   pickupInterval: 2.5,
-  pickupWeights: { bomb: 30, ghost: 15, shield: 20, dozer: 35 },
+  pickupWeights: { missile: 30, ghost: 15, shield: 20, dozer: 35 },
   ghostDuration: 3,
   effectWarning: 3,
   dozerDuration: 5,

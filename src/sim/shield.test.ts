@@ -80,13 +80,13 @@ describe('shield', () => {
     expect(me.heading).toBeCloseTo(HALF_PI, 9);
   });
 
-  it('absorbs a blast without moving', () => {
+  it('absorbs a missile without moving', () => {
     const s = shielded(600, 600, 1);
     const events: SimEvent[] = [];
-    expect(tryShield(s, 0, 'blast', cfg, events)).toBe(true);
+    expect(tryShield(s, 0, 'missile', cfg, events)).toBe(true);
     const me = s.snakes[0];
     expect([me.x, me.y, me.heading]).toEqual([600, 600, 1]);
-    expect(events[0]).toMatchObject({ type: 'shieldBlocked', cause: 'blast' });
+    expect(events[0]).toMatchObject({ type: 'shieldBlocked', cause: 'missile' });
   });
 
   it('never pushes the head out of the arena', () => {
@@ -97,9 +97,9 @@ describe('shield', () => {
   });
 
   // Grace never covers walls, so a save that left the head crossing or facing into one would cost a second hit next tick.
-  it('a blast that catches you crossing a wall still slides you along it', () => {
+  it('a missile that catches you crossing a wall still slides you along it', () => {
     const s = shielded(800, ARENA_HEIGHT - 5, HALF_PI - 0.3);
-    tryShield(s, 0, 'blast', cfg, []);
+    tryShield(s, 0, 'missile', cfg, []);
     const me = s.snakes[0];
     expect([me.x, me.y, me.heading]).toEqual([800, ARENA_HEIGHT - r - 0.5, 0]);
   });

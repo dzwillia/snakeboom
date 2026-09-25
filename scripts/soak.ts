@@ -53,15 +53,15 @@ const lengths: number[] = [];
 const causes = new Map<string, number>();
 const problems: string[] = [];
 const wins = [0, 0];
-/** Deaths and heart losses each seat inflicted on the other (body, head-on and blast). */
+/** Deaths and heart losses each seat inflicted on the other (body, head-on, missile, encircled). */
 const kills = [0, 0];
 const hits = [0, 0];
-/** Deaths and heart losses each seat brought on itself (walls, blocks, own tail, own bomb). */
+/** Deaths and heart losses each seat brought on itself (walls, blocks). */
 const ownGoals = [0, 0];
 let draws = 0;
 let ticks = 0;
-let explosions = 0;
-let chained = 0;
+let missileHits = 0;
+let missilesFired = 0;
 let collected = 0;
 const started = performance.now();
 
@@ -78,7 +78,7 @@ while (lengths.length < rounds) {
     if (e.type === 'death' || e.type === 'heartLost') {
       const key = `${names[e.player]}:${e.cause}`;
       causes.set(key, (causes.get(key) ?? 0) + 1);
-      const byOpponent = e.type === 'death' ? e.killer === 1 : e.cause === 'body' || e.cause === 'headOn' || e.cause === 'blast';
+      const byOpponent = e.type === 'death' ? e.killer === 1 : e.cause === 'body' || e.cause === 'headOn' || e.cause === 'missile';
       if (args.has('debug') && e.player === 0 && !byOpponent) {
         const s = state.snakes[0];
         const fx = Object.entries(s.effects).filter(([, v]) => v > 0).map(([k, v]) => `${k}=${v}`);
@@ -95,12 +95,12 @@ while (lengths.length < rounds) {
       else ownGoals[e.player]++;
     }
     if (e.type === 'heartLost') {
-      if (e.cause === 'body' || e.cause === 'headOn' || e.cause === 'blast') hits[1 - e.player]++;
+      if (e.cause === 'body' || e.cause === 'headOn' || e.cause === 'missile') hits[1 - e.player]++;
       else ownGoals[e.player]++;
     }
-    if (e.type === 'explosion') {
-      explosions++;
-      if (e.chainDepth > 0) chained++;
+    if (e.type === 'missileFired') missilesFired++;
+    if (e.type === 'missileHit') {
+      missileHits++;
     }
     if (e.type === 'pickupCollected') collected++;
     if (e.type === 'roundOver') {
@@ -128,7 +128,7 @@ console.log(
 console.log(`rounds inside 60–180 s: ${Math.round((100 * inTarget) / lengths.length)}%`);
 console.log(`hits taken (deaths + hearts): ${[...causes].sort().map(([cause, n]) => `${cause} ${n}`).join(' · ')}`);
 console.log(
-  `per round: ${(collected / rounds).toFixed(1)} pickups · ${(explosions / rounds).toFixed(1)} explosions (${chained} chained in total)`,
+  `per round: ${(collected / rounds).toFixed(1)} pickups · ${(missilesFired / rounds).toFixed(1)} missiles fired, ${missileHits} hits in total`,
 );
 console.log(`speed: ${(ticks / TICK_RATE / wall).toFixed(0)}× real time (${wall.toFixed(1)} s wall clock)`);
 if (problems.length > 0) {

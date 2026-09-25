@@ -39,13 +39,13 @@ describe('step with power-ups', () => {
     expect(deaths(run(s, 3))).toEqual([[0, 'wall']]);
   });
 
-  it('grace shrugs off a blast right after a Shield save', () => {
+  it('grace shrugs off a missile right after a Shield save', () => {
     const s = toPlaying();
     const cyan = s.snakes[0];
     cyan.shield = true;
     Object.assign(cyan, { x: 12, y: 500, heading: PI });
     run(s, 3);
-    s.bombs.push({ id: 99, owner: 1, x: cyan.x, y: cyan.y, fuse: 1, maxFuse: 1, chainDepth: 0, flight: 0, flightTotal: 0, fromX: cyan.x, fromY: cyan.y });
+    s.missiles.push({ id: 99, owner: 1, x: cyan.x, y: cyan.y, heading: 0, ttl: 100 });
     expect(deaths(run(s, 1))).toEqual([]);
     expect(cyan.alive).toBe(true);
   });

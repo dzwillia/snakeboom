@@ -38,10 +38,6 @@ declare global {
   }
 }
 
-/** Bombs tick audibly during their last half second. */
-const FUSE_TICK_FROM = 30;
-const FUSE_TICK_EVERY = 8;
-
 function element(id: string): HTMLElement {
   const el = document.getElementById(id);
   if (!el) throw new Error(`Missing #${id}`);
@@ -85,7 +81,6 @@ async function boot(): Promise<void> {
   let names: string[] = [...PLAYER_NAMES];
   let menuRow: MenuRow = 'local';
   let tuningOpen = false;
-  const fuseStage = new Map<number, number>();
   const now = () => performance.now() / 1000;
   const newSeed = () => Math.floor(Math.random() * 2 ** 31);
   const persist = () => {
@@ -128,21 +123,6 @@ async function boot(): Promise<void> {
     else screens.resume();
   };
 
-  const tickFuses = (s: MatchState | null) => {
-    if (!s || paused) return;
-    if (s.bombs.length === 0) {
-      fuseStage.clear();
-      return;
-    }
-    for (const b of s.bombs) {
-      if (b.flight > 0 || b.fuse > FUSE_TICK_FROM) continue;
-      const stage = Math.floor(b.fuse / FUSE_TICK_EVERY);
-      if (fuseStage.get(b.id) !== stage) {
-        fuseStage.set(b.id, stage);
-        sound.play('tick', 0.5);
-      }
-    }
-  };
 
   const loop = new FixedLoop(
     () => {
@@ -166,7 +146,6 @@ async function boot(): Promise<void> {
       renderer.draw(s, alpha, activeCfg(), performance.now() / 1000, online?.offsets);
       fx.update(frameSeconds);
       hud.update(s, activeCfg(), performance.now() / 1000);
-      tickFuses(s);
       online?.frame(performance.now());
     },
   );

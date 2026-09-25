@@ -26,8 +26,8 @@ export function describeDeath(d: DeathRecord, names: readonly string[] = PLAYER_
       return `${victim} hit ${killer}'s body`;
     case 'headOn':
       return 'Head-on collision';
-    case 'blast':
-      return d.killer === d.player ? `${victim} blew themselves up` : `${victim} got blasted by ${killer}`;
+    case 'missile':
+      return `${victim} was shot down by ${killer}`;
   }
 }
 
@@ -47,11 +47,11 @@ export function describeRound(
 }
 
 /** The order the Powers page lists pickups in: the same as the title screen's line. */
-export const POWER_ORDER: readonly PickupKind[] = ['bomb', 'ghost', 'shield', 'dozer'];
+export const POWER_ORDER: readonly PickupKind[] = ['missile', 'ghost', 'shield', 'dozer'];
 
 export interface PowerInfo {
   name: string;
-  /** Live numbers from the config, like "×3 per pickup · blast radius 70". */
+  /** Live numbers from the config, like "×3 per pickup · 2.5 s of flight". */
   stats: string;
   /** What it does, in a sentence or two. */
   detail: string;
@@ -76,20 +76,19 @@ export function spawnShare(kind: PickupKind, cfg: Config): number {
 export function describePower(kind: PickupKind, cfg: Config): PowerInfo {
   const share = `${spawnShare(kind, cfg)}% of spawns`;
   switch (kind) {
-    case 'bomb':
+    case 'missile':
       return {
-        name: 'BOMB',
-        stats: `×${num(cfg.bombCharges)} per pickup · blast radius ${num(cfg.blastRadius)} · ${share}`,
+        name: 'MISSILE',
+        stats: `×${num(cfg.missileCharges)} per pickup · ${secs(cfg.missileLife)} of flight · ${share}`,
         detail:
-          `Thrown ahead of your opponent, where they'll be if they hold course. A reticle marks the blast zone; ` +
-          `it lands after ${secs(cfg.bombFlightTime)} and goes off ${secs(cfg.bombFuse)} later. Blasts hit heads (yours too), ` +
-          `punch holes through bodies, destroy blocks and set off other bombs. One throw every ${secs(cfg.bombThrowCooldown)}.`,
+          `Fires from your head and homes on your opponent for ${secs(cfg.missileLife)}. It turns, but not on a dime: ` +
+          `a hard cut or a Ghost dodges it, a Shield eats it, and it never hits you. One shot every ${secs(cfg.missileCooldown)}.`,
       };
     case 'ghost':
       return {
         name: 'GHOST',
         stats: `${secs(cfg.ghostDuration)} · ${share}`,
-        detail: `Your head slips through bodies, heads and blocks. Walls and blasts still hit you.`,
+        detail: `Your head slips through bodies, heads and blocks, and a closing loop can't catch you. Walls and missiles still hit you.`,
       };
     case 'shield':
       return {
@@ -114,8 +113,8 @@ export function describePower(kind: PickupKind, cfg: Config): PowerInfo {
 export function describeItem(item: ItemState | null): string {
   if (!item) return '';
   switch (item.kind) {
-    case 'bomb':
-      return `BOMB ×${item.charges}`;
+    case 'missile':
+      return `MISSILE ×${item.charges}`;
     case 'ghost':
       return 'GHOST';
     case 'shield':

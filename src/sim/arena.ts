@@ -87,12 +87,3 @@ export function solidTilesTouching(tiles: readonly number[], x: number, y: numbe
   return out;
 }
 
-/** Clears every solid tile a circle touches; returns the cleared indices in ascending order. */
-export function destroyTilesInCircle(tiles: number[], x: number, y: number, r: number): number[] {
-  const destroyed: number[] = [];
-  forEachSolidTileTouching(tiles, x, y, r, (index) => {
-    destroyed.push(index);
-  });
-  for (const index of destroyed) tiles[index] = 0;
-  return destroyed;
-}

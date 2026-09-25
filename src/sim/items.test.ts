@@ -1,99 +1,63 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CONFIG, TICK_RATE } from './config';
-import { PI } from './detmath';
+import { DEFAULT_CONFIG, TICK_RATE, type Config } from './config';
 import { createItem, tickItemTimers, useItem } from './items';
 import { createMatch } from './state';
-import type { MatchState, SimEvent } from './types';
+import { step } from './step';
+import { NO_INPUT, type MatchState, type SimEvent } from './types';
 
-const cfg = DEFAULT_CONFIG;
-const FLIGHT = Math.round(cfg.bombFlightTime * TICK_RATE);
-const FUSE = Math.round(cfg.bombFuse * TICK_RATE);
+const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000 };
 
-function withBombs(): MatchState {
+function playing(): MatchState {
   const s = createMatch(cfg, 1);
   s.phase = 'playing';
-  s.snakes[0].items = [createItem('bomb', cfg)];
   return s;
 }
 
 describe('items', () => {
-  it('a bomb pickup holds bombCharges bombs', () => {
-    expect(createItem('bomb', cfg)).toEqual({ kind: 'bomb', charges: 3 });
+  it('a timed special holds one charge and a missile pickup holds missileCharges shots', () => {
+    expect(createItem('ghost', cfg)).toEqual({ kind: 'ghost', charges: 1 });
+    expect(createItem('missile', cfg)).toEqual({ kind: 'missile', charges: cfg.missileCharges });
   });
 
-  it('throws a bomb to where the opponent will be when it goes off, and reports it', () => {
-    const s = withBombs();
-    const [cyan, pink] = s.snakes;
-    const events: SimEvent[] = [];
-    useItem(s, 0, cfg, events);
-    const lead = cfg.baseSpeed * (cfg.bombFlightTime + cfg.bombFuse) * cfg.bombLeadFactor;
-    const bomb = s.bombs[0];
-    expect(bomb).toMatchObject({
-      id: 1,
-      owner: 0,
-      fromX: cyan.x,
-      fromY: cyan.y,
-      flight: FLIGHT,
-      flightTotal: FLIGHT,
-      fuse: FUSE,
-      maxFuse: FUSE,
-      chainDepth: 0,
-    });
-    expect(bomb.x).toBeCloseTo(pink.x - lead, 6); // PINK is heading west
-    expect(bomb.y).toBeCloseTo(pink.y, 6);
-    expect(events).toEqual([{ type: 'bombThrown', id: 1, player: 0, fromX: cyan.x, fromY: cyan.y, x: bomb.x, y: bomb.y }]);
-    expect(s.snakes[0].items).toEqual([{ kind: 'bomb', charges: 2 }]);
-  });
-
-  it('keeps the landing spot inside the arena', () => {
-    const s = withBombs();
-    Object.assign(s.snakes[1], { x: 60, y: 500, heading: PI });
+  it('waits missileCooldown between shots', () => {
+    const s = playing();
+    s.snakes[0].items = [createItem('missile', cfg)];
     useItem(s, 0, cfg, []);
-    expect(s.bombs[0].x).toBe(cfg.snakeRadius);
-    expect(s.bombs[0].y).toBeCloseTo(500, 6);
+    useItem(s, 0, cfg, []);
+    expect(s.missiles).toHaveLength(1);
+    for (let t = 0; t < Math.round(cfg.missileCooldown * TICK_RATE); t++) tickItemTimers(s, []);
+    useItem(s, 0, cfg, []);
+    expect(s.missiles).toHaveLength(2);
   });
 
-  it('waits bombThrowCooldown between throws', () => {
-    const s = withBombs();
-    const events: SimEvent[] = [];
-    useItem(s, 0, cfg, events);
-    useItem(s, 0, cfg, events);
-    expect(s.bombs).toHaveLength(1);
-    for (let t = 0; t < Math.round(cfg.bombThrowCooldown * TICK_RATE); t++) tickItemTimers(s, []);
-    useItem(s, 0, cfg, events);
-    expect(s.bombs).toHaveLength(2);
-  });
-
-  it('empties the slot after the last bomb', () => {
-    const s = withBombs();
-    const events: SimEvent[] = [];
-    for (let k = 0; k < 3; k++) {
-      useItem(s, 0, cfg, events);
+  it('empties the slot after the last shot', () => {
+    const s = playing();
+    s.snakes[0].items = [createItem('missile', cfg), createItem('ghost', cfg)];
+    for (let k = 0; k < cfg.missileCharges; k++) {
       s.snakes[0].useCooldown = 0;
+      useItem(s, 0, cfg, []);
     }
-    expect(s.bombs).toHaveLength(3);
-    expect(s.snakes[0].items).toEqual([]);
-    useItem(s, 0, cfg, events);
-    expect(s.bombs).toHaveLength(3);
+    expect(s.missiles).toHaveLength(cfg.missileCharges);
+    expect(s.snakes[0].items.map((i) => i.kind)).toEqual(['ghost']);
   });
 
   it('does nothing without an item', () => {
-    const s = createMatch(cfg, 1);
+    const s = playing();
     const events: SimEvent[] = [];
     useItem(s, 0, cfg, events);
-    expect(s.bombs).toEqual([]);
     expect(events).toEqual([]);
+    expect(s.missiles).toEqual([]);
   });
 
-  it('starts every round with empty slots, no bombs and the first pickup scheduled', () => {
-    const s = createMatch(cfg, 1);
-    expect(s.snakes.map((sn) => [sn.items, sn.shield, sn.useCooldown, sn.holeVersion])).toEqual([
-      [[], false, 0, 0],
-      [[], false, 0, 0],
-    ]);
-    expect(s.pickups).toEqual([]);
-    expect(s.bombs).toEqual([]);
+  it('starts every round with empty slots, no missiles and the first pickup scheduled', () => {
+    const s = playing();
+    s.snakes[0].items = [createItem('missile', cfg)];
+    useItem(s, 0, cfg, []);
+    s.snakes[1].alive = false;
+    for (let t = 0; t < 1 + Math.round(cfg.roundOverSeconds * TICK_RATE); t++) step(s, [NO_INPUT, NO_INPUT], cfg);
+    expect(s.round).toBe(2);
+    expect(s.snakes[0].items).toEqual([]);
+    expect(s.missiles).toEqual([]);
     expect(s.pickupTimer).toBe(Math.round(cfg.firstPickupDelay * TICK_RATE));
-    expect(s.nextId).toBe(1);
   });
 });

@@ -46,9 +46,9 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
     if (circleHitsWall(p.x, p.y, 0, state.inset)) problems.push(`pickup ${p.id} outside the live area`);
     if (p.ttl <= 0) problems.push(`pickup ${p.id} outlived its lifetime`);
   }
-  for (const b of state.bombs) {
-    if (!Number.isFinite(b.x) || !Number.isFinite(b.y)) problems.push(`bomb ${b.id} has a non-finite position`);
-    if (b.fuse <= 0) problems.push(`bomb ${b.id} should have exploded`);
+  for (const m of state.missiles) {
+    if (!Number.isFinite(m.x) || !Number.isFinite(m.y) || !Number.isFinite(m.heading)) problems.push(`missile ${m.id} has a non-finite position`);
+    if (m.ttl <= 0) problems.push(`missile ${m.id} should have fizzled`);
   }
   if (state.tiles.some((v) => v !== 0 && v !== 1)) problems.push('tiles hold values other than 0 and 1');
   if (!Number.isFinite(state.inset) || state.inset < 0) problems.push(`inset is ${state.inset}`);

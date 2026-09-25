@@ -1,12 +1,10 @@
-import { ARENA_HEIGHT, ARENA_WIDTH, TICK_RATE, type Config, type PickupKind } from './config';
-import { detCos, detSin } from './detmath';
-import { snakeSpeed } from './snake';
+import { TICK_RATE, type Config, type PickupKind } from './config';
 import type { EffectName, ItemState, MatchState, SimEvent } from './types';
 
 const ANNOUNCED: EffectName[] = ['ghost', 'dozer'];
 
 export function createItem(kind: PickupKind, cfg: Config): ItemState {
-  return { kind, charges: kind === 'bomb' ? Math.max(1, Math.round(cfg.bombCharges)) : 1 };
+  return { kind, charges: kind === 'missile' ? Math.max(1, Math.round(cfg.missileCharges)) : 1 };
 }
 
 /** Counts down Use cooldowns and effect timers, reporting effects that run out. Call once per playing tick. */
@@ -28,11 +26,6 @@ function startEffect(state: MatchState, player: number, effect: EffectName, seco
 }
 
 /**
- * Where a thrown bomb lands: ahead of the nearest living opponent, at the spot they'll reach by
- * the time it blasts if they hold course (scaled by bombLeadFactor), kept inside the arena.
- * With no opponent alive, the thrower's own path is the target.
- */
-export function throwTarget(state: MatchState, idx: number, cfg: Config): { x: number; y: number } {
   const me = state.snakes[idx];
   let target = me;
   let best = Infinity;
@@ -52,21 +45,18 @@ export function throwTarget(state: MatchState, idx: number, cfg: Config): { x: n
   return { x: Math.min(Math.max(x, r), ARENA_WIDTH - r), y: Math.min(Math.max(y, r), ARENA_HEIGHT - r) };
 }
 
-/** Uses the oldest carried item (items[0]); a bomb stays at the front until its last charge is thrown. */
+/** Uses the oldest carried item (items[0]); a missile pickup stays at the front until its last shot. */
 export function useItem(state: MatchState, idx: number, cfg: Config, events: SimEvent[]): void {
   const s = state.snakes[idx];
   const item = s.items[0];
   if (!item || s.useCooldown > 0) return;
-  if (item.kind !== 'bomb') events.push({ type: 'itemUsed', player: idx, kind: item.kind });
+  if (item.kind !== 'missile') events.push({ type: 'itemUsed', player: idx, kind: item.kind });
   switch (item.kind) {
-    case 'bomb': {
-      const fuse = Math.max(1, Math.round(cfg.bombFuse * TICK_RATE));
-      const flight = Math.max(1, Math.round(cfg.bombFlightTime * TICK_RATE));
-      const { x, y } = throwTarget(state, idx, cfg);
+    case 'missile': {
       const id = state.nextId++;
-      state.bombs.push({ id, owner: idx, x, y, fromX: s.x, fromY: s.y, flight, flightTotal: flight, fuse, maxFuse: fuse, chainDepth: 0 });
-      events.push({ type: 'bombThrown', id, player: idx, fromX: s.x, fromY: s.y, x, y });
-      s.useCooldown = Math.round(cfg.bombThrowCooldown * TICK_RATE);
+      state.missiles.push({ id, owner: idx, x: s.x, y: s.y, heading: s.heading, ttl: Math.max(1, Math.round(cfg.missileLife * TICK_RATE)) });
+      events.push({ type: 'missileFired', id, player: idx, x: s.x, y: s.y, heading: s.heading });
+      s.useCooldown = Math.round(cfg.missileCooldown * TICK_RATE);
       break;
     }
     case 'ghost':

@@ -69,14 +69,13 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   pickups.add(cfg, 'pickupMinHeadDistance', 0, 400, 10).name('min distance from heads');
   pickups.add(cfg, 'pickupClearance', 10, 120, 5).name('clearance');
 
-  const bombs = gui.addFolder('Bombs');
-  bombs.add(cfg, 'bombCharges', 1, 10, 1).name('bombs per pickup');
-  bombs.add(cfg, 'bombThrowCooldown', 0, 2, 0.05).name('throw cooldown (s)');
-  bombs.add(cfg, 'bombFlightTime', 0.1, 2, 0.05).name('flight time (s)');
-  bombs.add(cfg, 'bombFuse', 0.2, 5, 0.1).name('fuse after landing (s)');
-  bombs.add(cfg, 'bombLeadFactor', 0, 2, 0.05).name('aim ahead ×');
-  bombs.add(cfg, 'blastRadius', 20, 200, 5).name('blast radius');
-  bombs.add(cfg, 'chainDelay', 0.02, 1, 0.02).name('chain delay (s)');
+  const missiles = gui.addFolder('Missiles');
+  missiles.add(cfg, 'missileCharges', 1, 10, 1).name('shots per pickup');
+  missiles.add(cfg, 'missileCooldown', 0, 2, 0.05).name('cooldown (s)');
+  missiles.add(cfg, 'missileSpeed', 100, 900, 10).name('speed');
+  missiles.add(cfg, 'missileTurnRate', 0.5, 12, 0.1).name('turn rate (rad/s)');
+  missiles.add(cfg, 'missileLife', 0.5, 6, 0.1).name('life (s)');
+  missiles.add(cfg, 'missileRadius', 4, 30, 1).name('radius');
 
   const power = gui.addFolder('Power-ups');
   power.add(cfg, 'ghostDuration', 0.5, 10, 0.25).name('ghost (s)');

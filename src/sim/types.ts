@@ -4,7 +4,7 @@ import type { RngState } from './rng';
 export type Phase = 'countdown' | 'playing' | 'roundOver' | 'matchOver';
 
 /** Listed in reporting priority order (spec 3.3). */
-export type DeathCause = 'blast' | 'headOn' | 'body' | 'obstacle' | 'wall';
+export type DeathCause = 'missile' | 'headOn' | 'body' | 'obstacle' | 'wall';
 
 export interface PlayerInput {
   turn: -1 | 0 | 1;
@@ -65,24 +65,16 @@ export interface PickupState {
   ttl: number;
 }
 
-export interface BombState {
+/** A homing missile in flight. */
+export interface MissileState {
   id: number;
   owner: number;
-  /** Where it lands (and blasts). */
   x: number;
   y: number;
-  /** Where it was thrown from, for drawing the arc. */
-  fromX: number;
-  fromY: number;
-  /** Ticks left in the air; 0 once it has landed. */
-  flight: number;
-  flightTotal: number;
-  /** Ticks from landing until it explodes (counts down only after landing). */
-  fuse: number;
-  /** The fuse it started from, for drawing the countdown ring. */
-  maxFuse: number;
-  /** 0 for a dropped bomb; n for the nth link of a chain reaction. */
-  chainDepth: number;
+  /** Radians, like a snake's heading. */
+  heading: number;
+  /** Ticks left before it fizzles. */
+  ttl: number;
 }
 
 export interface SnakeState {
@@ -106,7 +98,7 @@ export interface SnakeState {
   hearts: number;
   /** Ticks until Use works again. */
   useCooldown: number;
-  /** Bumped whenever a blast punches holes in this trail, so the renderer redraws it. */
+  /** Bumped whenever holes change in this trail (nothing makes holes any more; kept for the renderer). */
   holeVersion: number;
   effects: EffectTimers;
   /** Ticks until another near miss can be reported for this snake. */
@@ -116,7 +108,7 @@ export interface SnakeState {
 export interface DeathRecord {
   player: number;
   cause: DeathCause;
-  /** Owner of the body or bomb that killed; the victim for self-kills; null for walls and blocks. */
+  /** Owner of the body or missile that killed; null for walls and blocks. */
   killer: number | null;
   x: number;
   y: number;
@@ -143,17 +135,17 @@ export interface MatchState {
   rng: RngState;
   /** TILE_COLS * TILE_ROWS entries, 1 = solid. Replaced (new array) at each round start. */
   tiles: number[];
-  /** Bumped whenever tiles change (round start or blasts). */
+  /** Bumped whenever tiles change (round start or the plow). */
   tilesVersion: number;
   snakes: SnakeState[];
   grid: Grid;
   /** Deaths so far this round. */
   deaths: DeathRecord[];
   pickups: PickupState[];
-  bombs: BombState[];
+  missiles: MissileState[];
   /** Ticks until the next pickup spawn attempt. */
   pickupTimer: number;
-  /** Next id for pickups and bombs. */
+  /** Next id for pickups and missiles. */
   nextId: number;
 }
 
@@ -170,22 +162,13 @@ export type SimEvent =
   | { type: 'pickupSpawned'; id: number; kind: PickupKind; x: number; y: number }
   | { type: 'pickupCollected'; id: number; kind: PickupKind; player: number }
   | { type: 'pickupExpired'; id: number }
-  | { type: 'bombThrown'; id: number; player: number; fromX: number; fromY: number; x: number; y: number }
-  | { type: 'bombLanded'; id: number; x: number; y: number }
+  | { type: 'missileFired'; id: number; player: number; x: number; y: number; heading: number }
+  | { type: 'missileHit'; id: number; player: number; x: number; y: number }
+  | { type: 'missileFizzled'; id: number; x: number; y: number }
   | { type: 'itemUsed'; player: number; kind: PickupKind }
   | { type: 'effectStarted'; player: number; effect: EffectName }
   | { type: 'effectEnded'; player: number; effect: EffectName }
   | { type: 'shieldBlocked'; player: number; x: number; y: number; cause: DeathCause }
   | { type: 'nearMiss'; player: number; x: number; y: number }
   | { type: 'plowed'; player: number; moved: number; crushed: number[] }
-  | { type: 'heartLost'; player: number; heartsLeft: number; cause: DeathCause; x: number; y: number }
-  | {
-      type: 'explosion';
-      id: number;
-      owner: number;
-      x: number;
-      y: number;
-      radius: number;
-      chainDepth: number;
-      tilesDestroyed: number[];
-    };
+  | { type: 'heartLost'; player: number; heartsLeft: number; cause: DeathCause; x: number; y: number };

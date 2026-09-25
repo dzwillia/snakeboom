@@ -10,12 +10,11 @@ export function glyphSvg(kind: PickupKind): string {
 }
 
 const BG = 'var(--bg)';
-const FUSE = '#ffb020';
 
 const GLYPHS: Record<PickupKind, string> = {
-  bomb:
-    `<circle cx="-0.1" cy="0.15" r="0.7" fill="currentColor"/>` +
-    `<path d="M0.3 -0.4 L0.75 -0.9" stroke="${FUSE}" stroke-width="0.14" stroke-linecap="round" fill="none"/>`,
+  missile:
+    `<polygon points="0.95,0 -0.35,-0.5 -0.1,0 -0.35,0.5" fill="currentColor"/>` +
+    `<circle cx="-0.7" cy="0" r="0.18" fill="currentColor" opacity="0.6"/>`,
   ghost:
     `<circle cx="0" cy="-0.15" r="0.6" fill="currentColor"/>` +
     `<rect x="-0.6" y="-0.15" width="1.2" height="0.75" fill="currentColor"/>` +

@@ -34,7 +34,7 @@ export function isProtected(s: SnakeState): boolean {
 }
 
 /**
- * Checks one live head against heads, bodies, blocks and walls (blasts are resolved elsewhere).
+ * Checks one live head against heads, bodies, blocks and walls (missiles are resolved elsewhere).
  * Priority: headOn > body > obstacle > wall. Ties pick the lowest snake index, so the
  * result never depends on grid visit order. A ghost's head (its newest 2r of path) is
  * intangible to others; the rest of its body is solid. A bulldozing head ignores blocks.

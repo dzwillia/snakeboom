@@ -1,9 +1,8 @@
 import { circleHitsTiles, circleHitsWall } from '../arena';
 import { insetAt } from '../border';
 import { forEachSolidPointNear } from '../collision';
-import { DT, TICK_RATE, TILE_COLS, TILE_ROWS, TILE_SIZE, type Config } from '../config';
+import { DT, TILE_COLS, TILE_ROWS, TILE_SIZE, type Config } from '../config';
 import { detCos, detSin } from '../detmath';
-import { throwTarget } from '../items';
 import { createRng, rngInt, rngNext, type RngState } from '../rng';
 import { headCum } from '../trail';
 import { NO_INPUT, type MatchState, type PlayerInput, type SnakeState } from '../types';
@@ -134,10 +133,6 @@ const STICK_W = 4;
  */
 const CUT_MIN = 4;
 const CUT_MAX = 12;
-/** A blast counts as a hazard from this long before it fires (ticks)... */
-const BLAST_BEFORE = 6;
-/** ...until this long after (the head may still be nearby). */
-const BLAST_AFTER = 45;
 const SEEK_RANGE = 520;
 const INTERCEPT_RANGE = 700;
 /** Ticks before the Bulldozer runs out during which blocks count as solid again. */
@@ -179,17 +174,11 @@ interface Ctx {
   look: number;
   /** Ticks during which bodies, blocks and heads can't hurt (Ghost or grace). */
   protectedTicks: number;
-  /** Ticks during which blasts can't hurt (grace). */
-  graceTicks: number;
   dozerTicks: number;
   opp: SnakeState | null;
   /** The opponent's predicted head position at each step, holding course. */
   oppX: number[];
   oppY: number[];
-  /** Pending blasts: position and the tick they fire. */
-  bombX: number[];
-  bombY: number[];
-  bombAt: number[];
   /** Built on first use: the tile map and BFS scratch space for space and territory scoring. */
   field: Field | null;
 }
@@ -275,14 +264,6 @@ function buildCtx(state: MatchState, idx: number, cfg: Config, look: number): Ct
       oppY.push(opp.y + cy * k);
     }
   }
-  const bombX: number[] = [];
-  const bombY: number[] = [];
-  const bombAt: number[] = [];
-  for (const b of state.bombs) {
-    bombX.push(b.x);
-    bombY.push(b.y);
-    bombAt.push(b.flight + b.fuse);
-  }
   return {
     state,
     idx,
@@ -291,16 +272,12 @@ function buildCtx(state: MatchState, idx: number, cfg: Config, look: number): Ct
     r,
     look,
     protectedTicks: Math.max(me.effects.ghost, me.effects.grace),
-    graceTicks: me.effects.grace,
     // Blocks shoved along by the plow end up right in front of the head, so stop trusting the
     // Bulldozer a beat before it runs out.
     dozerTicks: Math.max(0, me.effects.dozer - DOZER_MARGIN),
     opp,
     oppX,
     oppY,
-    bombX,
-    bombY,
-    bombAt,
     field: null,
   };
 }
@@ -316,8 +293,6 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
   const bodyReach = 2 * r + 4;
   const bodyReach2 = bodyReach * bodyReach;
   const headReach2 = (2 * r + 4) * (2 * r + 4);
-  const blastReach = cfg.blastRadius + r + 6;
-  const blastReach2 = blastReach * blastReach;
   const px: number[] = [me.x];
   const py: number[] = [me.y];
   let x = me.x;
@@ -362,12 +337,6 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
             break;
           }
         }
-      }
-    }
-    if (tick > ctx.graceTicks) {
-      for (let j = 0; j < ctx.bombX.length; j++) {
-        const at = ctx.bombAt[j];
-        if (at >= tick - BLAST_BEFORE && at <= tick + BLAST_AFTER && dist2(ctx.bombX[j], ctx.bombY[j], x, y) < blastReach2) return fail();
       }
     }
     px.push(x);
@@ -603,18 +572,13 @@ function wantBoost(ctx: Ctx, bot: OpponentState, best: Plan, goal: Goal | null):
     const toward = Math.sqrt(dist2(goal.x, goal.y, me.x, me.y)) - Math.sqrt(dist2(goal.x, goal.y, best.x, best.y));
     reason = far && toward > best.pathLen * 0.5;
   }
-  // A blast about to go off nearby: get out of there.
-  const flee = (cfg.blastRadius + 3 * cfg.snakeRadius) * (cfg.blastRadius + 3 * cfg.snakeRadius);
-  for (let j = 0; j < ctx.bombX.length; j++) {
-    if (ctx.bombAt[j] <= 40 && dist2(ctx.bombX[j], ctx.bombY[j], me.x, me.y) < flee) reason = true;
-  }
   if (!reason || rngNext(bot.rng) >= p.boostUse) return false;
   // Only if the same line is still clear at boost speed.
   return rollout(ctx, best.turns, best.holds, cruiseSpeed(cfg, true), ctx.look).steps === ctx.look;
 }
 
 function wantUse(ctx: Ctx, bot: OpponentState, best: Plan): boolean {
-  const { me, cfg, opp, state, idx } = ctx;
+  const { me, cfg, opp } = ctx;
   const p = bot.profile;
   const item = me.items[0];
   if (!item || me.useCooldown > 0) return false;
@@ -626,17 +590,14 @@ function wantUse(ctx: Ctx, bot: OpponentState, best: Plan): boolean {
   switch (item.kind) {
     case 'shield':
       return true;
-    case 'bomb': {
-      if (!opp) return false;
-      // Never blast ourselves: where will we be when it goes off, holding course?
-      const at = throwTarget(state, idx, cfg);
-      const ticks = Math.round((cfg.bombFlightTime + cfg.bombFuse) * TICK_RATE);
-      const travel = cruiseSpeed(cfg, me.boosting) * DT * ticks;
-      const mx = me.x + detCos(me.heading) * travel;
-      const my = me.y + detSin(me.heading) * travel;
-      const safe = cfg.blastRadius + 3 * cfg.snakeRadius + 20;
-      if (dist2(at.x, at.y, mx, my) < safe * safe || dist2(at.x, at.y, me.x, me.y) < safe * safe) return false;
-      const chance = oppBoxed ? 0.4 : oppDist < 500 ? 0.08 : 0.015;
+    case 'missile': {
+      // Fire when the opponent is roughly ahead and in range; a missile can turn, but not around.
+      if (!opp) return unclog;
+      const dx = opp.x - me.x;
+      const dy = opp.y - me.y;
+      const ahead = (dx * detCos(me.heading) + dy * detSin(me.heading)) / Math.max(1, oppDist);
+      if (oppDist > 320 || ahead < 0.3) return unclog;
+      const chance = oppBoxed ? 0.5 : oppDist < 350 ? 0.12 : 0.03;
       return rngNext(bot.rng) < chance * (0.2 + 0.8 * p.itemSkill);
     }
     case 'ghost':

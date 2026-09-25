@@ -10,7 +10,7 @@ const roundOver = (tick: number, confirmed: boolean): TaggedEvent => ({
 const explosion = (tick: number, id: number, confirmed: boolean): TaggedEvent => ({
   tick,
   confirmed,
-  event: { type: 'explosion', id, owner: 0, x: 1, y: 2, radius: 70, chainDepth: 0, tilesDestroyed: [] },
+  event: { type: 'missileHit', id, player: 1, x: 1, y: 2 },
 });
 
 describe('EventGate', () => {

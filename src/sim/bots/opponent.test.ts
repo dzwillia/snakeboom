@@ -119,10 +119,12 @@ describe('AI opponent', () => {
   it(
     'ranks the difficulties: hard and normal both beat easy',
     () => {
-      const hardVsEasy = duel(['hard', 'easy'], 6, 31);
-      expect(hardVsEasy.wins[0]).toBeGreaterThan(hardVsEasy.wins[1] * 2);
-      const normalVsEasy = duel(['normal', 'easy'], 6, 32);
-      expect(normalVsEasy.wins[0]).toBeGreaterThan(normalVsEasy.wins[1] * 2);
+      // One life and homing missiles compress the gap until the AI learns to dodge them (M11):
+      // a missile from Easy kills Hard just as dead. So: a dozen rounds, and the higher level wins more.
+      const hardVsEasy = duel(['hard', 'easy'], 12, 31);
+      expect(hardVsEasy.wins[0]).toBeGreaterThan(hardVsEasy.wins[1]);
+      const normalVsEasy = duel(['normal', 'easy'], 12, 32);
+      expect(normalVsEasy.wins[0]).toBeGreaterThan(normalVsEasy.wins[1]);
     },
     LONG,
   );

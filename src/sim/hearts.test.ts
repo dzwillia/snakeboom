@@ -65,24 +65,25 @@ describe('hearts', () => {
     expect(s.snakes[0].hearts).toBe(3);
   });
 
-  it('a blast costs a heart without moving you', () => {
+  it('a missile costs a heart without moving you', () => {
     const s = toPlaying();
     const cyan = s.snakes[0];
-    const x = cyan.x + cfg.baseSpeed / TICK_RATE;
-    s.bombs.push({ id: 99, owner: 1, x, y: cyan.y, fromX: x, fromY: cyan.y, flight: 0, flightTotal: 0, fuse: 1, maxFuse: 1, chainDepth: 0 });
-    const events = run(s, 1);
-    expect(events).toContainEqual(expect.objectContaining({ type: 'heartLost', player: 0, cause: 'blast', heartsLeft: 2 }));
+    // Coming straight at the head from just ahead.
+    s.missiles.push({ id: 99, owner: 1, x: cyan.x + 40, y: cyan.y, heading: Math.PI, ttl: 100 });
+    const events = run(s, 6);
+    expect(events).toContainEqual(expect.objectContaining({ type: 'heartLost', player: 0, cause: 'missile', heartsLeft: 2 }));
     expect(cyan.alive).toBe(true);
-    expect(cyan.x).toBeCloseTo(x, 6);
+    expect(cyan.heading).toBe(0);
+    expect(s.missiles).toEqual([]);
   });
 
-  it('a blast that catches you at a wall costs one heart, not two', () => {
+  it('a missile that catches you at a wall costs one heart, not two', () => {
     const s = toPlaying();
     const cyan = s.snakes[0];
     Object.assign(cyan, { x: 800, y: ARENA_HEIGHT - 9, prevX: 800, prevY: ARENA_HEIGHT - 9, heading: HALF_PI - 0.3 });
-    s.bombs.push({ id: 99, owner: 1, x: 800, y: 960, fromX: 800, fromY: 960, flight: 0, flightTotal: 0, fuse: 1, maxFuse: 1, chainDepth: 0 });
+    s.missiles.push({ id: 99, owner: 1, x: cyan.x, y: cyan.y, heading: 0, ttl: 100 });
     const events = run(s, 1);
-    expect(events).toContainEqual(expect.objectContaining({ type: 'heartLost', player: 0, cause: 'blast', heartsLeft: 2 }));
+    expect(events).toContainEqual(expect.objectContaining({ type: 'heartLost', player: 0, cause: 'missile', heartsLeft: 2 }));
     expect(circleHitsWall(cyan.x, cyan.y, cfg.snakeRadius)).toBe(false);
     run(s, 30);
     expect(cyan.alive).toBe(true);

@@ -24,7 +24,7 @@ function tick(s: MatchState, n: number, c: Config = cfg): SimEvent[] {
 describe('pickups', () => {
   it('picks kinds by weight and returns null when no weight is positive', () => {
     const rng = createRng(1);
-    const none = { bomb: 0, ghost: 0, shield: 0, dozer: 0 };
+    const none = { missile: 0, ghost: 0, shield: 0, dozer: 0 };
     expect(pickKind({ ...none, shield: 5 }, rng)).toBe('shield');
     expect(pickKind(none, rng)).toBeNull();
   });
@@ -89,13 +89,13 @@ describe('pickups', () => {
   it('gives a shared pickup to the closer head only', () => {
     const s = playing();
     const [a, b] = s.snakes;
-    s.pickups = [{ id: 50, kind: 'bomb', x: 500, y: 500, ttl: 100 }];
+    s.pickups = [{ id: 50, kind: 'missile', x: 500, y: 500, ttl: 100 }];
     Object.assign(a, { x: 490, y: 500 });
     Object.assign(b, { x: 505, y: 500 });
     const events: SimEvent[] = [];
     collectPickups(s, cfg, events);
-    expect(events).toEqual([{ type: 'pickupCollected', id: 50, kind: 'bomb', player: 1 }]);
-    expect(b.items).toEqual([{ kind: 'bomb', charges: 3 }]);
+    expect(events).toEqual([{ type: 'pickupCollected', id: 50, kind: 'missile', player: 1 }]);
+    expect(b.items).toEqual([{ kind: 'missile', charges: 3 }]);
     expect(a.items).toEqual([]);
     expect(s.pickups).toEqual([]);
   });
@@ -104,12 +104,12 @@ describe('pickups', () => {
     const s = playing();
     const a = s.snakes[0];
     a.items = [
-      { kind: 'bomb', charges: 1 },
+      { kind: 'missile', charges: 1 },
       { kind: 'ghost', charges: 1 },
       { kind: 'dozer', charges: 1 },
     ];
     Object.assign(a, { x: 500, y: 500 });
-    s.pickups = [{ id: 7, kind: 'bomb', x: 505, y: 500, ttl: 100 }];
+    s.pickups = [{ id: 7, kind: 'missile', x: 505, y: 500, ttl: 100 }];
     const events: SimEvent[] = [];
     collectPickups(s, cfg, events);
     expect(events).toEqual([]);

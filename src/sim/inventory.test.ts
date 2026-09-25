@@ -26,20 +26,20 @@ describe('item queue', () => {
   it('holds up to itemSlots items in the order they were grabbed', () => {
     const s = playing();
     grab(s, 'ghost', 1);
-    grab(s, 'bomb', 2);
+    grab(s, 'missile', 2);
     grab(s, 'dozer', 3);
-    expect(s.snakes[0].items.map((i) => i.kind)).toEqual(['ghost', 'bomb', 'dozer']);
+    expect(s.snakes[0].items.map((i) => i.kind)).toEqual(['ghost', 'missile', 'dozer']);
     expect(grab(s, 'ghost', 4)).toEqual([]);
     expect(s.pickups.map((p) => p.id)).toEqual([4]);
   });
 
-  it('uses the oldest item first; bombs stay at the front until all are thrown', () => {
+  it('uses the oldest item first; missiles stay at the front until all are fired', () => {
     const s = playing();
-    s.snakes[0].items = [createItem('bomb', cfg), createItem('ghost', cfg)];
+    s.snakes[0].items = [createItem('missile', cfg), createItem('ghost', cfg)];
     const events: SimEvent[] = [];
     useItem(s, 0, cfg, events);
     expect(s.snakes[0].items.map((i) => [i.kind, i.charges])).toEqual([
-      ['bomb', 2],
+      ['missile', 2],
       ['ghost', 1],
     ]);
     s.snakes[0].items[0].charges = 1;
@@ -54,7 +54,7 @@ describe('item queue', () => {
 
   it('turns a Shield pickup into a bubble that never takes a slot', () => {
     const s = playing();
-    s.snakes[0].items = [createItem('bomb', cfg), createItem('ghost', cfg), createItem('dozer', cfg)];
+    s.snakes[0].items = [createItem('missile', cfg), createItem('ghost', cfg), createItem('dozer', cfg)];
     expect(grab(s, 'shield', 9)).toEqual([{ type: 'pickupCollected', id: 9, kind: 'shield', player: 0 }]);
     expect(s.snakes[0].shield).toBe(true);
     expect(s.snakes[0].items).toHaveLength(3);

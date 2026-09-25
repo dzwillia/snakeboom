@@ -34,7 +34,7 @@ describe('power-ups', () => {
   });
 
   it('Use with an empty queue does nothing, even while shielded', () => {
-    const s = holding('bomb');
+    const s = holding('missile');
     s.snakes[0].items = [];
     s.snakes[0].shield = true;
     expect(use(s)).toEqual([]);

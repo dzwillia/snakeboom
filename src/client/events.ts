@@ -1,6 +1,6 @@
 import type { Config, MatchState, PickupKind, SimEvent } from '../sim';
 import type { Sound, SoundName } from './audio';
-import { PICKUP_COLORS, PLAYER_COLORS } from './colors';
+import { PALETTE, PICKUP_COLORS, PLAYER_COLORS } from './colors';
 import type { Fx } from './render/fx';
 import type { Screens } from './screens';
 import { describeRound } from './text';
@@ -90,15 +90,16 @@ export class EventSink {
           sound.play('pickup');
           break;
         }
-        case 'bombThrown':
-          sound.play('bombThrow');
+        case 'missileFired':
+          sound.play('missileFire');
           break;
-        case 'bombLanded':
-          sound.play('bombDrop', 0.8);
+        case 'missileHit':
+          fx.missileHit(e.x, e.y, PLAYER_COLORS[e.player]);
+          sound.play('missileHit');
           break;
-        case 'explosion':
-          fx.explosion(e.x, e.y, e.radius, e.chainDepth, e.tilesDestroyed);
-          sound.play('explosion', 1, 1 + 0.12 * Math.min(e.chainDepth, 5));
+        case 'missileFizzled':
+          fx.pickupBurst(e.x, e.y, PALETTE.missile);
+          sound.play('missileFizzle', 0.6);
           break;
         case 'itemUsed': {
           const name = ITEM_SOUNDS[e.kind];
