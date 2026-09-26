@@ -15,10 +15,20 @@ describe('QuickMatch', () => {
   it('skips the caller’s own room', () => {
     const q = new QuickMatch();
     q.offer('AAAAAA');
-    expect(q.take('AAAAAA')).toBeNull();
+    expect(q.take(2, 'AAAAAA')).toBeNull();
     q.offer('BBBBBB');
-    expect(q.take('AAAAAA')).toBe('BBBBBB');
+    expect(q.take(2, 'AAAAAA')).toBe('BBBBBB');
     expect(q.open).toEqual(['AAAAAA']);
+  });
+
+  it('keeps a queue per room size', () => {
+    const q = new QuickMatch();
+    q.offer('AAAAAA', 2);
+    q.offer('BBBBBB', 4);
+    expect(q.take(4)).toBe('BBBBBB');
+    expect(q.take(4)).toBeNull();
+    expect(q.take(2)).toBe('AAAAAA');
+    expect(q.size).toBe(0);
   });
 
   it('ignores duplicate offers and unknown withdrawals', () => {

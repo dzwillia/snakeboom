@@ -411,14 +411,17 @@ export class OnlineMatch {
       case 'start':
         this.start(m);
         return;
-      case 'peerAway':
-        this.peerAwayDeadline = this.clock.toLocal(m.deadline);
+      case 'seatAway':
+        this.peerAwayDeadline = m.deadline === null ? null : this.clock.toLocal(m.deadline);
         this.reconnectShown = -1;
         return;
-      case 'peerBack':
+      case 'seatBack':
         this.peerAwayDeadline = null;
         this.reconnectShown = -1;
         screens.uncover();
+        return;
+      case 'ended':
+        this.end('over', 'YOU WIN', 'EVERYONE ELSE LEFT THE MATCH', PLAYER_CSS[m.winner]);
         return;
       case 'forfeit':
         this.end('over', `${this.names[m.winner]} WINS`, `${this.names[1 - m.winner]} LEFT THE MATCH`, PLAYER_CSS[m.winner]);
@@ -426,7 +429,7 @@ export class OnlineMatch {
       case 'desync':
         this.end('over', 'OUT OF SYNC', 'MATCH VOIDED', 'var(--red)');
         return;
-      case 'peerLeft':
+      case 'seatLeft':
         if (this.session?.state.phase === 'matchOver') return; // the lobby message updates the line
         if (this.phase === 'playing' || this.phase === 'starting') this.end('over', 'OPPONENT LEFT', '', 'var(--text)');
         return;

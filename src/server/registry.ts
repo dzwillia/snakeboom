@@ -34,13 +34,13 @@ export class Registry {
    * A new room, or null when the server is full. With `name` the room is filed under that name
    * instead of a random code; the caller checks first that the name is valid and free.
    */
-  create(winsToWin: number, name?: string): RoomEntry | null {
+  create(winsToWin: number, size = 2, name?: string): RoomEntry | null {
     if (this.rooms.size >= this.maxRooms) return null;
     if (name !== undefined && this.rooms.has(name)) throw new Error(`room ${name} already exists`);
     let code = name ?? roomCode(Math.random);
     while (this.rooms.has(code)) code = roomCode(Math.random);
-    const host = new WsHost(code, this.log, this.lagMs);
-    const room = new Room(host, { code, winsToWin });
+    const host = new WsHost(code, this.log, this.lagMs, size);
+    const room = new Room(host, { code, winsToWin, size });
     const entry = { room, host };
     this.rooms.set(code, entry);
     room.onClosed = () => {
@@ -49,7 +49,7 @@ export class Registry {
       this.onRoomStatus?.(code, 'closed');
     };
     room.onStatus = (status) => this.onRoomStatus?.(code, status);
-    this.log({ room: code, event: 'created', winsToWin });
+    this.log({ room: code, event: 'created', winsToWin, size });
     return entry;
   }
 

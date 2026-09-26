@@ -3,14 +3,17 @@ import type { RoomHost } from '../net/room';
 
 /** RoomHost over `ws` sockets and Node timers. Sockets come and go (rejoins), so they are attached by seat. */
 export class WsHost implements RoomHost {
-  private readonly sockets: (WebSocket | null)[] = [null, null];
+  private readonly sockets: (WebSocket | null)[];
 
   constructor(
     private readonly code: string,
     private readonly logSink: (entry: Record<string, unknown>) => void,
     /** Artificial delay on every send, for testing rollback on a LAN. */
     private readonly lagMs = 0,
-  ) {}
+    size = 2,
+  ) {
+    this.sockets = Array.from({ length: size }, () => null);
+  }
 
   attach(player: number, socket: WebSocket): void {
     this.sockets[player] = socket;
