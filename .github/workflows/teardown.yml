@@ -1,0 +1,47 @@
+name: teardown
+
+# Removes one release's own stack from the box: its containers, Caddy fragment, directory and images.
+# The current release at snakeboom.com is a different stack and is never touched. Dispatch with the
+# slug (v0-16-0) or the tag (v0.16.0). Retention does this automatically for releases beyond the newest
+# five unless they are listed in /opt/happypathsoft/snakeboom/pinned; see infra/README.md.
+on:
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: 'Release to tear down (e.g. v0-16-0 or v0.16.0)'
+        required: true
+
+# Shares the deploy's group so a teardown never runs in the middle of a deploy.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  teardown:
+    # Pinned: ubuntu-latest moves to Ubuntu 26 on 2026-10-19 and this SSHes into the box; no surprise runner migrations.
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Copy the teardown script to the host
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: infra/teardown.sh
+          target: /tmp/snakeboom-deploy
+          strip_components: 0
+      - name: Tear the release down on the host
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          SLUG: ${{ github.event.inputs.slug }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: SLUG
+          script: |
+            set -euo pipefail
+            bash /tmp/snakeboom-deploy/infra/teardown.sh "$SLUG"

@@ -84,7 +84,7 @@ To play across a LAN, run the relay on one machine and point the other at it: `V
 
 ## Hosting
 
-The site and the relay ship as two Docker images (`Dockerfile.web`, `Dockerfile.api`) and run behind the shared Caddy on the Happy Path box. A `v*` tag builds, pushes and deploys them through `.github/workflows/deploy.yml`; the tag is baked into the site as the version shown in the corner of the title screen (a local build shows `v0.x.y-dev`). The runbook, including the one-time setup, is in [`infra/README.md`](infra/README.md).
+The site and the relay ship as two Docker images (`Dockerfile.web`, `Dockerfile.api`) and run behind the shared Caddy on the Happy Path box. A `v*` tag builds, pushes and deploys them through `.github/workflows/deploy.yml`; the tag is baked into the site as the version shown in the corner of the title screen (a local build shows `v0.x.y-dev`). Every release also stays playable at its own subdomain, the tag with dots as dashes (`v0.17.0` at `https://v0-17-0.snakeboom.com`, with its own relay), which is where the version label links. The runbook, including the one-time setup, pinning and teardown, is in [`infra/README.md`](infra/README.md).
 
 ## Develop
 

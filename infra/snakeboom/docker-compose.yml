@@ -1,9 +1,13 @@
-# SnakeBoom on the Happy Path box: /opt/happypathsoft/snakeboom/docker-compose.yml
-# Both containers sit on the shared Caddy network. There is no database.
+# SnakeBoom on the Happy Path box. Both containers sit on the shared Caddy network. There is no database.
+#
+# The same file runs two kinds of stack, told apart by .env (see infra/README.md):
+#   the current release   /opt/happypathsoft/snakeboom/            project snakeboom,        snakeboom-api / snakeboom-web
+#   one release, forever  /opt/happypathsoft/snakeboom/releases/S/ project snakeboom-S,      snakeboom-api-S / snakeboom-web-S
+# where S is the tag with dots as dashes (v0-17-0) and .env sets COMPOSE_PROJECT_NAME and NAME_SUFFIX=-S.
 services:
   snakeboom-api:
     image: ghcr.io/dzwillia/snakeboom-api:${API_IMAGE_TAG:-latest}
-    container_name: snakeboom-api
+    container_name: snakeboom-api${NAME_SUFFIX:-}
     restart: unless-stopped
     environment:
       PORT: "3001"
@@ -20,7 +24,7 @@ services:
 
   snakeboom-web:
     image: ghcr.io/dzwillia/snakeboom-web:${WEB_IMAGE_TAG:-latest}
-    container_name: snakeboom-web
+    container_name: snakeboom-web${NAME_SUFFIX:-}
     restart: unless-stopped
     networks:
       - happypathsoft-net
