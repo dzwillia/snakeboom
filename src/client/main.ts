@@ -40,6 +40,8 @@ import { Minimap } from './render/minimap';
 import { browserStorage, CONFIG_KEY, loadSettings, loadStored, saveStored, SETTINGS_KEY, settingsDefaults } from './settings';
 import { nextOpponent, nextPlayers, nextWins, PLAYER_NAMES } from './text';
 import { createTuningPanel } from './tuning';
+import { bootAdmin } from './admin';
+import { diffConfig, hasOverrides } from '../sim/configSchema';
 
 declare global {
   interface Window {
@@ -66,6 +68,11 @@ function relayBase(): string {
 
 async function boot(): Promise<void> {
   const storage = browserStorage();
+  if (location.pathname === '/admin' || location.pathname === '/admin/') {
+    document.body.classList.add('admin-page');
+    bootAdmin(element('screens'), relayBase(), storage);
+    return;
+  }
   const cfg = loadStored(storage, CONFIG_KEY, DEFAULT_CONFIG);
   const prefersCalm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const settings = loadSettings(storage, settingsDefaults(prefersCalm));
@@ -104,8 +111,9 @@ async function boot(): Promise<void> {
   let tuningOpen = false;
   const now = () => performance.now() / 1000;
   const newSeed = () => Math.floor(Math.random() * 2 ** 31);
+  // Only what differs from the defaults is saved, so a slider you never touched follows the game's defaults as they change.
   const persist = () => {
-    saveStored(storage, CONFIG_KEY, cfg);
+    saveStored(storage, CONFIG_KEY, diffConfig(cfg));
     saveStored(storage, SETTINGS_KEY, settings);
   };
   const activeCfg = () => (online ? online.cfg : cfg);
@@ -123,7 +131,14 @@ async function boot(): Promise<void> {
   });
 
   const showTitle = () =>
-    screens.title({ row: menuRow, winsToWin: cfg.winsToWin, hearts: cfg.hearts, opponent: settings.opponent, players: settings.players });
+    screens.title({
+      row: menuRow,
+      winsToWin: cfg.winsToWin,
+      hearts: cfg.hearts,
+      opponent: settings.opponent,
+      players: settings.players,
+      tuned: hasOverrides(diffConfig({ ...cfg, winsToWin: DEFAULT_CONFIG.winsToWin })),
+    });
   /**
    * Seats the bots for a new match (so a mid-match setting change waits for the next one): PINK
    * is the chosen opponent, and every seat past the second is a bot at that level (NORMAL when

@@ -9,6 +9,11 @@ services:
       PORT: "3001"
       APP_VERSION: ${API_IMAGE_TAG:-latest}
       ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:?set ALLOWED_ORIGIN in .env}
+      # House rules (the /admin page): the bearer token, and where the rules persist across restarts.
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      CONFIG_PATH: /data/config.json
+    volumes:
+      - snakeboom-data:/data
     networks:
       - happypathsoft-net
     healthcheck:
@@ -28,3 +33,6 @@ services:
 networks:
   happypathsoft-net:
     external: true
+
+volumes:
+  snakeboom-data:

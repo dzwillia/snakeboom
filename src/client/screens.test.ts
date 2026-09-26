@@ -66,6 +66,14 @@ describe('Screens title', () => {
     expect(root.innerHTML).toContain('plays this seat');
   });
 
+  it('notes when local play is tuned away from the defaults', () => {
+    const root = fakeRoot();
+    new Screens(root).title({ row: 'local', winsToWin: 5, hearts: 3, opponent: 'human', players: 2, tuned: true });
+    expect(root.innerHTML).toContain('LOCAL PLAY IS TUNED');
+    new Screens(root).title({ row: 'local', winsToWin: 5, hearts: 1, opponent: 'human', players: 2 });
+    expect(root.innerHTML).not.toContain('TUNED');
+  });
+
   it('says the extra seats are bots when more than two play', () => {
     const root = fakeRoot();
     new Screens(root).title({ row: 'players', winsToWin: 5, hearts: 1, opponent: 'human', players: 5 });
@@ -170,6 +178,15 @@ describe('Screens lobby', () => {
     expect((root.innerHTML.match(/class="seat[ "]/g) ?? []).length).toBe(5);
     expect(root.innerHTML).toContain('1/2 READY · STARTS WHEN EVERYONE IS');
     expect(root.innerHTML).toContain('class="seats many"');
+  });
+
+  it('shows the house rules when the relay has any', () => {
+    const root = fakeRoot();
+    const base = { code: 'x', link: 'x', players: [{ name: 'Ada', ready: false, connected: true }, null], winsToWin: 3, size: 2, pingMs: null, me: 0 };
+    new Screens(root).lobby({ ...base, houseRules: ['hearts 3', 'speed 320'] });
+    expect(root.innerHTML).toContain('HOUSE RULES · HEARTS 3 · SPEED 320');
+    new Screens(root).lobby({ ...base, houseRules: [] });
+    expect(root.innerHTML).not.toContain('HOUSE RULES');
   });
 
   it('shows the code, the link, both seats and the ping', () => {

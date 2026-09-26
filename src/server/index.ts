@@ -1,5 +1,8 @@
 import { serve, type ServerType } from '@hono/node-server';
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { timingSafeEqual } from 'node:crypto';
+import { OnlineConfigStore } from './onlineConfig';
 import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type RawData, type WebSocket } from 'ws';
@@ -24,12 +27,17 @@ export interface ServerOptions {
   maxQueued?: number;
   /** Delay every message the relay sends, to test rollback without a real network. */
   lagMs?: number;
+  /** Bearer token for the /admin endpoints; unset means they don't exist (404). */
+  adminToken?: string;
+  /** Where the house rules persist; unset keeps them in memory only. */
+  configPath?: string;
   log?: (entry: Record<string, unknown>) => void;
 }
 
 export interface RunningServer {
   port: number;
   registry: Registry;
+  houseRules: OnlineConfigStore;
   close(): Promise<void>;
 }
 
@@ -68,13 +76,60 @@ function clampWins(value: unknown): number {
 export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const log = opts.log ?? logLine;
   const version = opts.version ?? 'dev';
-  const registry = new Registry(opts.maxRooms ?? DEFAULT_MAX_ROOMS, log, opts.lagMs ?? 0);
+  const houseRules = new OnlineConfigStore(opts.configPath ?? null, log);
+  const registry = new Registry(opts.maxRooms ?? DEFAULT_MAX_ROOMS, log, opts.lagMs ?? 0, () => houseRules.get());
   const quick = new QuickMatch();
   const creations = new RateLimit(opts.roomsPerMinute ?? DEFAULT_ROOMS_PER_MINUTE, 60_000);
   const maxQueued = opts.maxQueued ?? DEFAULT_MAX_QUEUED;
   const pruneTimer = setInterval(() => creations.prune(Date.now()), 60_000);
   pruneTimer.unref();
   const app = new Hono();
+  // The admin page lives on the site's origin and calls these cross-origin with a bearer token.
+  app.use('/admin/*', cors({ origin: (origin) => (originAllowed(origin || undefined, opts.allowedOrigin) ? origin : ''), allowHeaders: ['Authorization', 'Content-Type'], allowMethods: ['GET', 'PUT', 'DELETE', 'OPTIONS'] }));
+  const adminToken = opts.adminToken && opts.adminToken.length >= 16 ? opts.adminToken : null;
+  const adminAuth = new RateLimit(30, 60_000);
+  const authorised = (c: { req: { header(name: string): string | undefined }; env?: unknown }, ip: string): boolean => {
+    if (!adminToken) return false;
+    const header = c.req.header('authorization') ?? '';
+    const given = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+    const a = Buffer.from(given);
+    const b = Buffer.from(adminToken);
+    const ok = a.length === b.length && timingSafeEqual(a, b);
+    if (!ok) log({ event: 'adminRefused', ip });
+    return ok;
+  };
+  app.get('/admin/config', (c) => {
+    if (!adminToken) return c.notFound();
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    if (!adminAuth.allow(ip, Date.now())) return c.json({ error: 'Slow down a little.' }, 429);
+    if (!authorised(c, ip)) return c.json({ error: 'That token is not right.' }, 401);
+    return c.json({ overrides: houseRules.get(), updatedAt: houseRules.updated });
+  });
+  app.put('/admin/config', async (c) => {
+    if (!adminToken) return c.notFound();
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    if (!adminAuth.allow(ip, Date.now())) return c.json({ error: 'Slow down a little.' }, 429);
+    if (!authorised(c, ip)) return c.json({ error: 'That token is not right.' }, 401);
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'The body is not JSON.' }, 400);
+    }
+    const raw = body && typeof body === 'object' && 'overrides' in (body as Record<string, unknown>) ? (body as { overrides: unknown }).overrides : body;
+    const { overrides, problems } = houseRules.set(raw);
+    log({ event: 'adminConfig', ip, keys: Object.keys(overrides), problems });
+    return c.json({ overrides, problems, updatedAt: houseRules.updated });
+  });
+  app.delete('/admin/config', (c) => {
+    if (!adminToken) return c.notFound();
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    if (!adminAuth.allow(ip, Date.now())) return c.json({ error: 'Slow down a little.' }, 429);
+    if (!authorised(c, ip)) return c.json({ error: 'That token is not right.' }, 401);
+    houseRules.clear();
+    log({ event: 'adminConfig', ip, keys: [], problems: [] });
+    return c.json({ overrides: {}, problems: [], updatedAt: houseRules.updated });
+  });
   app.get('/health', (c) =>
     c.json({
       status: 'ok',
@@ -83,6 +138,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       rooms: registry.count,
       players: registry.players,
       queued: quick.size,
+      houseRules: Object.keys(houseRules.get()).length,
     }),
   );
 
@@ -320,6 +376,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   return {
     port,
     registry,
+    houseRules,
     close: () =>
       new Promise<void>((resolve) => {
         clearInterval(pruneTimer);

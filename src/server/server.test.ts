@@ -484,6 +484,74 @@ describe('relay limits', () => {
   });
 });
 
+describe('relay house rules', () => {
+  const TOKEN = 'a-long-enough-admin-token-1234';
+  let server: RunningServer;
+  beforeAll(async () => {
+    server = await startServer({ port: 0, roomsPerMinute: 1000, adminToken: TOKEN, log: () => {} });
+  });
+  afterAll(async () => {
+    await server.close();
+  });
+  const call = (method: string, token: string | null, body?: unknown) =>
+    fetch(`http://127.0.0.1:${server.port}/admin/config`, {
+      method,
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+  it('refuses a missing or wrong token and accepts the right one', async () => {
+    expect((await call('GET', null)).status).toBe(401);
+    expect((await call('GET', 'nope')).status).toBe(401);
+    const ok = await call('GET', TOKEN);
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ overrides: {}, updatedAt: null });
+  });
+
+  it('publishes validated rules, serves them, hands them to new matches, and clears them', async () => {
+    const put = await call('PUT', TOKEN, { overrides: { hearts: 3, baseSpeed: 9999 } });
+    expect(put.status).toBe(200);
+    expect(await put.json()).toMatchObject({ overrides: { hearts: 3 }, problems: ['baseSpeed: 9999 is outside 60–400'] });
+    expect(await (await call('GET', TOKEN)).json()).toMatchObject({ overrides: { hearts: 3 } });
+    const health = await fetch(`http://127.0.0.1:${server.port}/health`).then((r) => r.json());
+    expect(health.houseRules).toBe(1);
+
+    const a = new TestClient(server.port);
+    const b = new TestClient(server.port);
+    await Promise.all([a.opened, b.opened]);
+    a.send(hello('Ada'));
+    a.send({ type: 'create', winsToWin: 2 });
+    const wa = await a.expect('welcome');
+    expect((await a.expect('lobby')).houseRules).toEqual({ hearts: 3 });
+    b.send(hello('Bob'));
+    b.send({ type: 'join', room: wa.room });
+    await b.expect('welcome');
+    a.send({ type: 'ready', ready: true });
+    b.send({ type: 'ready', ready: true });
+    expect((await a.expect('start')).houseRules).toEqual({ hearts: 3 });
+    a.close();
+    b.close();
+
+    const del = await call('DELETE', TOKEN);
+    expect(del.status).toBe(200);
+    expect(await (await call('GET', TOKEN)).json()).toMatchObject({ overrides: {} });
+  });
+
+  it('rejects a body that is not JSON', async () => {
+    const res = await fetch(`http://127.0.0.1:${server.port}/admin/config`, { method: 'PUT', headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }, body: '{nope' });
+    expect(res.status).toBe(400);
+  });
+
+  it('has no admin endpoints at all without a token, and refuses a short one', async () => {
+    const bare = await startServer({ port: 0, log: () => {} });
+    expect((await fetch(`http://127.0.0.1:${bare.port}/admin/config`, { headers: { Authorization: 'Bearer anything' } })).status).toBe(404);
+    await bare.close();
+    const short = await startServer({ port: 0, adminToken: 'short', log: () => {} });
+    expect((await fetch(`http://127.0.0.1:${short.port}/admin/config`, { headers: { Authorization: 'Bearer short' } })).status).toBe(404);
+    await short.close();
+  });
+});
+
 describe('relay origin check', () => {
   let server: RunningServer;
   beforeAll(async () => {

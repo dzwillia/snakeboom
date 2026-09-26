@@ -1,5 +1,6 @@
 import { roomCode } from '../net/names';
 import { Room } from '../net/room';
+import type { Overrides } from '../sim/configSchema';
 import { WsHost } from './wsHost';
 
 export interface RoomEntry {
@@ -18,6 +19,7 @@ export class Registry {
     private readonly maxRooms: number,
     private readonly log: (entry: Record<string, unknown>) => void,
     private readonly lagMs = 0,
+    private readonly houseRules: () => Overrides = () => ({}),
   ) {}
 
   get count(): number {
@@ -40,7 +42,7 @@ export class Registry {
     let code = name ?? roomCode(Math.random);
     while (this.rooms.has(code)) code = roomCode(Math.random);
     const host = new WsHost(code, this.log, this.lagMs, size);
-    const room = new Room(host, { code, winsToWin, size });
+    const room = new Room(host, { code, winsToWin, size, houseRules: this.houseRules });
     const entry = { room, host };
     this.rooms.set(code, entry);
     room.onClosed = () => {
