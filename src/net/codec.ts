@@ -2,7 +2,7 @@ import type { PlayerInput } from '../sim';
 
 /** client → relay: [FRAME_INPUT, tick u32 LE, input u8] */
 export const FRAME_INPUT = 1;
-/** relay → client: [FRAME_RELAYED, player u8, tick u32 LE, input u8] */
+/** relay → client: [FRAME_RELAYED, player u8 (0–7), tick u32 LE, input u8] */
 export const FRAME_RELAYED = 2;
 /** relay → client on rejoin: [FRAME_REPLAY, relayed frames...] */
 export const FRAME_REPLAY = 3;
@@ -11,6 +11,8 @@ export const RELAYED_FRAME_BYTES = 7;
 
 const TURN_CODES: Record<-1 | 0 | 1, number> = { 0: 0, 1: 1, [-1]: 2 };
 const MAX_TICK = 0xffffffff;
+/** Seats are 0–7. */
+export const MAX_SEAT = 7;
 
 /** Bits 0–1: turn (0 straight, 1 right, 2 left). Bit 2: boost. Bit 3: use (Fire). Bit 4: select. */
 export function packInput(input: PlayerInput): number {
@@ -61,7 +63,7 @@ export function decodeInput(bytes: Uint8Array): { tick: number; input: PlayerInp
 
 export function encodeRelayed(player: number, tick: number, input: PlayerInput): Uint8Array {
   if (!validTick(tick)) throw new RangeError(`tick out of range: ${tick}`);
-  if (player !== 0 && player !== 1) throw new RangeError(`player out of range: ${player}`);
+  if (!Number.isInteger(player) || player < 0 || player > MAX_SEAT) throw new RangeError(`player out of range: ${player}`);
   const out = new Uint8Array(RELAYED_FRAME_BYTES);
   out[0] = FRAME_RELAYED;
   out[1] = player;
@@ -71,7 +73,7 @@ export function encodeRelayed(player: number, tick: number, input: PlayerInput):
 }
 
 export function decodeRelayed(bytes: Uint8Array): { player: number; tick: number; input: PlayerInput } | null {
-  if (bytes.length !== RELAYED_FRAME_BYTES || bytes[0] !== FRAME_RELAYED || bytes[1] > 1) return null;
+  if (bytes.length !== RELAYED_FRAME_BYTES || bytes[0] !== FRAME_RELAYED || bytes[1] > MAX_SEAT) return null;
   const input = unpackInput(bytes[6]);
   return input ? { player: bytes[1], tick: readTick(bytes, 2), input } : null;
 }

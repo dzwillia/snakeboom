@@ -4,13 +4,15 @@ import { smoothLead } from './timeSync';
 export interface SessionOptions {
   seed: number;
   cfg: Config;
-  /** 0 or 1: which seat this machine plays. */
+  /** Seats in the match (2–8). */
+  players?: number;
+  /** Which seat this machine plays. */
   local: number;
   /** Ticks between pressing a key and it taking effect, at least 1. */
   inputDelay: number;
   /** Ticks the predicted state may run ahead of the confirmed state. */
   maxRollback?: number;
-  /** Estimated one-way latency to the peer in ticks, for the lead estimate. Can be set later. */
+  /** Estimated one-way latency to the peers in ticks, for the lead estimate. Can be set later. */
   oneWayTicks?: number;
   /** Outgoing local inputs, to be sent to the relay. */
   send: (tick: number, input: PlayerInput) => void;
@@ -79,14 +81,17 @@ function copyInput(i: PlayerInput): PlayerInput {
 }
 
 /**
- * Rollback netcode for one seat. Two copies of the sim run: `confirmed` only advances through
- * ticks whose inputs from both seats are known, and `predicted` runs ahead of it using a guess
- * for the remote seat (its last known input, without Fire or Select). When a guess turns out wrong, the
- * predicted state is rebuilt from the confirmed one. The predicted state is the one to draw.
+ * Rollback netcode for one seat among up to eight. Two copies of the sim run: `confirmed` only
+ * advances through ticks whose inputs from every seat are known, and `predicted` runs ahead of it
+ * using a guess for each remote seat (its last known input, without Fire or Select). When a guess
+ * turns out wrong, the predicted state is rebuilt from the confirmed one. The predicted state is
+ * the one to draw.
  */
 export class NetSession {
+  readonly players: number;
   readonly local: number;
-  readonly remote: number;
+  /** The seats other than the local one. */
+  readonly remotes: readonly number[];
   readonly inputDelay: number;
   readonly maxRollback: number;
   readonly stats: SessionStats = emptyStats();
@@ -96,12 +101,12 @@ export class NetSession {
   private readonly cfg: Config;
   private readonly send: SessionOptions['send'];
   private readonly onConfirmed: SessionOptions['onConfirmed'];
-  private readonly localInputs = new Map<number, PlayerInput>();
-  private readonly remoteInputs = new Map<number, PlayerInput>();
-  /** The remote input each predicted tick above the confirmed tick was stepped with. */
-  private readonly predictedRemote = new Map<number, PlayerInput>();
-  private latestRemote: PlayerInput = NO_INPUT;
-  private latestRemoteTick = -1;
+  /** Known inputs per seat, by tick (the local seat's are the ones it scheduled). */
+  private readonly inputs: Map<number, PlayerInput>[];
+  /** Per predicted tick above the confirmed tick: the inputs each seat was stepped with. */
+  private readonly predictedWith = new Map<number, PlayerInput[]>();
+  private readonly latest: PlayerInput[];
+  private readonly latestTick: number[];
   private needRollback = false;
   private stalledNow = false;
   private oneWayTicks: number;
@@ -109,23 +114,26 @@ export class NetSession {
   private pendingCorrections: Correction[] = [];
 
   constructor(opts: SessionOptions) {
-    if (opts.local !== 0 && opts.local !== 1) throw new RangeError(`local seat must be 0 or 1, got ${opts.local}`);
+    const players = opts.players ?? 2;
+    if (!Number.isInteger(players) || players < 2 || players > 8) throw new RangeError(`players must be 2–8, got ${players}`);
+    if (!Number.isInteger(opts.local) || opts.local < 0 || opts.local >= players) throw new RangeError(`local seat must be 0–${players - 1}, got ${opts.local}`);
     if (!Number.isInteger(opts.inputDelay) || opts.inputDelay < 1) throw new RangeError('inputDelay must be at least 1');
+    this.players = players;
     this.local = opts.local;
-    this.remote = 1 - opts.local;
+    this.remotes = Array.from({ length: players }, (_, i) => i).filter((i) => i !== opts.local);
     this.inputDelay = opts.inputDelay;
     this.maxRollback = opts.maxRollback ?? DEFAULT_MAX_ROLLBACK;
     this.cfg = opts.cfg;
     this.oneWayTicks = opts.oneWayTicks ?? 2;
     this.send = opts.send;
     this.onConfirmed = opts.onConfirmed;
-    this.confirmed = createMatch(opts.cfg, opts.seed);
+    this.confirmed = createMatch(opts.cfg, opts.seed, players);
     this.predicted = cloneState(this.confirmed);
-    // Ticks before the first scheduled input are neutral on both sides by contract; nobody sends them.
-    for (let t = 1; t < opts.inputDelay; t++) {
-      this.localInputs.set(t, NO_INPUT);
-      this.remoteInputs.set(t, NO_INPUT);
-    }
+    this.inputs = Array.from({ length: players }, () => new Map<number, PlayerInput>());
+    this.latest = Array.from({ length: players }, () => NO_INPUT);
+    this.latestTick = new Array<number>(players).fill(-1);
+    // Ticks before the first scheduled input are neutral on every side by contract; nobody sends them.
+    for (let t = 1; t < opts.inputDelay; t++) for (const map of this.inputs) map.set(t, NO_INPUT);
   }
 
   /** The state to draw. Replaced by a rollback, so don't hold on to it across frames. */
@@ -146,7 +154,7 @@ export class NetSession {
     return this.confirmed.tick;
   }
 
-  /** True when the last advance() refused to step because the remote is too far behind. */
+  /** True when the last advance() refused to step because a remote seat is too far behind. */
   get stalled(): boolean {
     return this.stalledNow;
   }
@@ -167,15 +175,24 @@ export class NetSession {
     return out;
   }
 
-  /** Highest remote tick received, or −1 before any. */
+  /** Highest tick received from the slowest remote seat, or −1 before every seat has sent. */
   get remoteTickSeen(): number {
-    return this.latestRemoteTick;
+    let min = Number.POSITIVE_INFINITY;
+    for (const r of this.remotes) min = Math.min(min, this.latestTick[r]);
+    return min === Number.POSITIVE_INFINITY ? -1 : min;
+  }
+
+  /** Highest tick received from any remote seat, or −1 before any. */
+  get remoteTickMax(): number {
+    let max = -1;
+    for (const r of this.remotes) max = Math.max(max, this.latestTick[r]);
+    return max;
   }
 
   /** A local input taken from the relay's log after a refresh. Stored without sending. */
   restoreLocal(tick: number, input: PlayerInput): void {
-    if (!Number.isInteger(tick) || tick <= this.confirmed.tick || this.localInputs.has(tick)) return;
-    this.localInputs.set(tick, copyInput(input));
+    if (!Number.isInteger(tick) || tick <= this.confirmed.tick || this.inputs[this.local].has(tick)) return;
+    this.inputs[this.local].set(tick, copyInput(input));
   }
 
   /**
@@ -186,38 +203,39 @@ export class NetSession {
     let stepped = 0;
     while (stepped < maxTicks) {
       const tick = this.confirmed.tick + 1;
-      const remote = this.remoteInputs.get(tick);
-      const local = this.localInputs.get(tick);
-      if (!remote || !local) break;
-      const events = step(this.confirmed, this.seatInputs(tick, remote), this.cfg);
+      const known = this.knownInputs(tick);
+      if (!known) break;
+      const events = step(this.confirmed, known, this.cfg);
       this.onConfirmed?.(tick, this.confirmed, events);
       stepped++;
     }
     if (stepped > 0) {
       this.predicted = cloneState(this.confirmed);
-      this.predictedRemote.clear();
+      this.predictedWith.clear();
       this.needRollback = false;
     }
     return stepped;
   }
 
-  /** True while the newest known remote tick is further ahead than the input delay explains. */
+  /** True while the newest tick known from every remote seat is further ahead than the input delay explains. */
   get behind(): boolean {
-    return this.latestRemoteTick - this.predicted.tick > this.inputDelay;
+    return this.remoteTickSeen - this.predicted.tick > this.inputDelay;
   }
 
-  /** A remote input for a tick. Any order is fine; duplicates and already-confirmed ticks are ignored. */
-  receive(tick: number, input: PlayerInput): void {
-    if (!Number.isInteger(tick) || tick <= this.confirmed.tick || this.remoteInputs.has(tick)) return;
+  /** A remote seat's input for a tick. Any order is fine; duplicates and already-confirmed ticks are ignored. */
+  receive(seat: number, tick: number, input: PlayerInput): void {
+    if (seat === this.local || seat < 0 || seat >= this.players) return;
+    const map = this.inputs[seat];
+    if (!Number.isInteger(tick) || tick <= this.confirmed.tick || map.has(tick)) return;
     const stored = copyInput(input);
-    this.remoteInputs.set(tick, stored);
-    if (tick > this.latestRemoteTick) {
-      this.latestRemoteTick = tick;
-      this.latestRemote = stored;
+    map.set(tick, stored);
+    if (tick > this.latestTick[seat]) {
+      this.latestTick[seat] = tick;
+      this.latest[seat] = stored;
     }
     if (tick <= this.predicted.tick) {
       this.stats.receivedLate++;
-      const guessed = this.predictedRemote.get(tick);
+      const guessed = this.predictedWith.get(tick)?.[seat];
       if (!guessed || !sameInput(guessed, stored)) this.needRollback = true;
     }
   }
@@ -230,11 +248,12 @@ export class NetSession {
   advance(localInput: PlayerInput): TaggedEvent[] {
     // Normally only the scheduled tick is new. After a rejoin the ticks between the log's last
     // local input and the schedule are missing too, and nothing else would ever fill them.
+    const mine = this.inputs[this.local];
     const target = this.predicted.tick + this.inputDelay;
     for (let tick = this.predicted.tick + 1; tick <= target; tick++) {
-      if (this.localInputs.has(tick)) continue;
+      if (mine.has(tick)) continue;
       const stored = copyInput(localInput);
-      this.localInputs.set(tick, stored);
+      mine.set(tick, stored);
       this.send(tick, stored);
     }
     const events = this.reconcile();
@@ -246,37 +265,46 @@ export class NetSession {
     this.stalledNow = false;
     this.stats.ticks++;
     events.push(...this.stepPredicted());
-    if (this.latestRemoteTick >= 0) this.leadEma = smoothLead(this.leadEma, this.lead(this.oneWayTicks));
+    if (this.remoteTickSeen >= 0) this.leadEma = smoothLead(this.leadEma, this.lead(this.oneWayTicks));
     if (this.predicted.tick % PRUNE_EVERY === 0) this.prune();
     return events;
   }
 
   /**
-   * Ticks this machine is ahead of the peer. The peer sends its input for tick R + inputDelay
+   * Ticks this machine is ahead of the slowest peer. A peer sends its input for tick R + inputDelay
    * while at tick R, and that input took about `oneWayTicks` to get here.
    */
   lead(oneWayTicks: number): number {
-    if (this.latestRemoteTick < 0) return 0;
-    const peerNow = this.latestRemoteTick - this.inputDelay + oneWayTicks;
+    const seen = this.remoteTickSeen;
+    if (seen < 0) return 0;
+    const peerNow = seen - this.inputDelay + oneWayTicks;
     return this.predicted.tick - peerNow;
   }
 
-  private seatInputs(tick: number, remote: PlayerInput): PlayerInput[] {
-    const inputs: PlayerInput[] = [NO_INPUT, NO_INPUT];
-    inputs[this.local] = this.localInputs.get(tick) ?? NO_INPUT;
-    inputs[this.remote] = remote;
-    return inputs;
+  /** Every seat's input for `tick`, or null while any is missing. */
+  private knownInputs(tick: number): PlayerInput[] | null {
+    const out: PlayerInput[] = [];
+    for (let seat = 0; seat < this.players; seat++) {
+      const input = this.inputs[seat].get(tick);
+      if (!input) return null;
+      out.push(input);
+    }
+    return out;
   }
 
-  private guessRemote(): PlayerInput {
-    return { turn: this.latestRemote.turn, boost: this.latestRemote.boost, use: false, select: false };
+  private guess(seat: number): PlayerInput {
+    const last = this.latest[seat];
+    return { turn: last.turn, boost: last.boost, use: false, select: false };
   }
 
   private stepPredicted(): TaggedEvent[] {
     const tick = this.predicted.tick + 1;
-    const remote = this.remoteInputs.get(tick) ?? this.guessRemote();
-    this.predictedRemote.set(tick, remote);
-    return step(this.predicted, this.seatInputs(tick, remote), this.cfg).map((event) => ({ tick, event, confirmed: false }));
+    const inputs: PlayerInput[] = [];
+    for (let seat = 0; seat < this.players; seat++) {
+      inputs.push(this.inputs[seat].get(tick) ?? (seat === this.local ? NO_INPUT : this.guess(seat)));
+    }
+    this.predictedWith.set(tick, inputs);
+    return step(this.predicted, inputs, this.cfg).map((event) => ({ tick, event, confirmed: false }));
   }
 
   private reconcile(): TaggedEvent[] {
@@ -285,12 +313,11 @@ export class NetSession {
     for (;;) {
       const tick = this.confirmed.tick + 1;
       if (tick > predictedTick) break;
-      const remote = this.remoteInputs.get(tick);
-      const local = this.localInputs.get(tick);
-      if (!remote || !local) break;
-      const events = step(this.confirmed, this.seatInputs(tick, remote), this.cfg);
+      const known = this.knownInputs(tick);
+      if (!known) break;
+      const events = step(this.confirmed, known, this.cfg);
       for (const event of events) out.push({ tick, event, confirmed: true });
-      this.predictedRemote.delete(tick);
+      this.predictedWith.delete(tick);
       this.onConfirmed?.(tick, this.confirmed, events);
     }
     if (this.needRollback) {
@@ -301,7 +328,7 @@ export class NetSession {
       if (depth > this.stats.maxRollbackDepth) this.stats.maxRollbackDepth = depth;
       const before = this.predicted.snakes.map((sn) => ({ x: sn.x, y: sn.y, alive: sn.alive }));
       this.predicted = cloneState(this.confirmed);
-      this.predictedRemote.clear();
+      this.predictedWith.clear();
       while (this.predicted.tick < predictedTick) out.push(...this.stepPredicted());
       this.predicted.snakes.forEach((sn, player) => {
         const was = before[player];
@@ -316,7 +343,7 @@ export class NetSession {
 
   private prune(): void {
     const cutoff = this.confirmed.tick - KEEP_TICKS;
-    for (const map of [this.localInputs, this.remoteInputs]) {
+    for (const map of this.inputs) {
       for (const tick of map.keys()) if (tick < cutoff) map.delete(tick);
     }
   }

@@ -132,7 +132,7 @@ describe('relay server', () => {
     expect(a.messages.some((m) => m.type === 'desync')).toBe(false);
 
     b.close();
-    const away = await a.expect('peerAway');
+    const away = await a.expect('seatAway');
     expect(away.deadline).toBeGreaterThan(Date.now());
     a.close();
     await a.waitClosed();
@@ -335,7 +335,7 @@ describe('relay server', () => {
     b.send({ type: 'ready', ready: true });
     await a.expect('start');
     b.close();
-    await a.expect('peerAway');
+    await a.expect('seatAway');
     a.sendFrame(encodeInput(1, NO_INPUT));
     a.sendFrame(encodeInput(2, NO_INPUT));
     await new Promise((r) => setTimeout(r, 50));
@@ -348,7 +348,7 @@ describe('relay server', () => {
     const replay = decodeReplay((await b2.waitFrames(1))[0]);
     expect(replay?.map((f) => f.tick)).toEqual([1, 2]);
     b2.frames.length = 0;
-    await a.expect('peerBack');
+    await a.expect('seatBack');
     a.sendFrame(encodeInput(3, NO_INPUT));
     expect(await b2.waitFrames(1)).toHaveLength(1);
     a.close();

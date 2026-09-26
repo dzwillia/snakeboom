@@ -29,7 +29,10 @@ const cfg = structuredClone(DEFAULT_CONFIG);
  * `--profile '{"aggression":0}'` overrides knobs on the first AI seat (to try tuning without editing code).
  */
 type Driver = (state: MatchState, idx: number, cfg: Config) => PlayerInput;
-const names = (args.get('bots') ?? 'simple,simple').split(',');
+/** `--players 8` seats that many; `--bots` names fill the seats in order and the last name repeats. */
+const players = Math.min(8, Math.max(2, Number(args.get('players') ?? 2)));
+const given = (args.get('bots') ?? 'simple,simple').split(',');
+const names = Array.from({ length: players }, (_, i) => given[Math.min(i, given.length - 1)]);
 const override = JSON.parse(args.get('profile') ?? '{}') as Partial<OpponentProfile>;
 let overrideLeft = 1;
 const ais: Array<OpponentState | null> = [];
@@ -48,16 +51,16 @@ const drivers: Driver[] = names.map((name, i): Driver => {
   return (state, idx, cfg) => opponentInput(bot, state, idx, cfg);
 });
 
-const state = createMatch(cfg, seed);
+const state = createMatch(cfg, seed, players);
 const lengths: number[] = [];
 const causes = new Map<string, number>();
 const problems: string[] = [];
-const wins = [0, 0];
+const wins = new Array<number>(players).fill(0);
 /** Deaths and heart losses each seat inflicted on the other (body, head-on, missile, encircled). */
-const kills = [0, 0];
-const hits = [0, 0];
+const kills = new Array<number>(players).fill(0);
+const hits = new Array<number>(players).fill(0);
 /** Deaths and heart losses each seat brought on itself (walls, blocks). */
-const ownGoals = [0, 0];
+const ownGoals = new Array<number>(players).fill(0);
 let draws = 0;
 let ticks = 0;
 let missileHits = 0;
@@ -95,7 +98,7 @@ while (lengths.length < rounds) {
       else ownGoals[e.player]++;
     }
     if (e.type === 'heartLost') {
-      if (e.cause === 'body' || e.cause === 'headOn' || e.cause === 'missile') hits[1 - e.player]++;
+      if (players === 2 && (e.cause === 'body' || e.cause === 'headOn' || e.cause === 'missile')) hits[1 - e.player]++;
       else ownGoals[e.player]++;
     }
     if (e.type === 'missileFired') missilesFired++;
@@ -118,9 +121,10 @@ lengths.sort((a, b) => a - b);
 const at = (p: number) => lengths[Math.min(lengths.length - 1, Math.floor(p * lengths.length))];
 const inTarget = lengths.filter((l) => l >= 60 && l <= 180).length;
 console.log(`rounds ${rounds} · draws ${draws} · ticks ${ticks}`);
-console.log(`wins: ${names[0]} ${wins[0]} · ${names[1]} ${wins[1]}`);
+console.log(`wins: ${names.map((n, i) => `${n}#${i} ${wins[i]}`).join(' · ')}`);
+console.log(`points: ${state.scores.map((s, i) => `${names[i]}#${i} ${s}`).join(' · ')} (this match)`);
 console.log(
-  `kills inflicted: ${names[0]} ${kills[0]} (+${hits[0]} hearts) · ${names[1]} ${kills[1]} (+${hits[1]} hearts) · self-inflicted: ${ownGoals[0]} / ${ownGoals[1]}`,
+  `kills inflicted: ${names.map((n, i) => `${n}#${i} ${kills[i]} (+${hits[i]} hearts)`).join(' · ')} · self-inflicted: ${ownGoals.join(' / ')}`,
 );
 console.log(
   `round length (s): min ${lengths[0].toFixed(1)} · median ${at(0.5).toFixed(1)} · p90 ${at(0.9).toFixed(1)} · max ${lengths[lengths.length - 1].toFixed(1)}`,

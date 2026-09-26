@@ -13,7 +13,9 @@ function fakeRoot(): HTMLElement {
     classList: { toggle: () => false },
     querySelector: (sel: string) => el(sel.replace('.', '')),
     querySelectorAll: (sel: string) =>
-      sel === '.side' ? [{ querySelector: (s: string) => el(`side0${s}`) }, { querySelector: (s: string) => el(`side1${s}`) }] : [el('name0'), el('name1')],
+      sel === '.side'
+        ? [{ dataset: { player: '0' }, querySelector: (s: string) => el(`side0${s}`) }, { dataset: { player: '1' }, querySelector: (s: string) => el(`side1${s}`) }]
+        : [el('name0'), el('name1')],
   } as unknown as HTMLElement;
 }
 

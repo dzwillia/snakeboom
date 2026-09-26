@@ -7,6 +7,7 @@ import { isRoomCode, isRoomKey, normalizeRoomName, roomNameProblem, sanitizeName
 import { isClientMessage, PROTOCOL, type ClientMessage, type ServerMessage } from '../net/protocol';
 import { logLine } from './log';
 import { QuickMatch } from '../net/quickMatch';
+import { clampSize } from '../net/room';
 import { RateLimit } from './rateLimit';
 import { Registry, type RoomEntry } from './registry';
 
@@ -150,7 +151,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         }
         // A room everyone has left lingers so its link keeps working, but it doesn't keep the name.
         holder?.room.close('idle');
-        const entry = registry.create(clampWins(message.winsToWin), name);
+        const entry = registry.create(clampWins(message.winsToWin), clampSize(message.size), name);
         if (!entry) return send(conn.socket, { type: 'error', code: 'busy', message: 'The server is full right now.' });
         joinEntry(conn, entry);
         return;
@@ -165,25 +166,28 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
         return;
       }
       case 'queue': {
-        // Join the oldest open room if one is really still waiting; otherwise open my own.
+        // Join the oldest open room of this size if one is really still waiting; otherwise open my own.
         if (!creations.allow(conn.ip, Date.now())) return slowDown(conn);
+        const size = clampSize(message.size);
         for (;;) {
-          const code = quick.take();
+          const code = quick.take(size);
           if (code === null) break;
           const open = registry.get(code);
           // Only a room with someone actually waiting in it; stale ones just fall out of the queue.
-          if (open && open.room.status === 'waiting' && open.room.playerCount === 1) {
+          if (open && open.room.status === 'waiting' && open.room.playerCount >= 1) {
             joinEntry(conn, open);
+            // A room with seats still free stays open for the next player of that size.
+            if (open.room.status === 'waiting') quick.offer(code, size);
             broadcastQueued();
             return;
           }
         }
         if (quick.size >= maxQueued) return send(conn.socket, { type: 'error', code: 'busy', message: 'Too many players are waiting right now.' });
-        const entry = registry.create(clampWins(message.winsToWin));
+        const entry = registry.create(clampWins(message.winsToWin), size);
         if (!entry) return send(conn.socket, { type: 'error', code: 'busy', message: 'The server is full right now.' });
         joinEntry(conn, entry);
         if (conn.entry === entry) {
-          quick.offer(entry.room.code);
+          quick.offer(entry.room.code, size);
           broadcastQueued();
         }
         return;
@@ -199,10 +203,8 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
 
   const joinEntry = (conn: Connection, entry: RoomEntry) => {
     // Attach first so the room's welcome and lobby messages reach this socket.
-    const reserved = entry.room.status === 'waiting' || entry.room.status === 'lobby';
-    if (!reserved) return send(conn.socket, { type: 'closed', reason: 'full' });
-    const probe = entry.room.playerCount;
-    const player = probe === 0 ? 0 : 1;
+    const player = entry.room.nextFreeSeat;
+    if (player === null) return send(conn.socket, { type: 'closed', reason: 'full' });
     entry.host.attach(player, conn.socket);
     const result = entry.room.join(conn.name);
     if (result === 'full') {

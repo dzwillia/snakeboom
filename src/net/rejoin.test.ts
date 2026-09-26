@@ -7,7 +7,7 @@ const FRAME_MS = 1000 / 60;
 const cfg = { ...DEFAULT_CONFIG, winsToWin: 2 };
 
 /** One bot tick per side per frame, recording confirmed hashes every second. */
-function run(link: FakeLink, sessions: [NetSession, NetSession], bots: [BotState, BotState], frames: number): void {
+function run(link: FakeLink, sessions: NetSession[], bots: BotState[], frames: number): void {
   for (let f = 0; f < frames; f++) {
     sessions.forEach((s, side) => s.advance(botInput(bots[side], s.state, side, cfg)));
     link.advance(FRAME_MS);
@@ -17,11 +17,11 @@ function run(link: FakeLink, sessions: [NetSession, NetSession], bots: [BotState
 // Review Focus 1: a session rebuilt from the log is the session.
 describe('rejoin from the relay log', () => {
   it('rebuilds seat 1 from the log to the same hashes, then keeps agreeing live', () => {
-    const hashes: [Map<number, number>, Map<number, number>] = [new Map(), new Map()];
+    const hashes: Map<number, number>[] = [new Map(), new Map()];
     const { link, sessions } = createLinkedSessions({ latencyMs: 40, jitterMs: 20, seed: 4 }, { seed: 99, cfg, inputDelay: 2 }, (side, tick, state) => {
       if (tick % 60 === 0) hashes[side].set(tick, hashState(state));
     });
-    const bots: [BotState, BotState] = [createBot(1), createBot(2)];
+    const bots: BotState[] = [createBot(1), createBot(2)];
     run(link, sessions, bots, 1500);
     const original = sessions[1];
 
@@ -39,7 +39,7 @@ describe('rejoin from the relay log', () => {
     });
     for (const entry of link.sent) {
       if (entry.from === 1) fresh.restoreLocal(entry.tick, entry.input);
-      else fresh.receive(entry.tick, entry.input);
+      else fresh.receive(entry.from, entry.tick, entry.input);
     }
     expect(fresh.behind).toBe(true);
     let slices = 0;
@@ -79,8 +79,8 @@ describe('rejoin from the relay log', () => {
     const s = new NetSession({ seed: 1, cfg, local: 0, inputDelay: 2, send: (t) => sends.push(t) });
     s.restoreLocal(2, { turn: 1, boost: false, use: false, select: false });
     s.restoreLocal(3, { turn: 1, boost: false, use: false, select: false });
-    s.receive(1, { turn: 0, boost: false, use: false, select: false });
-    s.receive(2, { turn: 0, boost: false, use: false, select: false });
+    s.receive(1, 1, { turn: 0, boost: false, use: false, select: false });
+    s.receive(1, 2, { turn: 0, boost: false, use: false, select: false });
     expect(s.catchUp(10)).toBe(2);
     expect(sends).toEqual([]);
     expect(s.confirmedTick).toBe(2);

@@ -5,7 +5,7 @@ import type { TaggedEvent } from './session';
 const roundOver = (tick: number, confirmed: boolean): TaggedEvent => ({
   tick,
   confirmed,
-  event: { type: 'roundOver', winner: 0, deaths: [] },
+  event: { type: 'roundOver', winner: 0, places: [1, 2], deaths: [] },
 });
 const explosion = (tick: number, id: number, confirmed: boolean): TaggedEvent => ({
   tick,
@@ -39,7 +39,7 @@ describe('EventGate', () => {
   });
 
   it('classifies the flow events', () => {
-    expect(isFlowEvent({ type: 'death', player: 0, cause: 'wall', killer: null, x: 0, y: 0 })).toBe(true);
+    expect(isFlowEvent({ type: 'death', player: 0, cause: 'wall', killer: null, x: 0, y: 0, tick: 1 })).toBe(true);
     expect(isFlowEvent({ type: 'go' })).toBe(true);
     expect(isFlowEvent({ type: 'boostStarted', player: 0 })).toBe(false);
     expect(isFlowEvent({ type: 'heartLost', player: 0, heartsLeft: 2, cause: 'wall', x: 0, y: 0 })).toBe(false);

@@ -18,7 +18,7 @@ export function spansJump(solid: readonly boolean[], from: number): boolean {
  * its trail, so skimming along your own body doesn't close a new loop every tick. Returns the hits
  * for the caller to resolve with the collision hits.
  */
-export function detectEncirclements(state: MatchState, cfg: Config, events: SimEvent[]): DeathRecord[] {
+export function detectEncirclements(state: MatchState, cfg: Config, events: SimEvent[], tick = state.roundTicks): DeathRecord[] {
   const hits: DeathRecord[] = [];
   const touch = 2 * cfg.snakeRadius;
   const caught = new Set<number>();
@@ -40,7 +40,7 @@ export function detectEncirclements(state: MatchState, cfg: Config, events: SimE
         if (j === i || !other.alive || other.effects.ghost > 0 || caught.has(j)) return;
         if (!pointInPolygon(other.x, other.y, poly)) return;
         caught.add(j);
-        hits.push({ player: j, cause: 'encircled', killer: i, x: other.x, y: other.y });
+        hits.push({ player: j, cause: 'encircled', killer: i, x: other.x, y: other.y, tick });
         events.push({ type: 'encircled', player: j, by: i, loop: decimatePolygon(poly, LOOP_EVENT_POINTS) });
       });
       if (cfg.collectByLoop) collectInLoop(state, cfg, i, poly, events);

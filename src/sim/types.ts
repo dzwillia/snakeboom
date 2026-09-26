@@ -152,6 +152,8 @@ export interface DeathRecord {
   killer: number | null;
   x: number;
   y: number;
+  /** The round tick it happened on: deaths on the same tick share a place. */
+  tick: number;
 }
 
 export interface MatchState {
@@ -169,6 +171,8 @@ export interface MatchState {
   scores: number[];
   matchWinner: number | null;
   lastRoundWinner: number | null;
+  /** Each player's place in the last finished round (1 = last standing); empty before the first. */
+  lastPlaces: number[];
   /** Index into the map catalogue for the current `maps` setting (hand-made maps first, then random slots). */
   mapIndex: number;
   /** Remaining shuffled map indices; popped from the end. */
@@ -206,7 +210,8 @@ export type SimEvent =
   | { type: 'borderClosing' }
   | { type: 'boostStarted'; player: number }
   | ({ type: 'death' } & DeathRecord)
-  | { type: 'roundOver'; winner: number | null; deaths: DeathRecord[] }
+  /** `places[player]` is that player's finishing place this round (1 = last standing); `winner` is the survivor or null. */
+  | { type: 'roundOver'; winner: number | null; places: number[]; deaths: DeathRecord[] }
   | { type: 'matchOver'; winner: number }
   /** `dropped` is set when it fell off a snake instead of spawning. */
   | { type: 'pickupSpawned'; id: number; kind: PickupKind; x: number; y: number; dropped?: boolean }

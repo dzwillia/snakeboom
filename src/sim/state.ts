@@ -2,10 +2,14 @@ import { ARENA_HEIGHT, ARENA_WIDTH, TICK_RATE, type Config } from './config';
 import { createGrid, gridClear, gridInsert } from './grid';
 import { generateMap, mapCatalogue, MAPS, type ParsedMap } from './maps';
 import { createRng, shuffleInPlace } from './rng';
+import { clampPlayers } from './players';
+import { clearAround, ringSpawns } from './maps/spawns';
 import { createSnake } from './snake';
 import type { MatchState } from './types';
 
-export function createMatch(cfg: Config, seed: number): MatchState {
+/** A match for `players` seats (2–8); two uses the maps' own spawns, more spawn on a ring. */
+export function createMatch(cfg: Config, seed: number, players = 2): MatchState {
+  const n = clampPlayers(players);
   const state: MatchState = {
     tick: 0,
     phase: 'countdown',
@@ -14,9 +18,10 @@ export function createMatch(cfg: Config, seed: number): MatchState {
     roundTicks: 0,
     overtime: false,
     inset: 0,
-    scores: [0, 0],
+    scores: new Array<number>(n).fill(0),
     matchWinner: null,
     lastRoundWinner: null,
+    lastPlaces: [],
     mapIndex: 0,
     mapBag: [],
     mapName: '',
@@ -56,7 +61,11 @@ export function startRound(state: MatchState, cfg: Config): void {
   state.mapName = map.name;
   state.tiles = map.tiles.slice();
   state.tilesVersion++;
-  state.snakes = map.spawns.map((sp, i) => createSnake(i, sp.x, sp.y, sp.heading, cfg));
+  const players = state.scores.length;
+  const spawns = players <= 2 ? map.spawns.slice(0, players) : ringSpawns(players);
+  // A ring spawn can land on a block on any map: clear the neighbourhood for this round only.
+  if (players > 2) for (const sp of spawns) clearAround(state.tiles, sp.x, sp.y, cfg.spawnClearance);
+  state.snakes = spawns.map((sp, i) => createSnake(i, sp.x, sp.y, sp.heading, cfg));
   state.pickups = [];
   state.missiles = [];
   state.wormholes = [];

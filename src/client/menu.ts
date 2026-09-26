@@ -1,7 +1,7 @@
 /** The title screen's rows, top to bottom. */
-export type MenuRow = 'local' | 'wins' | 'create' | 'quick';
+export type MenuRow = 'local' | 'players' | 'wins' | 'create' | 'quick';
 
-export const MENU_ROWS: readonly MenuRow[] = ['local', 'wins', 'create', 'quick'];
+export const MENU_ROWS: readonly MenuRow[] = ['local', 'players', 'wins', 'create', 'quick'];
 
 /** Moves the highlight up or down without wrapping. */
 export function nextRow(row: MenuRow, delta: number): MenuRow {

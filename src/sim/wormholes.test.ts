@@ -156,7 +156,8 @@ describe('wormholes', () => {
     s.pickupTimer = 1;
     for (let t = 0; t < 30 * TICK_RATE; t++) step(s, [circle, circle], busy);
     expect(s.round).toBe(1);
-    expect(s.pickups.length).toBeGreaterThan(50);
+    // The field caps at 40 spawned pickups for two players (players.ts), so "lots" is 30.
+    expect(s.pickups.length).toBeGreaterThan(30);
     const clear = busy.pickupClearance + busy.wormholeRadius;
     for (const p of s.pickups) {
       expect(Math.hypot(p.x - w.x, p.y - w.y)).toBeGreaterThanOrEqual(clear);

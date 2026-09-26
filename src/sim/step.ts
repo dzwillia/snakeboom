@@ -17,6 +17,7 @@ import { cutBySaws, moveSaws, sawHeads, updateSaws } from './saws';
 import { enterWormholes, updateWormholes } from './wormholes';
 import { tryHeart, tryShield } from './shield';
 import { pickNextMap, startRound } from './state';
+import { matchTarget, placePoints, placesFor } from './players';
 import { NO_INPUT, type DeathRecord, type MatchState, type PlayerInput, type SimEvent } from './types';
 
 /** Advances the match by one tick, mutating `state`, and returns what happened. */
@@ -45,6 +46,7 @@ export function rematch(state: MatchState, cfg: Config, seed: number): void {
   state.round = 1;
   state.matchWinner = null;
   state.lastRoundWinner = null;
+  state.lastPlaces = [];
   state.rng = createRng(seed);
   state.mapIndex = 0;
   state.mapBag = [];
@@ -102,27 +104,28 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   // Everyone alive at the start of the tick is judged before anyone moves or dies, so
   // simultaneous deaths are fair. Grace ignores missiles; a Shield, then a spare heart, turns a hit into a save.
   // Loops first: a head caught inside a loop that just closed is hit by that, whatever else is going on.
-  const hits: DeathRecord[] = detectEncirclements(state, cfg, events);
+  const tick = state.roundTicks;
+  const hits: DeathRecord[] = detectEncirclements(state, cfg, events, tick);
   const looped = new Set(hits.map((h) => h.player));
   state.snakes.forEach((s, i) => {
     if (!s.alive || looped.has(i)) return;
     const shooter = missiled.get(i);
     if (shooter !== undefined && s.effects.grace <= 0) {
-      hits.push({ player: i, cause: 'missile', killer: shooter, x: s.x, y: s.y });
+      hits.push({ player: i, cause: 'missile', killer: shooter, x: s.x, y: s.y, tick });
       return;
     }
     // The saw cuts through Ghosts too; only grace (a Shield or heart just spent) ignores it.
     if (sawn.has(i) && s.effects.grace <= 0) {
-      hits.push({ player: i, cause: 'saw', killer: null, x: s.x, y: s.y });
+      hits.push({ player: i, cause: 'saw', killer: null, x: s.x, y: s.y, tick });
       return;
     }
     const flamer = torched.get(i);
     if (flamer !== undefined && s.effects.grace <= 0) {
-      hits.push({ player: i, cause: 'flame', killer: flamer, x: s.x, y: s.y });
+      hits.push({ player: i, cause: 'flame', killer: flamer, x: s.x, y: s.y, tick });
       return;
     }
     const hit = detectHit(state, i, cfg);
-    if (hit) hits.push({ player: i, cause: hit.cause, killer: hit.killer, x: s.x, y: s.y });
+    if (hit) hits.push({ player: i, cause: hit.cause, killer: hit.killer, x: s.x, y: s.y, tick });
   });
   for (const d of hits) {
     if (tryShield(state, d.player, d.cause, cfg, events)) continue;
@@ -133,10 +136,9 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
     events.push({ type: 'death', ...d });
   }
 
-  // Time never ends a round: past the cap the border closes fast until somebody dies.
+  // Time never ends a round: past the cap the border closes fast until the last snakes fall.
   const alive = state.snakes.filter((s) => s.alive);
-  if (alive.length === 1) return endRound(state, cfg, events, alive[0].id);
-  if (alive.length === 0) return endRound(state, cfg, events, null);
+  if (alive.length <= 1) return endRound(state, cfg, events, alive.length === 1 ? alive[0].id : null);
   detectNearMisses(state, cfg, events);
   updatePickups(state, cfg, events);
   updateWormholes(state, cfg, events);
@@ -148,17 +150,27 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
  * then at borderCrushSpeed past the cap. Capped so the live area never drops below 4r on either axis.
  */
 function closeBorder(state: MatchState, cfg: Config, events: SimEvent[]): void {
-  const speed = borderSpeedAt(state.roundTicks, cfg);
+  const speed = borderSpeedAt(state.roundTicks, cfg, state.snakes.length);
   if (speed <= 0) return;
   if (state.inset === 0) events.push({ type: 'borderClosing' });
   state.inset = Math.min(maxInset(cfg), state.inset + speed * DT);
 }
 
+/**
+ * Places and points for everyone (see players.ts), then the match: the first to matchTarget
+ * points with a unique top score wins; an exact tie among those who crossed plays another round.
+ */
 function endRound(state: MatchState, cfg: Config, events: SimEvent[], winner: number | null): void {
-  if (winner !== null) state.scores[winner]++;
+  const players = state.snakes.length;
+  const places = placesFor(players, state.deaths, state.snakes.map((s) => s.alive));
+  places.forEach((place, p) => (state.scores[p] += placePoints(players, place)));
   state.lastRoundWinner = winner;
-  if (winner !== null && state.scores[winner] >= cfg.winsToWin) state.matchWinner = winner;
-  events.push({ type: 'roundOver', winner, deaths: state.deaths.map((d) => ({ ...d })) });
+  state.lastPlaces = places;
+  const target = matchTarget(cfg, players);
+  const top = Math.max(...state.scores);
+  const leaders = state.scores.filter((s) => s === top).length;
+  if (top >= target && leaders === 1) state.matchWinner = state.scores.indexOf(top);
+  events.push({ type: 'roundOver', winner, places, deaths: state.deaths.map((d) => ({ ...d })) });
   state.phase = 'roundOver';
   state.phaseTicks = Math.max(1, Math.round(cfg.roundOverSeconds * TICK_RATE));
 }

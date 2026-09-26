@@ -8,32 +8,29 @@ const FRAME_MS = 1000 / 60;
 const cfg = { ...DEFAULT_CONFIG, winsToWin: 2 };
 
 interface Run {
-  hashes: [Map<number, number>, Map<number, number>];
-  roundOvers: [number, number];
-  gated: [number, number];
-  sends: [{ calls: number; ticks: Set<number> }, { calls: number; ticks: Set<number> }];
+  hashes: Map<number, number>[];
+  roundOvers: number[];
+  gated: number[];
+  sends: { calls: number; ticks: Set<number> }[];
 }
 
-function makeRun(): Run {
+function makeRun(players = 2): Run {
   return {
-    hashes: [new Map(), new Map()],
-    roundOvers: [0, 0],
-    gated: [0, 0],
-    sends: [
-      { calls: 0, ticks: new Set() },
-      { calls: 0, ticks: new Set() },
-    ],
+    hashes: Array.from({ length: players }, () => new Map()),
+    roundOvers: new Array<number>(players).fill(0),
+    gated: new Array<number>(players).fill(0),
+    sends: Array.from({ length: players }, () => ({ calls: 0, ticks: new Set<number>() })),
   };
 }
 
 /** Both sides play one bot each, one tick per 60 Hz frame, recording confirmed hashes every second and at round ends. */
 function runFrames(
   link: FakeLink,
-  sessions: [NetSession, NetSession],
-  bots: [BotState, BotState],
+  sessions: NetSession[],
+  bots: BotState[],
   frames: number,
   run: Run,
-  gates: [EventGate, EventGate],
+  gates: EventGate[],
   onFrame?: (frame: number) => void,
 ): void {
   for (let f = 0; f < frames; f++) {
@@ -60,9 +57,9 @@ function expectAgreement(run: Run, minShared: number): void {
   for (const t of shared) expect(run.hashes[0].get(t)?.toString(16)).toBe(run.hashes[1].get(t)?.toString(16));
 }
 
-function setup(latencyMs: number, jitterMs: number, inputDelay: number, seed = 1, extra: Partial<FakeLinkOptions> = {}) {
-  const run = makeRun();
-  const { link, sessions } = createLinkedSessions({ latencyMs, jitterMs, seed, ...extra }, { seed: 4242, cfg, inputDelay }, (side, tick, state, events) => {
+function setup(latencyMs: number, jitterMs: number, inputDelay: number, seed = 1, extra: Partial<FakeLinkOptions> = {}, players = 2) {
+  const run = makeRun(players);
+  const { link, sessions } = createLinkedSessions({ latencyMs, jitterMs, seed, ...extra }, { seed: 4242, cfg, players, inputDelay }, (side, tick, state, events) => {
     if (tick % 60 === 0 || events.some((e) => e.type === 'roundOver')) run.hashes[side].set(tick, hashState(state));
   });
   const wrapSend = (s: NetSession, side: number) => {
@@ -74,9 +71,16 @@ function setup(latencyMs: number, jitterMs: number, inputDelay: number, seed = 1
     };
   };
   sessions.forEach(wrapSend);
-  const bots: [BotState, BotState] = [createBot(7), createBot(8)];
-  const gates: [EventGate, EventGate] = [new EventGate(), new EventGate()];
+  const bots: BotState[] = Array.from({ length: players }, (_, i) => createBot(7 + i));
+  const gates: EventGate[] = Array.from({ length: players }, () => new EventGate());
   return { run, link, sessions, bots, gates };
+}
+
+/** Every seat's hashes agree at every shared checkpoint. */
+function expectAllAgree(run: Run, minShared: number): void {
+  const shared = [...run.hashes[0].keys()].filter((t) => run.hashes.every((h) => h.has(t)));
+  expect(shared.length).toBeGreaterThanOrEqual(minShared);
+  for (const t of shared) for (const h of run.hashes) expect(h.get(t)?.toString(16)).toBe(run.hashes[0].get(t)?.toString(16));
 }
 
 // Each of these simulates thousands of frames of two sessions with bots, 1–2 s on a laptop and
@@ -169,6 +173,41 @@ describe('NetSession through a fake relay', () => {
   }, RELAY_TEST_TIMEOUT);
 });
 
+describe('NetSession with several seats', () => {
+  it('four seats agree on every confirmed hash at 60 ms ± 20 ms', () => {
+    const { run, link, sessions, bots, gates } = setup(60, 20, 2, 3, {}, 4);
+    runFrames(link, sessions, bots, 2400, run, gates);
+    expectAllAgree(run, 30);
+    for (const s of sessions) expect(s.stats.stalledTicks).toBe(0);
+    // Every seat sends each tick exactly once, to be fanned out by the link.
+    for (const s of run.sends) expect(s.calls).toBe(s.ticks.size);
+  }, RELAY_TEST_TIMEOUT);
+
+  it('eight seats agree through hotspot jitter, with bounded rollbacks and no lasting stalls', () => {
+    const { run, link, sessions, bots, gates } = setup(150, 60, 3, 5, { spikeMs: 300, spikeEveryMs: 7000 }, 8);
+    runFrames(link, sessions, bots, 1200, run, gates);
+    expectAllAgree(run, 15);
+    for (const s of sessions) {
+      expect(s.stats.maxRollbackDepth).toBeLessThanOrEqual(s.maxRollback);
+      expect(s.stats.stalledTicks).toBeLessThan(120);
+    }
+    const ticks = sessions.map((s) => s.tick);
+    expect(Math.max(...ticks) - Math.min(...ticks)).toBeLessThanOrEqual(3);
+  }, RELAY_TEST_TIMEOUT);
+
+  it('a seat that goes silent stalls the others within the window, and they catch up when it returns', () => {
+    const { run, link, sessions, bots, gates } = setup(40, 10, 2, 9, {}, 4);
+    runFrames(link, sessions, bots, 300, run, gates);
+    link.pause(2, true);
+    runFrames(link, sessions, bots, 120, run, gates);
+    for (const [i, s] of sessions.entries()) if (i !== 2) expect(s.stalled).toBe(true);
+    link.pause(2, false);
+    runFrames(link, sessions, bots, 300, run, gates);
+    for (const s of sessions) expect(s.stalled).toBe(false);
+    expectAllAgree(run, 8);
+  }, RELAY_TEST_TIMEOUT);
+});
+
 describe('NetSession bookkeeping', () => {
   const make = (inputDelay: number, sends: number[] = []) =>
     new NetSession({ seed: 1, cfg, local: 0, inputDelay, send: (tick) => sends.push(tick) });
@@ -184,7 +223,7 @@ describe('NetSession bookkeeping', () => {
 
   it('estimates its lead over the peer', () => {
     const s = make(2);
-    for (let t = 1; t <= 100; t++) s.receive(t, NO_INPUT);
+    for (let t = 1; t <= 100; t++) s.receive(1, t, NO_INPUT);
     for (let i = 0; i < 102; i++) s.advance(NO_INPUT);
     expect(s.tick).toBe(102);
     expect(s.confirmedTick).toBe(100);
@@ -195,17 +234,18 @@ describe('NetSession bookkeeping', () => {
 
   it('ignores duplicates and inputs for ticks it has already confirmed', () => {
     const s = make(1);
-    s.receive(1, { turn: 1, boost: false, use: false, select: false });
-    s.receive(1, { turn: -1, boost: false, use: false, select: false });
+    s.receive(1, 1, { turn: 1, boost: false, use: false, select: false });
+    s.receive(1, 1, { turn: -1, boost: false, use: false, select: false });
     s.advance(NO_INPUT);
     expect(s.confirmedTick).toBe(0);
     expect(s.tick).toBe(1);
     s.advance(NO_INPUT);
     expect(s.confirmedTick).toBe(1);
     expect(s.confirmedState.snakes[1].heading).toBe(s.state.snakes[1].heading);
-    s.receive(1, { turn: -1, boost: true, use: true, select: false });
-    s.receive(0, NO_INPUT);
-    s.receive(-5, NO_INPUT);
+    s.receive(1, 1, { turn: -1, boost: true, use: true, select: false });
+    s.receive(1, 0, NO_INPUT);
+    s.receive(1, -5, NO_INPUT);
+    s.receive(0, 3, NO_INPUT); // my own seat: ignored
     s.advance(NO_INPUT);
     expect(s.stats.rollbacks).toBe(0);
   });
@@ -213,12 +253,12 @@ describe('NetSession bookkeeping', () => {
   // M8 Task 4: a wrong guess about the remote reports a head correction for that seat only.
   it('reports a correction for the remote head after a misprediction, not the local one', () => {
     const s = make(1);
-    for (let t = 1; t <= 240; t++) s.receive(t, NO_INPUT);
+    for (let t = 1; t <= 240; t++) s.receive(1, t, NO_INPUT);
     for (let i = 0; i < 250; i++) s.advance(NO_INPUT);
     expect(s.confirmedTick).toBe(240);
     expect(s.state.phase).toBe('playing');
     expect(s.takeCorrections()).toEqual([]);
-    s.receive(245, { turn: 1, boost: true, use: false, select: false });
+    s.receive(1, 245, { turn: 1, boost: true, use: false, select: false });
     s.advance(NO_INPUT);
     const corrections = s.takeCorrections();
     expect(corrections.map((c) => c.player)).toEqual([1]);
@@ -228,6 +268,8 @@ describe('NetSession bookkeeping', () => {
 
   it('rejects a bad seat or delay', () => {
     expect(() => new NetSession({ seed: 1, cfg, local: 2, inputDelay: 1, send: () => {} })).toThrow(RangeError);
+    expect(() => new NetSession({ seed: 1, cfg, players: 9, local: 0, inputDelay: 1, send: () => {} })).toThrow(RangeError);
+    expect(() => new NetSession({ seed: 1, cfg, players: 4, local: 3, inputDelay: 1, send: () => {} })).not.toThrow();
     expect(() => new NetSession({ seed: 1, cfg, local: 0, inputDelay: 0, send: () => {} })).toThrow(RangeError);
   });
 });

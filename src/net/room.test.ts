@@ -8,8 +8,8 @@ type Sent = ServerMessage | Uint8Array;
 
 class FakeHost implements RoomHost {
   t = 0;
-  readonly sent: Sent[][] = [[], []];
-  readonly closed = [false, false];
+  readonly sent: Sent[][] = [[], [], [], [], [], [], [], []];
+  readonly closed = [false, false, false, false, false, false, false, false];
   readonly logs: Record<string, unknown>[] = [];
   private timers: { due: number; fn: () => void; id: number }[] = [];
   private nextId = 1;
@@ -283,7 +283,7 @@ describe('Room disconnects', () => {
     const room = started(host);
     host.t = 10_000;
     room.onDisconnect(1);
-    expect(host.last(0, 'peerAway')).toEqual({ type: 'peerAway', deadline: 10_000 + DEFAULT_GRACE_MS });
+    expect(host.last(0, 'seatAway')).toEqual({ type: 'seatAway', seat: 1, deadline: 10_000 + DEFAULT_GRACE_MS });
     expect(room.playerCount).toBe(1);
     host.tick(14_000);
     expect(room.status).toBe('playing');
@@ -299,7 +299,7 @@ describe('Room disconnects', () => {
     room.onDisconnect(1);
     host.tick(14_000);
     expect(room.rejoin(session)).toBe(1);
-    expect(host.last(0, 'peerBack')).toEqual({ type: 'peerBack' });
+    expect(host.last(0, 'seatBack')).toEqual({ type: 'seatBack', seat: 1 });
     host.tick(20_000);
     expect(room.status).toBe('playing');
     expect(host.messages(0, 'forfeit')).toHaveLength(0);
@@ -326,6 +326,8 @@ describe('Room disconnects', () => {
       type: 'resume',
       seed: start.seed,
       winsToWin: 5,
+      players: 2,
+      seats: [0, 1],
       inputDelay: start.inputDelay,
       rttMs: [60, 80],
       frames: 5,
@@ -339,7 +341,7 @@ describe('Room disconnects', () => {
       [0, 3],
     ]);
     expect(replay?.[4].input).toEqual({ turn: -1, boost: true, use: true, select: false });
-    expect(host.last(0, 'peerBack')).toEqual({ type: 'peerBack' });
+    expect(host.last(0, 'seatBack')).toEqual({ type: 'seatBack', seat: 1 });
 
     room.onDisconnect(1);
     host.sent[1].length = 0;
@@ -361,11 +363,11 @@ describe('Room disconnects', () => {
     const host = new FakeHost();
     const room = started(host);
     room.onMessage(0, { type: 'away' });
-    expect(host.last(1, 'peerAway')).toMatchObject({ type: 'peerAway' });
+    expect(host.last(1, 'seatAway')).toMatchObject({ type: 'seatAway', seat: 0 });
     expect(host.last(1, 'lobby')).toMatchObject({ players: [{ connected: true }, { connected: true }] });
     host.tick(5_000);
     room.onMessage(0, { type: 'back' });
-    expect(host.last(1, 'peerBack')).toEqual({ type: 'peerBack' });
+    expect(host.last(1, 'seatBack')).toEqual({ type: 'seatBack', seat: 0 });
     host.tick(20_000);
     expect(room.status).toBe('playing');
   });
@@ -376,7 +378,7 @@ describe('Room disconnects', () => {
     room.onMessage(0, { type: 'ready', ready: true });
     room.onDisconnect(1);
     expect(room.status).toBe('waiting');
-    expect(host.last(0, 'peerLeft')).toEqual({ type: 'peerLeft' });
+    expect(host.last(0, 'seatLeft')).toEqual({ type: 'seatLeft', seat: 1 });
     expect(host.last(0, 'lobby')).toMatchObject({ players: [{ name: 'Ada', ready: false }, null] });
     expect(room.join('Cy')).toEqual({ player: 1, session: expect.any(String) });
     expect(room.status).toBe('lobby');
@@ -389,6 +391,126 @@ describe('Room disconnects', () => {
     expect(room.status).toBe('waiting');
     expect(host.last(0, 'forfeit')).toEqual({ type: 'forfeit', winner: 0, reason: 'left' });
     expect(host.closed[1]).toBe(true);
+  });
+});
+
+/** A room of `size` with `seated` players joined, pinged and ready; started when at least two are in. */
+function bigRoom(host: FakeHost, size: number, seated: number, ready = true): Room {
+  const room = new Room(host, { code: 'BIGROOM', winsToWin: 3, size });
+  const names = ['Ada', 'Bob', 'Cy', 'Di', 'Ed', 'Flo', 'Gus', 'Hal'];
+  for (let i = 0; i < seated; i++) expect(room.join(names[i])).toEqual({ player: i, session: expect.any(String) });
+  host.tick(1000);
+  const ping = host.last(0, 'ping') as { t: number };
+  for (let i = 0; i < seated; i++) {
+    host.t = ping.t + 40 + i * 10;
+    room.onMessage(i, { type: 'pong', t: ping.t });
+  }
+  if (ready) for (let i = 0; i < seated; i++) room.onMessage(i, { type: 'ready', ready: true });
+  return room;
+}
+
+describe('Rooms of three or more', () => {
+  it('seats up to its size, lists every seat, and starts once everyone present is ready', () => {
+    const host = new FakeHost();
+    const room = bigRoom(host, 4, 3, false);
+    expect(room.size).toBe(4);
+    expect(room.status).toBe('waiting');
+    expect(host.last(0, 'lobby')).toMatchObject({ size: 4, players: [{ name: 'Ada' }, { name: 'Bob' }, { name: 'Cy' }, null] });
+    room.onMessage(0, { type: 'ready', ready: true });
+    room.onMessage(1, { type: 'ready', ready: true });
+    expect(room.status).toBe('waiting');
+    room.onMessage(2, { type: 'ready', ready: true });
+    expect(room.status).toBe('playing');
+    const start = host.last(2, 'start') as Extract<ServerMessage, { type: 'start' }>;
+    expect(start).toMatchObject({ players: 3, seats: [0, 1, 2, -1], winsToWin: 3 });
+    expect(start.rttMs).toHaveLength(4);
+    expect(host.last(0, 'start')).toEqual(start);
+    // Nobody joins a match in progress.
+    expect(room.nextFreeSeat).toBeNull();
+    expect(room.join('Di')).toBe('full');
+  });
+
+  it('fans every input out to every other seat and logs it once', () => {
+    const host = new FakeHost();
+    const room = bigRoom(host, 4, 4);
+    room.onInput(2, encodeInput(1, { turn: 1, boost: false, use: false, select: false }));
+    for (const seat of [0, 1, 3]) expect(host.frames(seat).map((f) => decodeRelayed(f))).toEqual([{ player: 2, tick: 1, input: { turn: 1, boost: false, use: false, select: false } }]);
+    expect(host.frames(2)).toHaveLength(0);
+    expect(room.log).toHaveLength(1);
+  });
+
+  it('ghosts a seat that drops mid-match: neutral inputs follow the live ticks, the others never wait, and a rejoin takes over', () => {
+    const host = new FakeHost();
+    const room = bigRoom(host, 4, 3);
+    const session = (host.last(2, 'welcome') as { session: string }).session;
+    for (const seat of [0, 1, 2]) room.onInput(seat, encodeInput(1, NO_INPUT));
+    room.onDisconnect(2);
+    expect(host.last(0, 'seatAway')).toEqual({ type: 'seatAway', seat: 2, deadline: null });
+    expect(room.status).toBe('playing');
+    // Seats 0 and 1 press on; seat 2's frames are made up by the room, tick for tick, and logged.
+    room.onInput(0, encodeInput(2, NO_INPUT));
+    room.onInput(1, encodeInput(2, NO_INPUT));
+    room.onInput(0, encodeInput(3, { turn: -1, boost: false, use: false, select: false }));
+    const ghostFrames = host.frames(1).map((f) => decodeRelayed(f)!).filter((f) => f.player === 2);
+    expect(ghostFrames.map((f) => f.tick)).toEqual([1, 2, 3]);
+    expect(ghostFrames[2].input).toEqual(NO_INPUT);
+    expect(room.log.map((f) => decodeRelayed(f)!).filter((f) => f.player === 2).map((f) => f.tick)).toEqual([1, 2, 3]);
+    // A frame from the ghost's stale socket is ignored.
+    room.onInput(2, encodeInput(2, { turn: 1, boost: true, use: false, select: false }));
+    expect(host.frames(0).filter((f) => decodeRelayed(f)!.player === 2 && decodeRelayed(f)!.tick === 2).map((f) => decodeRelayed(f)!.input)).toEqual([NO_INPUT]);
+    // Rejoin: the replay holds the made-up frames, and from then on the seat's own frames count again.
+    host.sent[2].length = 0;
+    expect(room.rejoin(session, 0)).toBe(2);
+    // Three live frames each at ticks 1–2 and seat 0's tick 3, plus the two made-up ones for seat 2.
+    expect(host.last(2, 'resume')).toMatchObject({ players: 3, seats: [0, 1, 2, -1], frames: 8 });
+    expect(host.last(0, 'seatBack')).toEqual({ type: 'seatBack', seat: 2 });
+    room.onInput(2, encodeInput(4, { turn: 1, boost: false, use: false, select: false }));
+    expect(host.frames(0).map((f) => decodeRelayed(f)!).filter((f) => f.player === 2 && f.tick === 4)).toHaveLength(1);
+  });
+
+  it('a deliberate leave mid-match ghosts the seat until the match ends, then frees it', () => {
+    const host = new FakeHost();
+    const room = bigRoom(host, 4, 3);
+    const session = (host.last(2, 'welcome') as { session: string }).session;
+    room.onMessage(2, { type: 'leave' });
+    expect(host.last(0, 'seatLeft')).toEqual({ type: 'seatLeft', seat: 2 });
+    expect(room.status).toBe('playing');
+    expect(room.rejoin(session)).toBeNull();
+    room.onInput(0, encodeInput(1, NO_INPUT));
+    expect(host.frames(1).map((f) => decodeRelayed(f)!.player)).toEqual([0, 2]);
+    const result = { round: 2, winner: 0, scores: [6, 2, 0], matchWinner: 0 };
+    room.onMessage(0, { type: 'hash', tick: 60, hash: 1, result });
+    room.onMessage(1, { type: 'hash', tick: 60, hash: 1, result });
+    expect(room.status).toBe('waiting');
+    expect(host.last(0, 'lobby')).toMatchObject({ players: [{ name: 'Ada' }, { name: 'Bob' }, null, null] });
+  });
+
+  it('ends the match for the last human when everyone else has gone', () => {
+    const host = new FakeHost();
+    const room = bigRoom(host, 3, 3);
+    room.onDisconnect(1);
+    expect(room.status).toBe('playing');
+    room.onMessage(2, { type: 'leave' });
+    expect(host.last(0, 'ended')).toEqual({ type: 'ended', winner: 0, reason: 'left' });
+    expect(room.status).toBe('waiting');
+    expect(host.last(0, 'lobby')).toMatchObject({ players: [{ name: 'Ada' }, null, null] });
+  });
+
+  it('referees hashes among the seats still reporting and ignores ghosts', () => {
+    const host = new FakeHost();
+    const room = bigRoom(host, 4, 4);
+    room.onMessage(0, { type: 'hash', tick: 60, hash: 7 });
+    room.onMessage(1, { type: 'hash', tick: 60, hash: 7 });
+    room.onMessage(2, { type: 'hash', tick: 60, hash: 7 });
+    expect(host.messages(0, 'desync')).toHaveLength(0);
+    room.onDisconnect(3);
+    // Three reporters now: the row settles without seat 3.
+    room.onMessage(0, { type: 'hash', tick: 120, hash: 8 });
+    room.onMessage(1, { type: 'hash', tick: 120, hash: 8 });
+    expect(host.messages(0, 'desync')).toHaveLength(0);
+    room.onMessage(2, { type: 'hash', tick: 120, hash: 9 });
+    expect(host.last(0, 'desync')).toEqual({ type: 'desync', tick: 120 });
+    expect(room.status).toBe('waiting');
   });
 });
 
@@ -419,7 +541,7 @@ describe('Room cleanup', () => {
     expect(room.status).toBe('closed');
     expect(host.last(0, 'closed')).toEqual({ type: 'closed', reason: 'idle' });
     expect(host.last(1, 'closed')).toEqual({ type: 'closed', reason: 'idle' });
-    expect(host.closed).toEqual([true, true]);
+    expect(host.closed.slice(0, 2)).toEqual([true, true]);
     expect(host.pendingTimers).toBe(0);
     host.tick(DEFAULT_IDLE_MS * 3);
     expect(host.messages(0, 'closed')).toHaveLength(1);

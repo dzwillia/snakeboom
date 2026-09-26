@@ -1,12 +1,13 @@
-import { DEFAULT_CONFIG, hashState, type Config, type MatchState } from '../../sim';
+import { ARENA_HEIGHT, ARENA_WIDTH, DEFAULT_CONFIG, hashState, type Config, type MatchState } from '../../sim';
 import { decodeRelayed, decodeReplay, encodeInput, FRAME_REPLAY } from '../../net/codec';
 import { EventGate } from '../../net/events';
 import { displayName } from '../../net/names';
 import { PROTOCOL, type ClientMessage, type RoundResult, type ServerMessage } from '../../net/protocol';
 import { emptyStats, NetSession, statsDelta, type SessionStats } from '../../net/session';
 import { timeScaleFor } from '../../net/timeSync';
+import { followView, MAX_ZOOM, type View } from '../camera';
 import { PLAYER_CSS } from '../colors';
-import { describeRound } from '../text';
+import { describeRound, PLAYER_NAMES } from '../text';
 import type { EventSink } from '../events';
 import type { Hud } from '../hud';
 import type { KeyboardInput } from '../input';
@@ -19,9 +20,9 @@ import { RelayConnection } from './transport';
 
 export type OnlineMode =
   /** `name`: the room name the host chose, or undefined for a random code. */
-  | { kind: 'create'; winsToWin: number; name?: string }
+  | { kind: 'create'; winsToWin: number; size: number; name?: string }
   | { kind: 'join'; room: string }
-  | { kind: 'quick'; winsToWin: number }
+  | { kind: 'quick'; winsToWin: number; size: number }
   /** A refreshed tab coming back to its room with its session token. */
   | { kind: 'rejoin'; room: string; session: string };
 
@@ -94,10 +95,23 @@ export class OnlineMatch {
   private gate = new EventGate();
   private session: NetSession | null = null;
   private phase: Phase = 'connecting';
+  /** My room seat. */
   private me = -1;
+  /** My sim player index once a match is on (seats compact to players), or −1. */
+  private player = -1;
+  /** Room seat → sim player index (−1 for an empty seat) for the current match. */
+  private seatMap: number[] = [];
   private room = '';
   private link = '';
-  private names: string[] = ['CYAN', 'PINK'];
+  /** Names by room seat. */
+  private names: string[] = [...PLAYER_NAMES];
+  /** Names by sim player index, for the HUD and banners during a match. */
+  private playerNames: string[] = [...PLAYER_NAMES];
+  /** Spectating after death: which live snake (by sim index) the camera follows, and how close. */
+  private spectating: number | null = null;
+  private spectateZoom = MAX_ZOOM;
+  /** The seat whose drop is being shown (two-player rooms count down; larger ones just note it). */
+  private awaySeat: number | null = null;
   private lobby: Extract<ServerMessage, { type: 'lobby' }> | null = null;
   private startAtLocal = 0;
   private oneWayTicks = 2;
@@ -115,7 +129,7 @@ export class OnlineMatch {
   private queueShown = '';
   private replayFrames = 0;
   private showNet = false;
-  private readonly smoothing = new HeadSmoothing(2);
+  private readonly smoothing = new HeadSmoothing(8);
   private roundStatsBase: SessionStats = emptyStats();
   /** For the per-minute rates: stats and time at the last readout sample. */
   private rateSample: { at: number; stats: SessionStats } | null = null;
@@ -144,9 +158,9 @@ export class OnlineMatch {
       this.conn.send(rejoinHello(name, mode.session));
     } else {
       this.conn.send({ type: 'hello', protocol: PROTOCOL, version: __APP_VERSION__, name });
-      if (mode.kind === 'create') this.conn.send({ type: 'create', winsToWin: mode.winsToWin, ...(mode.name ? { name: mode.name } : {}) });
+      if (mode.kind === 'create') this.conn.send({ type: 'create', winsToWin: mode.winsToWin, size: mode.size, ...(mode.name ? { name: mode.name } : {}) });
       else if (mode.kind === 'join') this.conn.send({ type: 'join', room: mode.room });
-      else this.conn.send({ type: 'queue', winsToWin: mode.winsToWin });
+      else this.conn.send({ type: 'queue', winsToWin: mode.winsToWin, size: mode.size });
     }
     deps.screens.caption(mode.kind === 'rejoin' ? 'REJOINING…' : 'CONNECTING…');
     document.addEventListener('visibilitychange', this.onVisibility);
@@ -161,9 +175,61 @@ export class OnlineMatch {
     return this.phase === 'playing';
   }
 
-  /** Which seat this machine plays, or −1 before the room answers. */
+  /** Which sim player this machine plays, or −1 outside a match. */
   get localPlayer(): number {
-    return this.me;
+    return this.player;
+  }
+
+  /**
+   * Where the camera should look: your own head while you're alive; after that the snake you're
+   * spectating (the longest live one until you pick with Left/Right); null when nobody is alive.
+   */
+  cameraTarget(state: MatchState): View | null {
+    const mine = state.snakes[this.player];
+    if (mine?.alive) return followView(mine, ARENA_WIDTH, ARENA_HEIGHT);
+    const live = state.snakes.filter((s) => s.alive);
+    if (live.length === 0) return null;
+    let target = this.spectating === null ? null : state.snakes[this.spectating];
+    if (!target?.alive) {
+      target = live.reduce((best, s) => (s.targetLength > best.targetLength ? s : best), live[0]);
+      this.spectating = target.id;
+    }
+    return followView(target, ARENA_WIDTH, ARENA_HEIGHT, this.spectateZoom);
+  }
+
+  /** Left/Right: the next live snake; Up/Down: closer or wider. Only while dead in a match. */
+  private spectateKey(code: string): boolean {
+    const state = this.session?.state;
+    if (!state || this.phase !== 'playing' || state.snakes[this.player]?.alive) return false;
+    const live = state.snakes.filter((s) => s.alive).map((s) => s.id);
+    if (live.length === 0) return false;
+    const at = Math.max(0, live.indexOf(this.spectating ?? -1));
+    switch (code) {
+      case 'ArrowLeft':
+      case 'KeyA':
+        this.spectating = live[(at - 1 + live.length) % live.length];
+        return true;
+      case 'ArrowRight':
+      case 'KeyD':
+        this.spectating = live[(at + 1) % live.length];
+        return true;
+      case 'ArrowUp':
+      case 'KeyW':
+        this.spectateZoom = Math.min(MAX_ZOOM, this.spectateZoom + 0.25);
+        return true;
+      case 'ArrowDown':
+      case 'KeyS':
+        this.spectateZoom = Math.max(1, this.spectateZoom - 0.25);
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  /** The other player's name in a two-player room; who to wait for otherwise. */
+  private peerLabel(): string {
+    if (this.names.length <= 2) return this.names[1 - this.me] ?? PLAYER_NAMES[1 - this.me];
+    return 'THE OTHERS';
   }
 
   /** Visual offsets for the drawn heads (rollback smoothing). */
@@ -230,7 +296,7 @@ export class OnlineMatch {
       const seconds = Math.max(0, Math.ceil((this.peerAwayDeadline - nowMs) / 1000));
       if (seconds !== this.reconnectShown) {
         this.reconnectShown = seconds;
-        this.deps.screens.reconnecting(this.names[1 - this.me], seconds);
+        this.deps.screens.reconnecting(this.names[this.awaySeat ?? 1 - this.me] ?? 'YOUR OPPONENT', seconds);
       }
       return;
     }
@@ -239,7 +305,7 @@ export class OnlineMatch {
       if (this.stalledSince === null) this.stalledSince = nowMs;
       else if (!this.stallShown && nowMs - this.stalledSince > STALL_CAPTION_MS) {
         this.stallShown = true;
-        this.deps.screens.waiting(this.names[1 - this.me]);
+        this.deps.screens.waiting(this.peerLabel());
       }
     } else {
       this.stalledSince = null;
@@ -288,6 +354,7 @@ export class OnlineMatch {
       this.showNet = !this.showNet;
       return true;
     }
+    if (this.spectateKey(code)) return true;
     const matchOver = this.phase === 'playing' && this.session?.state.phase === 'matchOver';
     if (matchOver && code === 'Space') {
       // Request (or withdraw) a rematch; the lobby message updates the line under the banner.
@@ -396,9 +463,10 @@ export class OnlineMatch {
         this.pingMs = m.pingMs;
         // An empty seat keeps its last name, so "Ada left" reads right after Ada leaves.
         this.names = m.players.map((p, i) => (p ? displayName(p.name, i) : (this.names[i] ?? displayName('', i))));
-        this.deps.hud.setNames(this.names);
-        this.deps.onNames(this.names);
-        if (this.phase === 'queue' && m.players.every((p) => p !== null)) this.phase = 'lobby';
+        // A rejoining tab gets its resume before this lobby message, so the names catch up here.
+        this.refreshPlayerNames();
+        // Quick match: the lobby shows as soon as someone else is in; a bigger room keeps filling from there.
+        if (this.phase === 'queue' && m.players.filter((p) => p !== null).length >= 2) this.phase = 'lobby';
         if (this.phase === 'connecting' && this.mode.kind === 'rejoin') this.phase = 'lobby';
         if (this.phase === 'lobby') this.showLobby();
         else if (this.phase === 'playing' && this.session?.state.phase === 'matchOver') this.showRematchLine();
@@ -411,28 +479,44 @@ export class OnlineMatch {
       case 'start':
         this.start(m);
         return;
-      case 'peerAway':
+      case 'seatAway':
+        this.awaySeat = m.seat;
+        if (m.deadline === null) {
+          // A bigger room: their snake coasts on; just say so.
+          if (this.phase === 'playing') screens.flash(`${this.names[m.seat] ?? 'A PLAYER'} DROPPED`, 'var(--dim)', 1500);
+          return;
+        }
         this.peerAwayDeadline = this.clock.toLocal(m.deadline);
         this.reconnectShown = -1;
         return;
-      case 'peerBack':
+      case 'seatBack':
+        if (this.peerAwayDeadline !== null) screens.uncover();
         this.peerAwayDeadline = null;
         this.reconnectShown = -1;
-        screens.uncover();
+        this.awaySeat = null;
         return;
-      case 'forfeit':
-        this.end('over', `${this.names[m.winner]} WINS`, `${this.names[1 - m.winner]} LEFT THE MATCH`, PLAYER_CSS[m.winner]);
+      case 'ended':
+        this.end('over', 'YOU WIN', 'EVERYONE ELSE LEFT THE MATCH', PLAYER_CSS[this.player] ?? 'var(--text)');
         return;
+      case 'forfeit': {
+        const loser = this.names.findIndex((_, i) => i !== m.winner && this.lobby?.players[i]);
+        const loserName = this.names[loser >= 0 ? loser : 1 - m.winner] ?? 'YOUR OPPONENT';
+        const winnerPlayer = this.seatMap[m.winner] ?? m.winner;
+        this.end('over', `${this.names[m.winner]} WINS`, `${loserName} LEFT THE MATCH`, PLAYER_CSS[winnerPlayer] ?? 'var(--text)');
+        return;
+      }
       case 'desync':
         this.end('over', 'OUT OF SYNC', 'MATCH VOIDED', 'var(--red)');
         return;
-      case 'peerLeft':
+      case 'seatLeft':
         if (this.session?.state.phase === 'matchOver') return; // the lobby message updates the line
-        if (this.phase === 'playing' || this.phase === 'starting') this.end('over', 'OPPONENT LEFT', '', 'var(--text)');
+        if (this.phase !== 'playing' && this.phase !== 'starting') return;
+        if (this.names.length <= 2) this.end('over', 'OPPONENT LEFT', '', 'var(--text)');
+        else screens.flash(`${this.names[m.seat] ?? 'A PLAYER'} LEFT`, 'var(--dim)', 1500);
         return;
       case 'closed':
         storeSession(null);
-        if (m.reason === 'full') this.end('error', 'ROOM IS FULL', `${this.room || this.roomFromMode()} ALREADY HAS TWO PLAYERS`, 'var(--text)');
+        if (m.reason === 'full') this.end('error', 'ROOM IS FULL', `${this.room || this.roomFromMode()} HAS NO SEAT LEFT OR IS MID-MATCH`, 'var(--text)');
         else if (m.reason === 'unknownRoom') this.end('error', 'NO SUCH ROOM', 'THE LINK MAY HAVE EXPIRED', 'var(--text)');
         else if (m.reason === 'restart') this.end('error', 'SERVER RESTARTED', 'THE MATCH ENDED', 'var(--text)');
         else this.end('error', 'ROOM CLOSED', 'NOBODY PLAYED FOR A WHILE', 'var(--text)');
@@ -465,15 +549,44 @@ export class OnlineMatch {
   }
 
   /** A mid-match rejoin: build the session, then wait for the replay frame. */
+  /** Names in sim order (through the seat map during a match, seat order otherwise), for the HUD and banners. */
+  private refreshPlayerNames(): void {
+    if (this.seatMap.length === 0) {
+      this.playerNames = [...this.names];
+    } else {
+      const players = this.seatMap.filter((p) => p >= 0).length;
+      this.playerNames = Array.from({ length: players }, (_, p) => PLAYER_NAMES[p]);
+      this.seatMap.forEach((p, seat) => {
+        if (p >= 0) this.playerNames[p] = this.names[seat] ?? PLAYER_NAMES[seat];
+      });
+    }
+    this.deps.hud.setNames(this.playerNames);
+    this.deps.onNames(this.playerNames);
+  }
+
+  /** Seats compact to sim players for a match: remember the map and the names in sim order. */
+  private seatMatch(m: { players: number; seats: number[]; rttMs: number[] }): void {
+    this.seatMap = m.seats;
+    this.player = m.seats[this.me] ?? -1;
+    this.deps.hud.setLocal(this.player);
+    this.refreshPlayerNames();
+    const present = m.rttMs.filter((_, seat) => m.seats[seat] >= 0);
+    const meanRtt = present.length ? present.reduce((a, b) => a + b, 0) / present.length : 100;
+    this.oneWayTicks = meanRtt / 2 / TICK_MS;
+    this.spectating = null;
+    this.spectateZoom = MAX_ZOOM;
+  }
+
   private resume(m: Extract<ServerMessage, { type: 'resume' }>): void {
     this.cfg.winsToWin = m.winsToWin;
     this.rttMs = m.rttMs[this.me] ?? null;
-    this.oneWayTicks = (m.rttMs[0] + m.rttMs[1]) / 2 / 2 / TICK_MS;
+    this.seatMatch(m);
     this.replayFrames = m.frames;
     this.session = new NetSession({
       seed: m.seed,
       cfg: this.cfg,
-      local: this.me,
+      players: m.players,
+      local: this.player,
       inputDelay: m.inputDelay,
       oneWayTicks: this.oneWayTicks,
       send: (tick, input) => this.conn.sendFrame(encodeInput(tick, input)),
@@ -495,8 +608,10 @@ export class OnlineMatch {
     const entries = decodeReplay(frame);
     if (!entries || !this.session) return;
     for (const e of entries) {
+      const p = this.seatMap[e.player] ?? -1;
+      if (p < 0) continue;
       if (e.player === this.me) this.session.restoreLocal(e.tick, e.input);
-      else this.session.receive(e.tick, e.input);
+      else this.session.receive(p, e.tick, e.input);
     }
     this.replayFrames = 0;
   }
@@ -526,10 +641,10 @@ export class OnlineMatch {
     const { screens } = this.deps;
     screens.clear();
     if (state.phase === 'roundOver') {
-      const { title, detail } = describeRound(state.lastRoundWinner, state.deaths, this.names);
+      const { title, detail } = describeRound(state.lastRoundWinner, state.deaths, this.playerNames, state.lastPlaces);
       screens.roundOver(title, detail, state.lastRoundWinner);
     } else if (state.phase === 'matchOver' && state.matchWinner !== null) {
-      screens.matchOver(state.matchWinner, state.scores, this.names, 'SPACE REMATCH · ESC LOBBY');
+      screens.matchOver(state.matchWinner, state.scores, this.playerNames, 'SPACE REMATCH · ESC LOBBY');
       this.showRematchLine();
     }
   }
@@ -538,7 +653,10 @@ export class OnlineMatch {
   private toLobby(): void {
     this.phase = 'lobby';
     this.session = null;
+    this.seatMap = [];
+    this.player = -1;
     this.peerAwayDeadline = null;
+    this.awaySeat = null;
     this.deps.setTimeScale(1);
     this.deps.hud.setPing(this.pingMs, false);
     this.deps.fx.clear();
@@ -549,13 +667,21 @@ export class OnlineMatch {
   private showRematchLine(): void {
     if (!this.lobby) return;
     const mine = this.lobby.players[this.me]?.ready ?? false;
-    const peer = this.lobby.players[1 - this.me];
-    const peerName = this.names[1 - this.me];
     let line = '';
-    if (!peer) line = `${peerName} LEFT · SPACE FOR THE LOBBY`;
-    else if (mine && peer.ready) line = 'REMATCH!';
-    else if (mine) line = `REMATCH REQUESTED · WAITING FOR ${peerName}`;
-    else if (peer.ready) line = `${peerName} WANTS A REMATCH · SPACE TO ACCEPT`;
+    if (this.lobby.players.length <= 2) {
+      const peer = this.lobby.players[1 - this.me];
+      const peerName = this.names[1 - this.me];
+      if (!peer) line = `${peerName} LEFT · SPACE FOR THE LOBBY`;
+      else if (mine && peer.ready) line = 'REMATCH!';
+      else if (mine) line = `REMATCH REQUESTED · WAITING FOR ${peerName}`;
+      else if (peer.ready) line = `${peerName} WANTS A REMATCH · SPACE TO ACCEPT`;
+    } else {
+      const seated = this.lobby.players.filter((p) => p !== null);
+      const ready = seated.filter((p) => p?.ready).length;
+      if (seated.length < 2) line = 'EVERYONE LEFT · SPACE FOR THE LOBBY';
+      else if (ready === seated.length) line = 'REMATCH!';
+      else line = `${ready} OF ${seated.length} WANT A REMATCH${mine ? '' : ' · SPACE TO JOIN IN'}`;
+    }
     this.deps.screens.matchOverLine(line);
   }
 
@@ -570,6 +696,7 @@ export class OnlineMatch {
       link: this.link,
       players: this.lobby.players,
       winsToWin: this.lobby.winsToWin,
+      size: this.lobby.size,
       pingMs: this.lobby.pingMs,
       me: this.me,
     });
@@ -578,11 +705,12 @@ export class OnlineMatch {
   private start(m: Extract<ServerMessage, { type: 'start' }>): void {
     this.cfg.winsToWin = m.winsToWin;
     this.rttMs = m.rttMs[this.me] ?? null;
-    this.oneWayTicks = (m.rttMs[0] + m.rttMs[1]) / 2 / 2 / TICK_MS;
+    this.seatMatch(m);
     this.session = new NetSession({
       seed: m.seed,
       cfg: this.cfg,
-      local: this.me,
+      players: m.players,
+      local: this.player,
       inputDelay: m.inputDelay,
       oneWayTicks: this.oneWayTicks,
       send: (tick, input) => this.conn.sendFrame(encodeInput(tick, input)),
@@ -594,6 +722,7 @@ export class OnlineMatch {
     this.rateSample = null;
     this.startAtLocal = this.clock.synced ? this.clock.toLocal(m.startAt) : performance.now() + 1500;
     this.peerAwayDeadline = null;
+    this.awaySeat = null;
     this.stalledSince = null;
     this.stallShown = false;
     this.leavePromptUntil = 0;
@@ -620,7 +749,8 @@ export class OnlineMatch {
     if (frame[0] === FRAME_REPLAY) return this.onReplay(frame);
     const decoded = decodeRelayed(frame);
     if (!decoded || !this.session || decoded.player === this.me) return;
-    this.session.receive(decoded.tick, decoded.input);
+    const p = this.seatMap[decoded.player] ?? -1;
+    if (p >= 0) this.session.receive(p, decoded.tick, decoded.input);
   }
 
   private onSocketClosed(code: number): void {

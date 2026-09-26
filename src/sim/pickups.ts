@@ -4,6 +4,7 @@ import { circleHitsWall } from './arena';
 import { ARENA_HEIGHT, ARENA_WIDTH, TICK_RATE, type Config, type PickupKind } from './config';
 import { decimatePolygon, LOOP_EVENT_POINTS, pointInPolygon } from './geometry';
 import { createItem } from './items';
+import { maxPickupsFor, pickupIntervalFor } from './players';
 import { slotsFor } from './storage';
 import { rngNext, rngRange, type RngState } from './rng';
 import type { MatchState, PickupState, SimEvent, SnakeState } from './types';
@@ -82,8 +83,9 @@ export function updatePickups(state: MatchState, cfg: Config, events: SimEvent[]
 
   state.pickupTimer--;
   if (state.pickupTimer > 0) return;
-  state.pickupTimer = Math.max(1, Math.round(cfg.pickupInterval * TICK_RATE));
-  if (state.pickups.length >= cfg.maxPickups) return;
+  const players = state.snakes.length;
+  state.pickupTimer = Math.max(1, Math.round(pickupIntervalFor(cfg, players) * TICK_RATE));
+  if (state.pickups.length >= maxPickupsFor(cfg, players)) return;
   // A Bulldozer is pointless on a map without blocks.
   const weights = state.tiles.includes(1) ? cfg.pickupWeights : { ...cfg.pickupWeights, dozer: 0 };
   const kind = pickKind(weights, state.rng);

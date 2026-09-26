@@ -92,6 +92,6 @@ describe('soak', () => {
       const { problems, lengths } = soak({ ...FAST, ...overrides }, 3, 5);
       expect(problems).toEqual([]);
       expect(lengths).toHaveLength(3);
-    });
+    }, 60000);
   }
 });

@@ -1,6 +1,8 @@
 export * from './config';
 export * from './types';
 export { generateMap, mapCatalogue, MAPS, RANDOM_SLOTS, type GeneratedMap, type MapEntry } from './maps';
+export { ringSpawns } from './maps/spawns';
+export { MAX_PLAYERS, clampPlayers, matchTarget, maxPickupsFor, pickupIntervalFor, placePoints, placesFor, roundCapSeconds } from './players';
 export { cloneState, createMatch } from './state';
 export { rematch, step } from './step';
 export { checkInvariants } from './invariants';
