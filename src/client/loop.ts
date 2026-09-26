@@ -10,7 +10,9 @@ export const browserClock: Clock = {
 
 /**
  * Fixed-timestep loop: calls `tick` at 1/dt per second of (scaled) time and `render` once per
- * frame with the interpolation alpha. Long gaps are clamped so a hidden tab never fast-forwards.
+ * frame with the interpolation alpha. A slow frame's leftover time carries into the next frames
+ * (up to `maxSteps` ticks' worth), so a client with a hitch catches up instead of falling behind
+ * its peers for good; long gaps are clamped so a hidden tab never fast-forwards far.
  */
 export class FixedLoop {
   timeScale = 1;
@@ -42,7 +44,9 @@ export class FixedLoop {
       this.acc -= this.dt;
       steps++;
     }
-    if (this.acc >= this.dt) this.acc = 0;
+    // Keep what's left for the next frames, but never more than one frame's worth of catch-up.
+    const carry = this.maxSteps * this.dt;
+    if (this.acc > carry) this.acc = carry;
     this.render(this.acc / this.dt, frameSeconds);
     this.clock.request(this.frame);
   };

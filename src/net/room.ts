@@ -47,6 +47,20 @@ export const MAX_SIZE = 8;
 const UNKNOWN_RTT_MS = 100;
 const START_LEAD_MS = 1_500;
 
+/** The relayed frames as one base64 string, for the desync report and scripts/replay.ts. */
+export function encodeLogBase64(frames: readonly Uint8Array[]): string {
+  const total = frames.reduce((n, f) => n + f.length, 0);
+  const all = new Uint8Array(total);
+  let at = 0;
+  for (const f of frames) {
+    all.set(f, at);
+    at += f.length;
+  }
+  let binary = '';
+  for (let i = 0; i < all.length; i++) binary += String.fromCharCode(all[i]);
+  return btoa(binary);
+}
+
 export function clampSize(value: unknown): number {
   const n = typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : MIN_SIZE;
   return Math.min(MAX_SIZE, Math.max(MIN_SIZE, n));
@@ -115,6 +129,8 @@ export class Room {
   private readonly hashes = new Map<number, (number | undefined)[]>();
   private lastPingShown: number | null = null;
   private loggedRound = 0;
+  /** The newest tick every reporting seat agreed on, for the desync report. */
+  private lastAgreed = -1;
   private seed = 0;
   /** The current match's parameters, for rejoins. `seats[roomSeat]` is the sim player index, or −1. */
   private match: { seed: number; winsToWin: number; players: number; seats: number[]; inputDelay: number; rttMs: number[] } | null = null;
@@ -223,6 +239,7 @@ export class Room {
     this.touch();
     this.clearEmpty();
     this.ensurePing();
+    this.host.log({ event: 'rejoin', seat: player, fromTick, playing: this.statusNow === 'playing', frames: this.inputLog.length });
     this.host.send(player, { type: 'welcome', player, room: this.code, session, name: seat.name });
     if (this.match && this.statusNow === 'playing') {
       // From here the seat sends its own frames again; the log already holds the synthesised ones.
@@ -353,6 +370,7 @@ export class Room {
     this.inputLog = [];
     this.hashes.clear();
     this.loggedRound = 0;
+    this.lastAgreed = -1;
     this.relaying = true;
     this.setStatus('playing');
     this.match = { seed: this.seed, winsToWin: this.winsToWin, players, seats, inputDelay, rttMs };
@@ -386,11 +404,23 @@ export class Room {
     this.hashes.delete(tick);
     const reported = reporters.map((i) => row![i]);
     if (reported.some((h) => h !== reported[0])) {
-      this.host.log({ event: 'desync', tick, hashes: reported, seats: reporters, seed: this.seed, frames: this.inputLog.length });
+      // Everything needed to replay the match offline (scripts/replay.ts) and find where a client diverged.
+      this.host.log({
+        event: 'desync',
+        tick,
+        lastAgreed: this.lastAgreed,
+        hashes: reported,
+        seats: reporters,
+        seed: this.seed,
+        match: this.match,
+        frames: this.inputLog.length,
+        log: encodeLogBase64(this.inputLog),
+      });
       this.broadcast({ type: 'desync', tick });
       this.backToLobby();
       return;
     }
+    if (tick > this.lastAgreed) this.lastAgreed = tick;
     const results = reporters.map((i) => this.seats[i]!.result);
     const first = results[0];
     if (
@@ -489,6 +519,7 @@ export class Room {
   private startGrace(player: number, seat: Seat): void {
     if (seat.cancelGrace) return;
     const deadline = this.host.now() + this.graceMs;
+    this.host.log({ event: 'grace', seat: player, reason: seat.connected ? 'away' : 'dropped', lastTick: seat.lastTick });
     this.sendToOthers(player, { type: 'seatAway', seat: player, deadline });
     seat.cancelGrace = this.after(this.graceMs, () => {
       seat.cancelGrace = null;

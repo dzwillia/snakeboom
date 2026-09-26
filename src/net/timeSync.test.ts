@@ -7,14 +7,14 @@ const cfg = { ...DEFAULT_CONFIG, winsToWin: 50 };
 const FRAME_MS = 1000 / 60;
 
 describe('timeScaleFor', () => {
-  it('is exactly 1 inside the deadband and never beyond 1% either way', () => {
+  it('is exactly 1 inside the deadband and never beyond 2% either way', () => {
     expect(timeScaleFor(0)).toBe(1);
     expect(timeScaleFor(1)).toBe(1);
     expect(timeScaleFor(-1)).toBe(1);
-    expect(timeScaleFor(2)).toBeCloseTo(0.995, 6);
-    expect(timeScaleFor(-2)).toBeCloseTo(1.005, 6);
-    expect(timeScaleFor(50)).toBe(0.99);
-    expect(timeScaleFor(-50)).toBe(1.01);
+    expect(timeScaleFor(2)).toBeCloseTo(0.99, 6);
+    expect(timeScaleFor(-2)).toBeCloseTo(1.01, 6);
+    expect(timeScaleFor(50)).toBe(0.98);
+    expect(timeScaleFor(-50)).toBe(1.02);
   });
 
   it('smooths lead samples', () => {
@@ -48,8 +48,8 @@ describe('time sync between two sessions', () => {
       if (closedAt >= 0 && f > closedAt + 120) expect(gap).toBeLessThanOrEqual(2);
     }
     expect(closedAt).toBeGreaterThan(0);
-    expect(closedAt).toBeLessThan(900);
-    expect(Math.min(...scales)).toBeGreaterThanOrEqual(0.99);
-    expect(Math.max(...scales)).toBeLessThanOrEqual(1.01);
+    expect(closedAt).toBeLessThan(600);
+    expect(Math.min(...scales)).toBeGreaterThanOrEqual(0.98);
+    expect(Math.max(...scales)).toBeLessThanOrEqual(1.02);
   });
 });
