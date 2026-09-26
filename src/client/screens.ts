@@ -54,7 +54,7 @@ export class Screens {
       `<div class="row${opts.row === id ? ' active' : ''}" data-row="${id}">${html}</div>`;
     const pink =
       opts.opponent === 'human'
-        ? `<p><kbd>←</kbd> <kbd>→</kbd> steer</p><p><kbd>↑</kbd> boost</p><p><kbd>↓</kbd> use item</p>`
+        ? `<p><kbd>←</kbd> <kbd>→</kbd> steer</p><p><kbd>↑</kbd> boost</p><p><kbd>↓</kbd> fire</p><p><kbd>R SHIFT</kbd> select</p>`
         : `<p>${describeOpponent(opts.opponent)}</p><p class="dim">plays this seat</p>`;
     this.show(
       `
@@ -62,7 +62,7 @@ export class Screens {
         <div class="logo">SNAKEBOOM</div>
         <div class="controls">
           <div class="p1"><h3>${PLAYER_NAMES[0]}</h3>
-            <p><kbd>A</kbd> <kbd>D</kbd> steer</p><p><kbd>W</kbd> boost</p><p><kbd>S</kbd> use item</p></div>
+            <p><kbd>A</kbd> <kbd>D</kbd> steer</p><p><kbd>W</kbd> boost</p><p><kbd>S</kbd> fire</p><p><kbd>Q</kbd> select</p></div>
           <div class="p2"><h3>${PLAYER_NAMES[1]}</h3>${pink}</div>
         </div>
         <div class="menu">
@@ -94,7 +94,7 @@ export class Screens {
       `
       <div class="panel powers">
         <h2>POWERS</h2>
-        <p class="lead">PICKUPS SPAWN ALL ROUND · YOU CARRY ${slots.toUpperCase()} · USE FIRES THE OLDEST · TIMED POWERS FLASH FOR THEIR LAST ${cfg.effectWarning} S</p>
+        <p class="lead">PICKUPS SPAWN ALL ROUND · YOU CARRY ${slots.toUpperCase()} · SELECT PICKS ONE, FIRE USES IT · TIMED POWERS FLASH FOR THEIR LAST ${cfg.effectWarning} S</p>
         <div class="grid">${cards.join('')}</div>
         <div class="small footer"><kbd>H</kbd> OR <kbd>ESC</kbd> BACK TO ${back === 'title' ? 'TITLE' : 'PAUSE'}</div>
       </div>`,

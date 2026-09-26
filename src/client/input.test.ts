@@ -45,4 +45,33 @@ describe('KeyboardInput.sampleLocal', () => {
     expect(input.sampleLocal().use).toBe(true);
     expect(input.sample().every((i) => !i.use)).toBe(true);
   });
+
+  it('latches Select from either key and consumes it once', () => {
+    const { input, press } = keyboard();
+    press('ShiftRight');
+    expect(input.sampleLocal().select).toBe(true);
+    expect(input.sampleLocal().select).toBe(false);
+    press('KeyQ');
+    expect(input.sampleLocal().select).toBe(true);
+    expect(input.sample().every((i) => !i.select)).toBe(true);
+  });
+
+  it('forgets pending Select presses with the Fire ones', () => {
+    const { input, press } = keyboard();
+    press('KeyQ');
+    press('KeyS');
+    input.clearLatches();
+    expect(input.sampleLocal()).toMatchObject({ use: false, select: false });
+  });
+});
+
+describe('KeyboardInput.sample', () => {
+  it('keeps each seat\'s Fire and Select apart', () => {
+    const { input, press } = keyboard();
+    press('KeyQ');
+    press('ArrowDown');
+    const [cyan, pink] = input.sample();
+    expect(cyan).toMatchObject({ use: false, select: true });
+    expect(pink).toMatchObject({ use: true, select: false });
+  });
 });

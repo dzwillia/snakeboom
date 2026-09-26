@@ -164,12 +164,12 @@ describe('Room input relay', () => {
   it('forwards frames to the other seat with the sender marked, and logs them', () => {
     const host = new FakeHost();
     const room = started(host);
-    room.onInput(0, encodeInput(1, { turn: 1, boost: false, use: false }));
-    room.onInput(0, encodeInput(2, { turn: -1, boost: true, use: true }));
+    room.onInput(0, encodeInput(1, { turn: 1, boost: false, use: false, select: false }));
+    room.onInput(0, encodeInput(2, { turn: -1, boost: true, use: true, select: false }));
     const got = host.frames(1).map((f) => decodeRelayed(f));
     expect(got).toEqual([
-      { player: 0, tick: 1, input: { turn: 1, boost: false, use: false } },
-      { player: 0, tick: 2, input: { turn: -1, boost: true, use: true } },
+      { player: 0, tick: 1, input: { turn: 1, boost: false, use: false, select: false } },
+      { player: 0, tick: 2, input: { turn: -1, boost: true, use: true, select: false } },
     ]);
     expect(room.log).toHaveLength(2);
   });
@@ -312,10 +312,10 @@ describe('Room disconnects', () => {
     const room = started(host, [60, 80]);
     const session = (host.last(1, 'welcome') as { session: string }).session;
     room.onInput(0, encodeInput(1, NO_INPUT));
-    room.onInput(1, encodeInput(1, { turn: 1, boost: false, use: false }));
+    room.onInput(1, encodeInput(1, { turn: 1, boost: false, use: false, select: false }));
     room.onInput(0, encodeInput(2, NO_INPUT));
     room.onInput(1, encodeInput(2, NO_INPUT));
-    room.onInput(0, encodeInput(3, { turn: -1, boost: true, use: true }));
+    room.onInput(0, encodeInput(3, { turn: -1, boost: true, use: true, select: false }));
     room.onDisconnect(1);
     host.sent[1].length = 0;
     expect(room.rejoin(session, 0)).toBe(1);
@@ -338,7 +338,7 @@ describe('Room disconnects', () => {
       [1, 2],
       [0, 3],
     ]);
-    expect(replay?.[4].input).toEqual({ turn: -1, boost: true, use: true });
+    expect(replay?.[4].input).toEqual({ turn: -1, boost: true, use: true, select: false });
     expect(host.last(0, 'peerBack')).toEqual({ type: 'peerBack' });
 
     room.onDisconnect(1);

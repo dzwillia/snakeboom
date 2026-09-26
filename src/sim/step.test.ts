@@ -34,7 +34,7 @@ describe('step: countdown', () => {
   it('counts 3-2-1 then GO after countdownSeconds, with snakes frozen', () => {
     const s = createMatch(cfg, 1);
     const x0 = s.snakes[0].x;
-    const events = run(s, 3 * TICK_RATE - 1, cfg, [{ turn: 1, boost: true, use: true }, NO_INPUT]);
+    const events = run(s, 3 * TICK_RATE - 1, cfg, [{ turn: 1, boost: true, use: true, select: false }, NO_INPUT]);
     expect(events).toEqual([
       { type: 'countdown', n: 3 },
       { type: 'countdown', n: 2 },
@@ -96,7 +96,7 @@ describe('step: playing', () => {
 
   it('reports when a snake starts boosting', () => {
     const s = toPlaying();
-    const events = run(s, 5, cfg, [{ turn: 0, boost: true, use: false }, NO_INPUT]);
+    const events = run(s, 5, cfg, [{ turn: 0, boost: true, use: false, select: false }, NO_INPUT]);
     expect(events.filter((e) => e.type === 'boostStarted')).toEqual([{ type: 'boostStarted', player: 0 }]);
   });
 });

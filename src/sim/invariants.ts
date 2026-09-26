@@ -29,6 +29,9 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
       if (item.charges < 1) problems.push(`snake ${i}: carries an empty ${item.kind}`);
       if (item.kind === 'shield') problems.push(`snake ${i}: a Shield is taking a slot`);
     }
+    if (!Number.isInteger(s.selected) || s.selected < 0 || s.selected >= Math.max(1, s.items.length)) {
+      problems.push(`snake ${i}: selected item ${s.selected} of ${s.items.length}`);
+    }
     if (!Number.isInteger(s.hearts) || s.hearts < 0 || s.hearts > Math.max(1, Math.round(cfg.hearts))) {
       problems.push(`snake ${i}: ${s.hearts} hearts`);
     }

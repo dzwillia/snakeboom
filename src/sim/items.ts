@@ -1,5 +1,5 @@
 import { TICK_RATE, type Config, type PickupKind } from './config';
-import type { EffectName, ItemState, MatchState, SimEvent } from './types';
+import type { EffectName, ItemState, MatchState, SimEvent, SnakeState } from './types';
 
 const ANNOUNCED: EffectName[] = ['ghost', 'scissors', 'dozer', 'flame'];
 
@@ -7,9 +7,10 @@ export function createItem(kind: PickupKind, cfg: Config): ItemState {
   return { kind, charges: kind === 'missile' ? Math.max(1, Math.round(cfg.missileCharges)) : 1 };
 }
 
-/** Counts down Use cooldowns and effect timers, reporting effects that run out. Call once per playing tick. */
+/** Counts down Fire cooldowns and effect timers, reporting effects that run out. Call once per playing tick. */
 export function tickItemTimers(state: MatchState, events: SimEvent[]): void {
   state.snakes.forEach((s, player) => {
+    clampSelection(s); // whatever dropped items since last tick, the selection still points at one
     if (s.useCooldown > 0) s.useCooldown--;
     if (s.effects.grace > 0) s.effects.grace--;
     for (const effect of ANNOUNCED) {
@@ -45,10 +46,26 @@ function startEffect(state: MatchState, player: number, effect: EffectName, seco
   return { x: Math.min(Math.max(x, r), ARENA_WIDTH - r), y: Math.min(Math.max(y, r), ARENA_HEIGHT - r) };
 }
 
-/** Uses the oldest carried item (items[0]); a missile pickup stays at the front until its last shot. */
+/** Keeps `selected` pointing at a carried item (0 when there are none), after anything drops items. */
+export function clampSelection(s: SnakeState): void {
+  if (s.items.length === 0) s.selected = 0;
+  else if (s.selected < 0 || s.selected >= s.items.length || !Number.isInteger(s.selected)) s.selected = 0;
+}
+
+/** Select: moves the selection to the next carried item, wrapping around to the first. */
+export function selectNextItem(s: SnakeState): void {
+  clampSelection(s);
+  if (s.items.length > 0) s.selected = (s.selected + 1) % s.items.length;
+}
+
+/**
+ * Fires the selected item (items[selected]); a missile pickup stays selected until its last shot.
+ * When the item is used up, the selection moves to the next one, wrapping to the first.
+ */
 export function useItem(state: MatchState, idx: number, cfg: Config, events: SimEvent[]): void {
   const s = state.snakes[idx];
-  const item = s.items[0];
+  clampSelection(s);
+  const item = s.items[s.selected];
   if (!item || s.useCooldown > 0) return;
   if (item.kind !== 'missile') events.push({ type: 'itemUsed', player: idx, kind: item.kind });
   switch (item.kind) {
@@ -76,5 +93,8 @@ export function useItem(state: MatchState, idx: number, cfg: Config, events: Sim
       break;
   }
   item.charges--;
-  if (item.charges <= 0) s.items.shift();
+  if (item.charges <= 0) {
+    s.items.splice(s.selected, 1); // the next item slides into the selected index
+    if (s.selected >= s.items.length) s.selected = 0;
+  }
 }

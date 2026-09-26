@@ -158,7 +158,7 @@ export class Hud {
         chip.style.visibility = blinkOn(ticks / TICK_RATE, cfg.effectWarning, t) ? 'visible' : 'hidden';
       }
 
-      const slotsKey = `${cfg.itemSlots}|${s.shield}|${s.items.map((it) => `${it.kind}:${it.charges}`).join(',')}`;
+      const slotsKey = `${cfg.itemSlots}|${s.shield}|${s.selected}|${s.items.map((it) => `${it.kind}:${it.charges}`).join(',')}`;
       if (slotsKey !== side.lastSlots) {
         side.lastSlots = slotsKey;
         side.slots.innerHTML = slotsHtml(s, cfg.itemSlots);
@@ -185,13 +185,13 @@ function heartsHtml(hearts: number, max: number): string {
   return Array.from({ length: Math.max(1, Math.round(max)) }, (_, k) => `<span class="heart${k < hearts ? '' : ' lost'}">♥</span>`).join('');
 }
 
-/** The Shield bubble chip, then the item queue with the next item (front) highlighted. */
+/** The Shield bubble chip, then the item queue with the selected item (what Fire uses) highlighted. */
 function slotsHtml(s: SnakeState, slotCount: number): string {
   const shield = s.shield ? '<span class="slot chip" data-kind="shield">SHIELD</span>' : '';
   const cells = Array.from({ length: Math.max(slotCount, s.items.length) }, (_, k) => {
     const item = s.items[k];
     if (!item) return '<span class="slot">—</span>';
-    return `<span class="slot full${k === 0 ? ' next' : ''}" data-kind="${item.kind}">${describeItem(item)}</span>`;
+    return `<span class="slot full${k === s.selected ? ' selected' : ''}" data-kind="${item.kind}">${describeItem(item)}</span>`;
   });
   return shield + cells.join('');
 }

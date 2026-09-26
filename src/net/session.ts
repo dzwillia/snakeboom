@@ -71,17 +71,17 @@ const KEEP_TICKS = 600;
 const PRUNE_EVERY = 60;
 
 function sameInput(a: PlayerInput, b: PlayerInput): boolean {
-  return a.turn === b.turn && a.boost === b.boost && a.use === b.use;
+  return a.turn === b.turn && a.boost === b.boost && a.use === b.use && a.select === b.select;
 }
 
 function copyInput(i: PlayerInput): PlayerInput {
-  return { turn: i.turn, boost: i.boost, use: i.use };
+  return { turn: i.turn, boost: i.boost, use: i.use, select: i.select };
 }
 
 /**
  * Rollback netcode for one seat. Two copies of the sim run: `confirmed` only advances through
  * ticks whose inputs from both seats are known, and `predicted` runs ahead of it using a guess
- * for the remote seat (its last known input, without Use). When a guess turns out wrong, the
+ * for the remote seat (its last known input, without Fire or Select). When a guess turns out wrong, the
  * predicted state is rebuilt from the confirmed one. The predicted state is the one to draw.
  */
 export class NetSession {
@@ -269,7 +269,7 @@ export class NetSession {
   }
 
   private guessRemote(): PlayerInput {
-    return { turn: this.latestRemote.turn, boost: this.latestRemote.boost, use: false };
+    return { turn: this.latestRemote.turn, boost: this.latestRemote.boost, use: false, select: false };
   }
 
   private stepPredicted(): TaggedEvent[] {

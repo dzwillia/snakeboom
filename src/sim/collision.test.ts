@@ -8,7 +8,7 @@ import { createTrail, trailPush } from './trail';
 import type { MatchState, PlayerInput } from './types';
 
 const cfg = DEFAULT_CONFIG;
-const turnRight: PlayerInput = { turn: 1, boost: false, use: false };
+const turnRight: PlayerInput = { turn: 1, boost: false, use: false, select: false };
 
 function playing(): MatchState {
   const s = createMatch(cfg, 1);

@@ -42,7 +42,7 @@ describe('Screens title', () => {
     expect(root.innerHTML.match(/class="row/g)).toHaveLength(4);
     expect(root.innerHTML).toContain('class="row active" data-row="create"');
     expect(root.innerHTML).toContain('HUMAN');
-    expect(root.innerHTML).toContain('use item</p></div>\n          <div class="p2">');
+    expect(root.innerHTML).toContain('select</p></div>\n          <div class="p2">');
   });
 
   it('shows the build version on the title and pause screens', () => {

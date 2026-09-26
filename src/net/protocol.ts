@@ -4,7 +4,7 @@
  */
 
 /** Bumped on every incompatible change; the relay refuses other values. */
-export const PROTOCOL = 5;
+export const PROTOCOL = 6;
 
 /** Netcode counters for one round, as the client measured them (deltas since the previous round). */
 export interface NetStats {

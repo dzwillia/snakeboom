@@ -47,7 +47,7 @@ export interface Config {
   pickupClearance: number;
   /** Relative spawn chance per kind. */
   pickupWeights: Record<PickupKind, number>;
-  /** Items a snake can carry at once, used oldest first (a Shield is a bubble and never takes a slot). */
+  /** Items a snake can carry at once; Select picks one and Fire uses it (a Shield is a bubble and never takes a slot). */
   itemSlots: number;
   /** Shots in one missile pickup. */
   missileCharges: number;

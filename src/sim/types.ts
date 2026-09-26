@@ -9,11 +9,13 @@ export type DeathCause = 'missile' | 'encircled' | 'saw' | 'flame' | 'headOn' | 
 export interface PlayerInput {
   turn: -1 | 0 | 1;
   boost: boolean;
-  /** Use was pressed at least once since the previous tick. */
+  /** Fire was pressed at least once since the previous tick: uses the selected item. */
   use: boolean;
+  /** Select was pressed at least once since the previous tick: moves the selection to the next carried item. */
+  select: boolean;
 }
 
-export const NO_INPUT: PlayerInput = { turn: 0, boost: false, use: false };
+export const NO_INPUT: PlayerInput = { turn: 0, boost: false, use: false, select: false };
 
 /** Points the head has passed through, oldest first. Indices before `start` are trimmed. */
 export interface Trail {
@@ -117,8 +119,13 @@ export interface SnakeState {
   targetLength: number;
   boosting: boolean;
   trail: Trail;
-  /** Carried items, oldest first; Use fires items[0]. */
+  /** Carried items, oldest first; Fire uses items[selected]. */
   items: ItemState[];
+  /**
+   * Index into `items` of the item Fire uses; 0 when empty. It follows the item, not the slot:
+   * collecting doesn't move it, using the selected item up moves it to the next one (wrapping to 0).
+   */
+  selected: number;
   /** A Shield bubble: absorbs the next death. Never takes an item slot. */
   shield: boolean;
   /** Hits left this round; the snake dies on the hit that takes the last one. */
