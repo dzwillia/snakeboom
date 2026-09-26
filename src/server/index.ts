@@ -86,7 +86,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const app = new Hono();
   // The admin page lives on the site's origin and calls these cross-origin with a bearer token.
   app.use('/admin/*', cors({ origin: (origin) => (originAllowed(origin || undefined, opts.allowedOrigin) ? origin : ''), allowHeaders: ['Authorization', 'Content-Type'], allowMethods: ['GET', 'PUT', 'DELETE', 'OPTIONS'] }));
-  const adminToken = opts.adminToken && opts.adminToken.length >= 16 ? opts.adminToken : null;
+  const adminToken = opts.adminToken && opts.adminToken.length >= 12 ? opts.adminToken : null;
   const adminAuth = new RateLimit(30, 60_000);
   const authorised = (c: { req: { header(name: string): string | undefined }; env?: unknown }, ip: string): boolean => {
     if (!adminToken) return false;

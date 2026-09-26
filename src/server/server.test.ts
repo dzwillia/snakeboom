@@ -546,8 +546,8 @@ describe('relay house rules', () => {
     const bare = await startServer({ port: 0, log: () => {} });
     expect((await fetch(`http://127.0.0.1:${bare.port}/admin/config`, { headers: { Authorization: 'Bearer anything' } })).status).toBe(404);
     await bare.close();
-    const short = await startServer({ port: 0, adminToken: 'short', log: () => {} });
-    expect((await fetch(`http://127.0.0.1:${short.port}/admin/config`, { headers: { Authorization: 'Bearer short' } })).status).toBe(404);
+    const short = await startServer({ port: 0, adminToken: 'tiny', log: () => {} });
+    expect((await fetch(`http://127.0.0.1:${short.port}/admin/config`, { headers: { Authorization: 'Bearer tiny' } })).status).toBe(404);
     await short.close();
   });
 });
