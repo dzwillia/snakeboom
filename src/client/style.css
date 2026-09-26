@@ -579,6 +579,8 @@ kbd {
 .power {
   display: grid;
   grid-template-columns: 56px 1fr;
+  /* Rows packed at the top: the leftover height (cards share the tallest one's) stays below the text. */
+  align-content: start;
   gap: 0 14px;
   padding: 12px 14px;
   border: 1px solid currentColor;
