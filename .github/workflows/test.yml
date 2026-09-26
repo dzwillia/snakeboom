@@ -1,7 +1,11 @@
 name: test
 
+# One run per event, not two: pushes to main (merges), pull requests (the branch's run), and the
+# deploy workflow calling this on a tag. A bare `push` also fired on every branch push and every
+# tag, so a PR ran twice and a release ran the tests twice.
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_call:
 
