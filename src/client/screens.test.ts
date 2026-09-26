@@ -54,6 +54,13 @@ describe('Screens title', () => {
     expect(root.innerHTML).toContain('v0.16.0');
   });
 
+  it('links the version to the release’s own address when the page is not already there', () => {
+    const root = fakeRoot();
+    new Screens(root, 'v0.16.0', 'https://v0-16-0.snakeboom.com/').title({ row: 'local', winsToWin: 5, hearts: 1, opponent: 'human' });
+    expect(root.innerHTML).toContain('<a class="version" href="https://v0-16-0.snakeboom.com/"');
+    expect(root.innerHTML).toContain('>v0.16.0</a>');
+  });
+
   it('defaults to the version Vite baked in', () => {
     expect(new Screens(fakeRoot()).version).toMatch(/^v\d+\.\d+\.\d+/);
   });

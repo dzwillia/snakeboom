@@ -482,7 +482,7 @@ kbd {
   letter-spacing: 0.12em;
 }
 
-/* The build's version, tucked into the corner of the title screen. */
+/* The build's version, tucked into the corner of the title screen; a link to the release's own address when there is one. */
 .version {
   position: absolute;
   left: 14px;
@@ -492,6 +492,14 @@ kbd {
   letter-spacing: 0.12em;
   opacity: 0.7;
   user-select: all;
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+a.version:hover,
+a.version:focus-visible {
+  opacity: 1;
+  text-decoration: underline;
 }
 
 /* Powers page */

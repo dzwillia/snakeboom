@@ -24,6 +24,7 @@ import { roomFromPath } from './net/link';
 import { OnlineMatch, rejoinHello, storedSession, type OnlineMode } from './net/online';
 import { RelayConnection } from './net/transport';
 import { relayUrl } from './net/transport';
+import { releaseUrl } from './release';
 import { Fx } from './render/fx';
 import { Renderer } from './render/renderer';
 import { applyBloom, createWorld } from './render/world';
@@ -71,7 +72,7 @@ async function boot(): Promise<void> {
   const minimap = new Minimap(world);
   const fx = new Fx(world, settings);
   const hud = new Hud(element('hud'));
-  const screens = new Screens(element('screens'));
+  const screens = new Screens(element('screens'), __APP_VERSION__, releaseUrl(__APP_VERSION__, relayBase(), location.hostname));
   const sound = new Sound(settings);
   const input = new KeyboardInput(window);
 

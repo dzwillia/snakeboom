@@ -44,6 +44,8 @@ export class Screens {
   constructor(
     private readonly root: HTMLElement,
     version = __APP_VERSION__,
+    /** This release's own address (https://v0-17-0.snakeboom.com/), when the page is not already there. */
+    private readonly permalink: string | null = null,
   ) {
     this.version = version;
   }
@@ -82,9 +84,16 @@ export class Screens {
         <div class="small"><kbd>▲</kbd> <kbd>▼</kbd> CHOOSE · <kbd>◀</kbd> <kbd>▶</kbd> ADJUST · ${opts.hearts} ${opts.hearts === 1 ? 'HEART' : 'HEARTS'} PER ROUND</div>
         <div class="small"><kbd>H</kbd> POWERS · <kbd>ESC</kbd> PAUSE · <kbd>M</kbd> MUTE · <kbd>\`</kbd> TUNING</div>
       </div>
-      <div class="version" title="The build you are playing">${escapeHtml(this.version)}</div>`,
+      ${this.versionLabel()}`,
       'title',
     );
+  }
+
+  /** The corner label: a link to the release's own address, where this exact build stays playable. */
+  private versionLabel(): string {
+    const label = escapeHtml(this.version);
+    if (!this.permalink) return `<div class="version" title="The build you are playing">${label}</div>`;
+    return `<a class="version" href="${escapeHtml(this.permalink)}" title="This build's own address; it stays playable there after the next release">${label}</a>`;
   }
 
   /** The Powers page: every pickup, what it does, and the numbers it currently runs on. */
