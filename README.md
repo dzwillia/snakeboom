@@ -55,6 +55,8 @@ The AI lives in the rules engine (`src/sim/bots/opponent.ts`), so it is determin
 
 Every timed special draws a **countdown ring** around your head in its colour, emptying as the time runs out, with the seconds left just above it, so you never have to look up at the HUD. Timed specials also flash on and off for their last second, on your snake and on the HUD. The tuning panel has a **Classic** preset with the slower v0.7 feel for comparison.
 
+**Music.** Three original tracks in the Star Control II tracker style, written as note data in `src/client/songs.ts` and rendered by your browser when the game starts, so there is nothing to download and nothing licensed from anyone: *Cold Orbit* (the title and lobby loop, 96 bpm, A minor), *Neon Coil* (the match loop, 150 bpm, E minor) and a two-second sting for the end of a round. The music ducks under the death beat and the banners, <kbd>M</kbd> mutes it with the effects, and the tuning panel's **Audio** folder has its own volume and an off switch.
+
 Maps rotate between rounds: the five hand-made, symmetrical ones (Open, Pillars, Cross, Bunkers and Lanes) plus three **random** slots per bag, each a fresh layout generated from the match seed when it comes up, built from the same vocabulary (pillars, walls with gaps, lanes and bunkers), point-symmetric so neither player is favoured, and checked so the spawns connect through nearly all of the floor. Round 1 is always Open. The tuning panel's **Maps** folder picks hand-made only, random only or both, and sets how many blocks a random map gets.
 
 ## Online (preview)
@@ -97,6 +99,6 @@ pnpm soak --bots hard,normal --rounds 40   # pit two AI levels (or `simple`, the
 ```
 
 - `src/sim` is the rules engine. It's deterministic, pure TypeScript with no browser APIs: fixed 60 Hz ticks, seeded random numbers, its own trig functions, and plain-data state. Online play runs it on both machines and hashes it to referee.
-- `src/client` is the PixiJS renderer with bloom, plus HTML overlays, ZzFX-generated sounds and a lil-gui tuning panel.
+- `src/client` is the PixiJS renderer with bloom, plus HTML overlays, ZzFX-generated sounds, a tiny tracker (`tracker.ts`) that plays the music in `songs.ts`, and a lil-gui tuning panel.
 
 Design: `docs/superpowers/specs/2026-09-23-snakeboom-v1-design.md` (local) and `docs/superpowers/specs/2026-09-24-snakeboom-online-design.md` (online) · Plans: `docs/superpowers/plans/`
