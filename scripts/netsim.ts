@@ -30,6 +30,10 @@ const link: FakeLinkOptions = {
   holdEveryMs: num('hold-every', profile.holdEvery),
 };
 const seconds = num('seconds', 300)!;
+/** `--skip 1:10`: side 1 skips every 10th frame (a client losing sim time), to push the other side to the window edge. */
+const skip = (args.get('skip') ?? '').split(':').map(Number);
+const skipSide = skip.length === 2 && Number.isFinite(skip[0]) ? skip[0] : -1;
+const skipEvery = skip.length === 2 && skip[1] > 0 ? skip[1] : 0;
 const players = Math.min(8, Math.max(2, num('players', 2)!));
 const inputDelay = num('delay', inputDelayFor(rtt, rtt))!;
 const maxRollback = num('window', undefined);
@@ -46,7 +50,10 @@ const lastRollbacks = new Array<number>(players).fill(0);
 const t0 = performance.now();
 for (let f = 0; f < frames; f++) {
   sessions.forEach((s: NetSession, side) => {
-    s.advance(botInput(bots[side], s.state, side, cfg));
+    if (side === skipSide && skipEvery > 0 && f % skipEvery === 0) return;
+    // Humans press Select and hold Fire in bursts; the bots don't, so sprinkle both in.
+    const input = botInput(bots[side], s.state, side, cfg);
+    s.advance({ ...input, select: f % (37 + side) === 0, use: input.use || f % (53 + side) === 0 });
     if (s.stats.rollbacks !== lastRollbacks[side]) {
       depths.push(s.stats.rollbackTicks);
       lastRollbacks[side] = s.stats.rollbacks;

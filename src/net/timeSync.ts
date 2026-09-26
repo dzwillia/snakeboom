@@ -1,15 +1,15 @@
 /**
  * Keeping two rollback peers on the same tick. Each side estimates how far ahead of the other
- * it runs and nudges its own speed by at most 1%: gentle enough to be invisible, and both sides
- * share the work, so a 10-tick gap closes in about 8 seconds.
+ * it runs and nudges its own speed by at most 2%: gentle enough to be invisible, and both sides
+ * share the work, so a 10-tick gap closes in about 4 seconds.
  */
 
 /** Ticks of lead (or lag, negative) inside which no correction is made. */
 export const DEADBAND_TICKS = 1;
 /** Speed change per tick of lead beyond the deadband. */
-export const SLOPE_PER_TICK = 0.005;
-/** The most either side ever speeds up or slows down. */
-export const MAX_ADJUST = 0.01;
+export const SLOPE_PER_TICK = 0.01;
+/** The most either side ever speeds up or slows down: 2% is still invisible, and both sides share it. */
+export const MAX_ADJUST = 0.02;
 /** Smoothing of the lead estimate per sample (an exponential moving average). */
 export const LEAD_SMOOTHING = 0.1;
 

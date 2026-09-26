@@ -17,6 +17,7 @@
     "soak": "tsx scripts/soak.ts",
     "bench:rollback": "tsx scripts/bench-rollback.ts",
     "netsim": "tsx scripts/netsim.ts",
+    "replay": "tsx scripts/replay.ts",
     "duel": "tsx scripts/duel.ts"
   },
   "dependencies": {

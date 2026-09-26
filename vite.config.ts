@@ -10,5 +10,7 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     environment: 'node',
+    // Simulation-heavy tests take a few seconds; a loaded runner (CI or a busy laptop) needs the headroom.
+    testTimeout: 30000,
   },
 });

@@ -13,6 +13,9 @@ import {
   type Difficulty,
   type MatchState,
   NO_INPUT,
+  hashState,
+  botInput,
+  createBot,
   type OpponentState,
 } from '../sim';
 import { Sound } from './audio';
@@ -44,6 +47,7 @@ declare global {
     __snakeboom?: {
       readonly state: MatchState | null;
       readonly online: OnlineMatch | null;
+      probe: (seed: number, ticks: number, players?: number) => string[];
       readonly music: { current: string | null; wanted: string | null; ready: boolean; rendered: string[] };
     };
   }
@@ -384,6 +388,20 @@ async function boot(): Promise<void> {
     },
     get online() {
       return online;
+    },
+    /**
+     * Determinism probe for cross-browser checks: a scripted match (simple bots) from `seed`,
+     * hashed every 300 ticks. Two engines that disagree here would desync online.
+     */
+    probe(seed: number, ticks: number, players = 2) {
+      const s = createMatch(DEFAULT_CONFIG, seed, players);
+      const bots = Array.from({ length: players }, (_, i) => createBot(seed + 1 + i));
+      const hashes: string[] = [];
+      for (let t = 1; t <= ticks; t++) {
+        step(s, bots.map((b, i) => botInput(b, s, i, DEFAULT_CONFIG)), DEFAULT_CONFIG);
+        if (t % 300 === 0) hashes.push(hashState(s).toString(16));
+      }
+      return hashes;
     },
     get music() {
       return { current: music.current, wanted: music.wanted, ready: music.ready, rendered: music.rendered };

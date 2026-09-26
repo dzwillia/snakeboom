@@ -206,7 +206,10 @@ describe('Room refereeing', () => {
     expect(host.last(0, 'desync')).toEqual({ type: 'desync', tick: 120 });
     expect(host.last(1, 'desync')).toEqual({ type: 'desync', tick: 120 });
     expect(room.status).toBe('lobby');
-    expect(host.logs.find((l) => l.event === 'desync')).toMatchObject({ tick: 120, hashes: [333, 222] });
+    const report = host.logs.find((l) => l.event === 'desync') as Record<string, unknown>;
+    expect(report).toMatchObject({ tick: 120, lastAgreed: 60, hashes: [333, 222], seats: [0, 1] });
+    expect(report.match).toMatchObject({ players: 2, seats: [0, 1], winsToWin: 5 });
+    expect(typeof report.log).toBe('string');
   });
 
   it('logs each round once both seats report it, with both sides’ net stats', () => {
