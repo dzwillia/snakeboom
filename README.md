@@ -61,6 +61,8 @@ Five hand-made, symmetrical maps rotate between rounds: Open, Pillars, Cross, Bu
 
 Since v0.8.0 two people can play from different computers. On the title screen pick **CREATE LINK**, type a name, and send the link (`/r/ABC123`) to a friend. They open it, both press Space in the lobby, and the match runs on both machines with rollback netcode: every tick each client sends its own input to a small relay and predicts the opponent's until the real one arrives. The HUD shows the ping between you next to the clock.
 
+- **Room names:** instead of the random code you can give the room a name (3–24 lowercase letters, digits and dashes; a few words like `new` and `admin` are reserved), so the link reads `snakeboom.com/r/dave` and a friend can just type it. Rooms are ephemeral, so nobody owns a name: whoever creates `dave` first has it until everyone leaves, and the game says so if it's taken.
+
 - **Quick match** pairs you with whoever else is waiting. While you wait you get an invite link too, and after ten seconds an offer to play the Hard AI instead (<kbd>A</kbd>).
 - **Rematch:** after a match, <kbd>Space</kbd> asks for another and <kbd>Esc</kbd> goes back to the lobby. A line under the banner shows who's in.
 - **Refresh to rejoin:** if your tab drops or you reload, the other player sees a 15 s countdown and the game waits. Come back in time and your browser rebuilds the match from the relay's input log in a moment; miss it and they win by forfeit.

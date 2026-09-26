@@ -66,6 +66,86 @@ describe('Screens title', () => {
   });
 });
 
+/** A root whose one input and problem line remember what the form does to them. */
+function formRoot() {
+  type FakeEvent = { key: string; preventDefault(): void; stopPropagation(): void };
+  const listeners: Record<string, ((e: FakeEvent) => void) | undefined> = {};
+  const classes = new Set<string>();
+  const input = {
+    value: '',
+    focused: false,
+    classList: { toggle: (name: string, on: boolean) => (on ? classes.add(name) : classes.delete(name)) },
+    addEventListener: (type: string, fn: (e: FakeEvent) => void) => (listeners[type] = fn),
+    focus: () => (input.focused = true),
+    select: () => {},
+  };
+  const problem = { textContent: '' };
+  const root = {
+    innerHTML: '',
+    querySelector: (sel: string) => (sel === '.room-name-input' ? input : sel === '.form .problem' ? problem : null),
+  } as unknown as HTMLElement;
+  const stopped: string[] = [];
+  const press = (key: string) => listeners.keydown?.({ key, preventDefault: () => {}, stopPropagation: () => stopped.push(key) });
+  const type = (value: string) => {
+    input.value = value;
+    listeners.input?.({ key: '', preventDefault: () => {}, stopPropagation: () => {} });
+  };
+  return { root, input, problem, classes, press, type, stopped };
+}
+
+describe('Screens room name box', () => {
+  it('submits a normalised name on Enter, or an empty string for a random code', () => {
+    const f = formRoot();
+    const submitted: (string | null)[] = [];
+    new Screens(f.root).roomNameBox('', null, (name) => submitted.push(name));
+    expect(f.root.innerHTML).toContain('ROOM NAME');
+    expect(f.root.innerHTML).toContain('(OPTIONAL)');
+    expect(f.root.innerHTML).toContain('3 TO 24 LETTERS, DIGITS AND DASHES');
+    expect(f.input.focused).toBe(true);
+    f.press('Enter');
+    expect(submitted).toEqual(['']);
+    f.type(' Dave-Night ');
+    expect(f.problem.textContent).toBe('');
+    f.press('Enter');
+    expect(submitted).toEqual(['', 'dave-night']);
+  });
+
+  it('shows the rule inline and keeps a bad name from being submitted', () => {
+    const f = formRoot();
+    const submitted: (string | null)[] = [];
+    new Screens(f.root).roomNameBox('', null, (name) => submitted.push(name));
+    f.type('ab');
+    expect(f.problem.textContent).toBe('A ROOM NAME IS 3 TO 24 CHARACTERS.');
+    expect(f.classes.has('invalid')).toBe(true);
+    f.press('Enter');
+    expect(submitted).toEqual([]);
+    f.type('dave z');
+    expect(f.problem.textContent).toBe('LETTERS, DIGITS AND DASHES ONLY.');
+    f.type('admin');
+    expect(f.problem.textContent).toBe('"ADMIN" IS RESERVED.');
+    f.type('dave');
+    expect(f.problem.textContent).toBe('');
+    expect(f.classes.has('invalid')).toBe(false);
+    f.type('');
+    expect(f.problem.textContent).toBe('');
+  });
+
+  it('starts with the relay’s reason and the last name, and Escape cancels', () => {
+    const f = formRoot();
+    const submitted: (string | null)[] = [];
+    new Screens(f.root).roomNameBox('dave', '"dave" is taken right now. Try another name.', (name) => submitted.push(name));
+    expect(f.root.innerHTML).toContain('value="dave"');
+    expect(f.problem.textContent).toBe('"DAVE" IS TAKEN RIGHT NOW. TRY ANOTHER NAME.');
+    expect(f.classes.has('invalid')).toBe(true);
+    f.press('Escape');
+    expect(submitted).toEqual([null]);
+    // Enter and Escape stay in the form; other keys reach nobody either, since the input has focus.
+    expect(f.stopped).toEqual(['Escape']);
+    f.press('ArrowDown');
+    expect(f.stopped).toEqual(['Escape']);
+  });
+});
+
 describe('Screens lobby', () => {
   it('shows the code, the link, both seats and the ping', () => {
     const root = fakeRoot();

@@ -36,3 +36,45 @@ export function roomCode(rng: () => number): string {
   }
   return out;
 }
+
+/*
+ * Room names: a host may pick one instead of a random code. Names are lowercase and codes are
+ * uppercase, so the two never collide in the relay's one namespace of live rooms.
+ */
+export const ROOM_NAME_MIN = 3;
+export const ROOM_NAME_MAX = 24;
+/** Words kept free for routes and for the game's own vocabulary. */
+export const RESERVED_ROOM_NAMES: ReadonlySet<string> = new Set([
+  'new',
+  'quick',
+  'admin',
+  'api',
+  'health',
+  'ws',
+  'join',
+  'create',
+  'room',
+  'snakeboom',
+]);
+
+/** Lowercased and trimmed; the form a name is stored and looked up in. */
+export function normalizeRoomName(raw: unknown): string {
+  return typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+}
+
+/** Why a (normalised) name can't be used, or null when it can. The same words the relay sends back. */
+export function roomNameProblem(name: string): string | null {
+  if (name.length < ROOM_NAME_MIN || name.length > ROOM_NAME_MAX) return `A room name is ${ROOM_NAME_MIN} to ${ROOM_NAME_MAX} characters.`;
+  if (!/^[a-z0-9-]+$/.test(name)) return 'Letters, digits and dashes only.';
+  if (RESERVED_ROOM_NAMES.has(name)) return `"${name}" is reserved.`;
+  return null;
+}
+
+export function isRoomName(s: unknown): s is string {
+  return typeof s === 'string' && roomNameProblem(s) === null;
+}
+
+/** Anything a live room can be filed under: a random code or a chosen name. */
+export function isRoomKey(s: unknown): s is string {
+  return isRoomCode(s) || isRoomName(s);
+}

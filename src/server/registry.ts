@@ -30,10 +30,14 @@ export class Registry {
     return n;
   }
 
-  /** A new room, or null when the server is full. */
-  create(winsToWin: number): RoomEntry | null {
+  /**
+   * A new room, or null when the server is full. With `name` the room is filed under that name
+   * instead of a random code; the caller checks first that the name is valid and free.
+   */
+  create(winsToWin: number, name?: string): RoomEntry | null {
     if (this.rooms.size >= this.maxRooms) return null;
-    let code = roomCode(Math.random);
+    if (name !== undefined && this.rooms.has(name)) throw new Error(`room ${name} already exists`);
+    let code = name ?? roomCode(Math.random);
     while (this.rooms.has(code)) code = roomCode(Math.random);
     const host = new WsHost(code, this.log, this.lagMs);
     const room = new Room(host, { code, winsToWin });

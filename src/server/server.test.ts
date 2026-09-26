@@ -187,6 +187,140 @@ describe('relay server', () => {
     for (const x of [a, b, c]) x.close();
   });
 
+  it('creates a room under a chosen name, normalised, and lets a friend join by it', async () => {
+    const a = new TestClient(server.port);
+    const b = new TestClient(server.port);
+    await Promise.all([a.opened, b.opened]);
+    a.send(hello('A'));
+    a.send({ type: 'create', winsToWin: 3, name: '  Dave-Night ' });
+    const wa = await a.expect('welcome');
+    expect(wa).toMatchObject({ player: 0, room: 'dave-night' });
+    expect(logs.some((e) => e.room === 'dave-night' && e.event === 'created')).toBe(true);
+    b.send(hello('B'));
+    b.send({ type: 'join', room: 'dave-night' });
+    expect(await b.expect('welcome')).toMatchObject({ player: 1, room: 'dave-night' });
+    const health = await fetch(`http://127.0.0.1:${server.port}/health`).then((r) => r.json());
+    expect(health.rooms).toBeGreaterThanOrEqual(1);
+    a.close();
+    b.close();
+    await b.waitClosed();
+  });
+
+  it('refuses a room name that is taken, reserved or malformed, keeping the socket open', async () => {
+    const a = new TestClient(server.port);
+    await a.opened;
+    a.send(hello('A'));
+    a.send({ type: 'create', winsToWin: 5, name: 'friday' });
+    await a.expect('welcome');
+
+    const b = new TestClient(server.port);
+    await b.opened;
+    b.send(hello('B'));
+    b.send({ type: 'create', winsToWin: 5, name: 'FRIDAY' });
+    const taken = await b.expect('error');
+    expect(taken).toMatchObject({ code: 'roomName' });
+    expect(taken.message).toMatch(/"friday" is taken/);
+    expect(b.closed).toBe(false);
+    // Still not in a room: the next create works, and a random code is what it gets.
+    b.send({ type: 'create', winsToWin: 5, name: 'admin' });
+    expect((await b.expect('error')).message).toMatch(/reserved/);
+    b.send({ type: 'create', winsToWin: 5, name: 'no spaces' });
+    expect((await b.expect('error')).message).toMatch(/letters, digits and dashes/i);
+    b.send({ type: 'create', winsToWin: 5, name: 'ab' });
+    expect((await b.expect('error')).message).toMatch(/3 to 24/);
+    b.send({ type: 'create', winsToWin: 5 });
+    expect((await b.expect('welcome')).room).toMatch(/^[A-Z2-9]{6}$/);
+    a.close();
+    b.close();
+    await b.waitClosed();
+  });
+
+  it('gives a name back as soon as everyone has left its room', async () => {
+    const a = new TestClient(server.port);
+    await a.opened;
+    a.send(hello('A'));
+    a.send({ type: 'create', winsToWin: 5, name: 'reuse-me' });
+    await a.expect('welcome');
+    a.send({ type: 'leave' });
+    await a.waitClosed();
+    // The empty room lingers (its link still works), but it no longer holds the name.
+    expect(server.registry.get('reuse-me')?.room.abandoned).toBe(true);
+    const b = new TestClient(server.port);
+    await b.opened;
+    b.send(hello('B'));
+    b.send({ type: 'create', winsToWin: 5, name: 'reuse-me' });
+    expect((await b.expect('welcome')).room).toBe('reuse-me');
+    expect(server.registry.get('reuse-me')?.room.playerCount).toBe(1);
+    b.close();
+  });
+
+  it('keeps a name while a match is waiting for its players to come back', async () => {
+    const a = new TestClient(server.port);
+    const b = new TestClient(server.port);
+    await Promise.all([a.opened, b.opened]);
+    a.send(hello('A'));
+    a.send({ type: 'create', winsToWin: 1, name: 'mid-match' });
+    await a.expect('welcome');
+    b.send(hello('B'));
+    b.send({ type: 'join', room: 'mid-match' });
+    await b.expect('welcome');
+    a.send({ type: 'ready', ready: true });
+    b.send({ type: 'ready', ready: true });
+    await a.expect('start');
+    // Both tabs drop: nobody is connected, but either can rejoin for 15 s, so the name is still in use.
+    a.close();
+    b.close();
+    await Promise.all([a.waitClosed(), b.waitClosed()]);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(server.registry.get('mid-match')?.room.playerCount).toBe(0);
+    expect(server.registry.get('mid-match')?.room.abandoned).toBe(false);
+    const c = new TestClient(server.port);
+    await c.opened;
+    c.send(hello('C'));
+    c.send({ type: 'create', winsToWin: 5, name: 'mid-match' });
+    expect((await c.expect('error')).message).toMatch(/is taken/);
+    c.close();
+    server.registry.get('mid-match')?.room.close('idle');
+  });
+
+  it('keeps names and codes apart: "ABC234" as a name is the room abc234, not the code', async () => {
+    const a = new TestClient(server.port);
+    await a.opened;
+    a.send(hello('A'));
+    a.send({ type: 'create', winsToWin: 5, name: 'ABC234' });
+    expect((await a.expect('welcome')).room).toBe('abc234');
+    const b = new TestClient(server.port);
+    await b.opened;
+    b.send(hello('B'));
+    b.send({ type: 'join', room: 'ABC234' });
+    expect((await b.expect('closed')).reason).toBe('unknownRoom');
+    const c = new TestClient(server.port);
+    await c.opened;
+    c.send(hello('C'));
+    c.send({ type: 'join', room: 'abc234' });
+    expect((await c.expect('welcome')).room).toBe('abc234');
+    for (const x of [a, b, c]) x.close();
+  });
+
+  it('finds a random-code room by its lowercase code, but a name exactly', async () => {
+    const a = new TestClient(server.port);
+    await a.opened;
+    a.send(hello('A'));
+    a.send({ type: 'create', winsToWin: 5 });
+    const code = (await a.expect('welcome')).room;
+    const b = new TestClient(server.port);
+    await b.opened;
+    b.send(hello('B'));
+    b.send({ type: 'join', room: code.toLowerCase() });
+    expect((await b.expect('welcome')).room).toBe(code);
+    const c = new TestClient(server.port);
+    await c.opened;
+    c.send(hello('C'));
+    c.send({ type: 'join', room: 'DAVE' });
+    expect((await c.expect('closed')).reason).toBe('unknownRoom');
+    for (const x of [a, b, c]) x.close();
+  });
+
   it('lets a hidden tab rejoin with its session token', async () => {
     const a = new TestClient(server.port);
     const b = new TestClient(server.port);
@@ -299,13 +433,14 @@ describe('relay limits', () => {
   });
 
   // Review Focus 5: the limits sit above anything a real player does.
-  it('refuses a sixth room from one address within a minute, keeping the socket open', async () => {
+  it('refuses a sixth room from one address within a minute, named or not, keeping the socket open', async () => {
     const clients: TestClient[] = [];
     for (let i = 0; i < 6; i++) {
       const c = new TestClient(server.port);
       await c.opened;
       c.send(hello(`P${i}`));
-      c.send({ type: 'create', winsToWin: 5 });
+      // Named rooms count too, so a list of names can't be squatted.
+      c.send(i % 2 === 0 ? { type: 'create', winsToWin: 5 } : { type: 'create', winsToWin: 5, name: `squat-${i}` });
       clients.push(c);
     }
     for (let i = 0; i < 5; i++) await clients[i].expect('welcome');

@@ -126,6 +126,14 @@ export class Room {
     return this.seats.filter((s) => s?.connected).length;
   }
 
+  /**
+   * Nobody is connected and no match is waiting for a rejoin. Such a room lingers a while so its
+   * link keeps working, but nothing in it is worth keeping.
+   */
+  get abandoned(): boolean {
+    return this.playerCount === 0 && this.statusNow !== 'playing';
+  }
+
   /** Frames relayed so far in the current match (M6 sends these to a rejoining client). */
   get log(): readonly Uint8Array[] {
     return this.inputLog;

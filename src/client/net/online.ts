@@ -14,10 +14,12 @@ import type { Fx } from '../render/fx';
 import type { Screens } from '../screens';
 import { HeadSmoothing } from '../smoothing';
 import { RelayClock } from './clock';
+import { inviteLink } from './link';
 import { RelayConnection } from './transport';
 
 export type OnlineMode =
-  | { kind: 'create'; winsToWin: number }
+  /** `name`: the room name the host chose, or undefined for a random code. */
+  | { kind: 'create'; winsToWin: number; name?: string }
   | { kind: 'join'; room: string }
   | { kind: 'quick'; winsToWin: number }
   /** A refreshed tab coming back to its room with its session token. */
@@ -62,6 +64,8 @@ export interface OnlineDeps {
   onAi: (winsToWin: number) => void;
   /** Called with the names to use on banners whenever they change. */
   onNames: (names: string[]) => void;
+  /** The relay refused the chosen room name (taken, most likely); `message` says why. The match is over. */
+  onRoomNameRefused: (name: string, message: string) => void;
   /** The loop's time scale, for time sync. */
   setTimeScale: (scale: number) => void;
   /** A connection opened early (a rejoin hello already sent), so the countdown stops before the renderer is up. */
@@ -140,7 +144,7 @@ export class OnlineMatch {
       this.conn.send(rejoinHello(name, mode.session));
     } else {
       this.conn.send({ type: 'hello', protocol: PROTOCOL, version: __APP_VERSION__, name });
-      if (mode.kind === 'create') this.conn.send({ type: 'create', winsToWin: mode.winsToWin });
+      if (mode.kind === 'create') this.conn.send({ type: 'create', winsToWin: mode.winsToWin, ...(mode.name ? { name: mode.name } : {}) });
       else if (mode.kind === 'join') this.conn.send({ type: 'join', room: mode.room });
       else this.conn.send({ type: 'queue', winsToWin: mode.winsToWin });
     }
@@ -370,7 +374,7 @@ export class OnlineMatch {
       case 'welcome':
         this.me = m.player;
         this.room = m.room;
-        this.link = `${location.origin}/r/${m.room}`;
+        this.link = inviteLink(location.origin, m.room);
         storeSession({ room: m.room, session: m.session });
         if (location.pathname !== `/r/${m.room}`) history.replaceState(null, '', `/r/${m.room}`);
         if (this.phase === 'connecting' && this.mode.kind === 'quick') {
@@ -436,6 +440,14 @@ export class OnlineMatch {
       case 'error':
         if (m.code === 'version') this.end('error', 'PLEASE REFRESH', 'THIS TAB IS RUNNING AN OLD VERSION', 'var(--text)');
         else if (m.code === 'busy') this.end('error', 'SERVER FULL', 'TRY AGAIN IN A MINUTE', 'var(--text)');
+        else if (m.code === 'roomName' && this.mode.kind === 'create') {
+          // Back to the form with the relay's reason, so the host can pick another name.
+          const name = this.mode.name ?? '';
+          this.phase = 'error';
+          storeSession(null);
+          this.dispose();
+          this.deps.onRoomNameRefused(name, m.message);
+        }
         else this.end('error', 'SOMETHING WENT WRONG', m.message.toUpperCase(), 'var(--text)');
         return;
     }

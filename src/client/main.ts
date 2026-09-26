@@ -14,13 +14,13 @@ import {
   type MatchState,
   type OpponentState,
 } from '../sim';
-import { isRoomCode } from '../net/names';
 import { Sound } from './audio';
 import { EventSink } from './events';
 import { Hud } from './hud';
 import { KeyboardInput } from './input';
 import { FixedLoop } from './loop';
 import { nextRow, type MenuRow } from './menu';
+import { roomFromPath } from './net/link';
 import { OnlineMatch, rejoinHello, storedSession, type OnlineMode } from './net/online';
 import { RelayConnection } from './net/transport';
 import { relayUrl } from './net/transport';
@@ -60,9 +60,9 @@ async function boot(): Promise<void> {
   const settings = loadSettings(storage, settingsDefaults(prefersCalm));
 
   // A refreshed tab says hello before the renderer starts, so the relay's 15 s countdown stops at once.
-  const joinCode = location.pathname.match(/^\/r\/([A-Z2-9]{6})\/?$/)?.[1];
+  const joinCode = roomFromPath(location.pathname);
   const stored = storedSession();
-  const rejoin = joinCode && isRoomCode(joinCode) && stored?.room === joinCode ? { room: joinCode, session: stored.session } : null;
+  const rejoin = joinCode && stored?.room === joinCode ? { room: joinCode, session: stored.session } : null;
   const early = rejoin ? new RelayConnection(relayUrl(relayBase())) : null;
   early?.send(rejoinHello(settings.name, rejoin!.session));
 
@@ -200,15 +200,36 @@ async function boot(): Promise<void> {
         startLocal('hard');
       },
       onNames: (n) => (names = n),
+      onRoomNameRefused: (name, message) => {
+        // Back to the form with the relay's reason (the name is taken, most likely).
+        leaveOnline();
+        lastRoomName = name;
+        askRoomName(mode.kind === 'create' ? mode.winsToWin : cfg.winsToWin, message);
+      },
       setTimeScale: (scale) => (loop.timeScale = scale),
     });
   };
 
+  /** The last room name the host typed, so the form remembers it for this visit. */
+  let lastRoomName = '';
+  /** CREATE LINK: an optional room name (empty means a random code), then the room. */
+  const askRoomName = (winsToWin: number, problem: string | null = null) => {
+    screens.roomNameBox(lastRoomName, problem, (name) => {
+      if (name === null) {
+        showTitle();
+        return;
+      }
+      lastRoomName = name;
+      startOnline(name ? { kind: 'create', winsToWin, name } : { kind: 'create', winsToWin });
+    });
+  };
+
   let askedName = false;
-  /** Asks for a name the first time, then goes online. */
+  /** Asks for a name the first time, then goes online (creating a room asks for its name first). */
   const beginOnline = (mode: OnlineMode) => {
+    const go = () => (mode.kind === 'create' ? askRoomName(mode.winsToWin) : startOnline(mode));
     if (settings.name || askedName) {
-      startOnline(mode);
+      go();
       return;
     }
     screens.nameBox(settings.name, (name) => {
@@ -220,7 +241,7 @@ async function boot(): Promise<void> {
       }
       settings.name = name.trim().slice(0, 12);
       persist();
-      startOnline(mode);
+      go();
     });
   };
 
@@ -329,7 +350,7 @@ async function boot(): Promise<void> {
   };
 
   if (rejoin && early) startOnline({ kind: 'rejoin', ...rejoin }, early);
-  else if (joinCode && isRoomCode(joinCode)) beginOnline({ kind: 'join', room: joinCode });
+  else if (joinCode) beginOnline({ kind: 'join', room: joinCode });
   else showTitle();
   loop.start();
 }
