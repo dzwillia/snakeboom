@@ -6,13 +6,13 @@ import { createItem } from './items';
 import { createSnake } from './snake';
 import { createMatch, rebuildGrid } from './state';
 import { step } from './step';
-import { slotsFor } from './storage';
+import { dropIndex, slotsFor } from './storage';
 import { createTrail, trailLength, trailPush } from './trail';
 import { NO_INPUT, type MatchState, type PickupState, type PlayerInput, type SimEvent, type SnakeState } from './types';
 
 const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000, hearts: 1, borderCloseSeconds: 0, sawInterval: 0, wormholeInterval: 0 };
-const straight: PlayerInput = { turn: 0, boost: false, use: false };
-const boosting: PlayerInput = { turn: 0, boost: true, use: false };
+const straight: PlayerInput = { turn: 0, boost: false, use: false, select: false };
+const boosting: PlayerInput = { turn: 0, boost: true, use: false, select: false };
 
 /** A snake with exactly `units` of straight body behind its head. */
 function withBody(units: number, c: Config = cfg): SnakeState {
@@ -77,18 +77,21 @@ describe('slotsFor', () => {
 });
 
 describe('a cut drops the weapons that no longer fit', () => {
-  it('drops exactly the overflow, oldest first, as pickups along the dropped segment', () => {
+  it('drops exactly the overflow, furthest from the selected item first, as pickups along the dropped segment', () => {
     const s = crossing();
     const pink = s.snakes[1];
-    // About 600 units laid: four slots, all full.
+    // About 600 units laid: four slots, all full; the Dozer is selected.
     expect(slotsFor(pink, cfg)).toBe(4);
     pink.items = [createItem('missile', cfg), createItem('ghost', cfg), createItem('dozer', cfg), createItem('flame', cfg)];
+    pink.selected = 2;
     const events = run(s, 30, [straight, straight]);
     const cut = events.find((e) => e.type === 'cut') as { x: number; segment: number[] } | undefined;
     expect(cut).toBeDefined();
-    // Roughly 300 units are left: two slots, so the two oldest fall off and the newest two stay.
+    // Roughly 300 units are left: two slots. The Missile (two away) goes first, then the Ghost; the
+    // selected Dozer and its neighbour stay, and the selection follows the Dozer to index 0.
     expect(slotsFor(pink, cfg)).toBe(2);
     expect(pink.items.map((i) => i.kind)).toEqual(['dozer', 'flame']);
+    expect(pink.selected).toBe(0);
     const dropped = drops(events);
     expect(dropped.map((d) => d.kind)).toEqual(['missile', 'ghost']);
     // On the segment that fell off (y = 500, between the old tail and the cut), and not on top of each other.
@@ -103,6 +106,23 @@ describe('a cut drops the weapons that no longer fit', () => {
     expect(onField.map((p) => [p.id, p.kind, p.x, p.y])).toEqual(dropped.map((d) => [d.id, d.kind, d.x, d.y]));
     for (const p of onField) expect(p.ttl).toBeGreaterThan(cfg.pickupLifetime * TICK_RATE - 40);
     expect(checkInvariants(s, cfg)).toEqual([]);
+  });
+
+  it('picks what to lose by distance from the selection, older first on a tie', () => {
+    const s = crossing();
+    const pink = s.snakes[1];
+    pink.items = [createItem('missile', cfg), createItem('ghost', cfg), createItem('dozer', cfg), createItem('flame', cfg)];
+    pink.selected = 0;
+    expect(dropIndex(pink)).toBe(3);
+    pink.selected = 3;
+    expect(dropIndex(pink)).toBe(0);
+    pink.selected = 1;
+    expect(dropIndex(pink)).toBe(3); // two away beats one away
+    pink.selected = 2;
+    expect(dropIndex(pink)).toBe(0); // missile and flame are both two away; the older one goes
+    pink.items = [createItem('missile', cfg)];
+    pink.selected = 0;
+    expect(dropIndex(pink)).toBe(0); // the selected item itself is all there is
   });
 
   it('drops nothing when everything still fits', () => {
@@ -161,13 +181,13 @@ describe('a cut drops the weapons that no longer fit', () => {
     const cyan = s.snakes[0];
     Object.assign(cyan, { x: dropped[0].x, y: dropped[0].y - 20, prevX: dropped[0].x, prevY: dropped[0].y - 20, heading: Math.PI / 2 });
     const later = run(s, 3, [straight, straight], c);
-    expect(later.find((e) => e.type === 'pickupCollected')).toMatchObject({ id: dropped[0].id, kind: 'missile', player: 0 });
-    expect(cyan.items.map((i) => i.kind)).toEqual(['missile']);
+    expect(later.find((e) => e.type === 'pickupCollected')).toMatchObject({ id: dropped[0].id, kind: dropped[0].kind, player: 0 });
+    expect(cyan.items.map((i) => i.kind)).toEqual([dropped[0].kind]);
   });
 });
 
 describe('boost sheds storage', () => {
-  it('drops the oldest item at the tail when the burn crosses a slot boundary', () => {
+  it('drops the item furthest from the selection at the tail when the burn crosses a slot boundary', () => {
     const c: Config = { ...cfg, growthPerSecond: 0 };
     const s = createMatch(c, 5);
     s.phase = 'playing';
@@ -181,11 +201,13 @@ describe('boost sheds storage', () => {
     pink.targetLength = trailLength(pink.trail);
     Object.assign(s.snakes[0], { x: 1600, y: 1500, prevX: 1600, prevY: 1500, heading: 0 });
     pink.items = [createItem('missile', c), createItem('ghost', c), createItem('dozer', c), createItem('flame', c)];
+    pink.selected = 3; // the Flame is what PINK means to fire, so the Missile end of the queue goes first
     expect(slotsFor(pink, c)).toBe(4);
     const events = run(s, 20, [straight, boosting], c);
     const dropped = drops(events);
     expect(dropped.map((d) => d.kind)).toEqual(['missile']);
     expect(pink.items.map((i) => i.kind)).toEqual(['ghost', 'dozer', 'flame']);
+    expect(pink.selected).toBe(2);
     expect(slotsFor(pink, c)).toBe(3);
     // At the tail: the boost had pulled it a few dozen units east of the old end by then, and it has moved on since.
     expect(dropped[0].y).toBeCloseTo(500, 3);

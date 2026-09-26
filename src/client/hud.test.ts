@@ -34,10 +34,10 @@ describe('Hud net readout', () => {
 
 describe('Hud item slots', () => {
   // Length is storage (M14): open slots show as empty cells, the rest of the cap as locked ones.
-  it('draws the open slots, the locked ones and the queue with the next item first', () => {
-    const snake = { shield: false, items: [{ kind: 'missile', charges: 2 }] } as unknown as Parameters<typeof slotsHtml>[0];
+  it('draws the open slots, the locked ones and the queue with the selected item highlighted', () => {
+    const snake = { shield: false, selected: 0, items: [{ kind: 'missile', charges: 2 }] } as unknown as Parameters<typeof slotsHtml>[0];
     const html = slotsHtml(snake, 2, 6);
-    expect(html).toContain('class="slot full next" data-kind="missile"');
+    expect(html).toContain('class="slot full selected" data-kind="missile"');
     expect((html.match(/class="slot">—/g) ?? []).length).toBe(1);
     expect((html.match(/class="slot locked"/g) ?? []).length).toBe(4);
     expect(html).not.toContain('SHIELD');

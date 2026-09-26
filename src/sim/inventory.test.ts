@@ -21,6 +21,8 @@ function playing(): MatchState {
   const s = createMatch(cfg, 2);
   s.phase = 'playing';
   layBody(s.snakes[0], 3 * cfg.slotLength);
+  // Keep the body that long through steps: the target is what trailTrim keeps.
+  s.snakes[0].targetLength = 3 * cfg.slotLength + 20;
   return s;
 }
 

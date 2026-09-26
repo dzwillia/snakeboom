@@ -1,6 +1,7 @@
 import { circleHitsTiles, circleHitsWall } from './arena';
 import { TICK_RATE, type Config } from './config';
 import { trailLength } from './trail';
+import { clampSelection } from './items';
 import type { MatchState, SimEvent, SnakeState } from './types';
 
 /** How many tail points the boost shed may walk forward from the tail to find a clear spot. */
@@ -51,9 +52,24 @@ function placeAlong(state: MatchState, cfg: Config, path: number[], ideal: numbe
   return fallback;
 }
 
+/** The item to lose next: the one furthest from the selection (what Fire would use), older ones first on a tie. */
+export function dropIndex(s: SnakeState): number {
+  let best = 0;
+  let bestDist = -1;
+  for (let i = 0; i < s.items.length; i++) {
+    if (i === s.selected) continue;
+    const d = Math.abs(i - s.selected);
+    if (d > bestDist) {
+      bestDist = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
 /**
- * Removes the items `player` can no longer carry, oldest first, and drops each one as a pickup of
- * its kind somewhere along `path` (flat x,y pairs, tail end first): spread evenly along it when
+ * Removes the items `player` can no longer carry, furthest from the selected item first (so what
+ * you are about to fire survives a cut), and drops each one as a pickup of its kind somewhere along `path` (flat x,y pairs, tail end first): spread evenly along it when
  * `spread` is set, else as near its start as possible. Anyone can take them and they expire as
  * usual. An item with nowhere to land (the whole path is in the dead zone or under blocks) is lost.
  * Returns how many items came off.
@@ -66,7 +82,10 @@ export function shedOverflow(state: MatchState, player: number, path: number[], 
   const taken: number[] = [];
   const ttl = Math.max(1, Math.round(cfg.pickupLifetime * TICK_RATE));
   for (let k = 0; k < excess; k++) {
-    const item = s.items.shift()!;
+    const at = dropIndex(s);
+    const item = s.items.splice(at, 1)[0];
+    if (at < s.selected) s.selected--;
+    clampSelection(s);
     if (points === 0) continue;
     const ideal = spread ? Math.round(((k + 1) / (excess + 1)) * (points - 1)) : 0;
     const spot = placeAlong(state, cfg, path, ideal, taken);
@@ -80,8 +99,8 @@ export function shedOverflow(state: MatchState, player: number, path: number[], 
 }
 
 /**
- * Boost burns the tail, and the tail is storage: once the body is short enough that the oldest
- * item no longer fits, it falls off at the tail. One length check per boosting snake per tick.
+ * Boost burns the tail, and the tail is storage: once the body is short enough that one item
+ * no longer fits, the one furthest from the selection falls off at the tail. One length check per boosting snake per tick.
  */
 export function shedAtTail(state: MatchState, player: number, cfg: Config, events: SimEvent[]): number {
   const s = state.snakes[player];
