@@ -537,6 +537,15 @@ describe('relay house rules', () => {
     expect(await (await call('GET', TOKEN)).json()).toMatchObject({ overrides: {} });
   });
 
+  it('serves the rules to anyone at /rules, read-only', async () => {
+    await call('PUT', TOKEN, { overrides: { hearts: 2 } });
+    const res = await fetch(`http://127.0.0.1:${server.port}/rules`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ overrides: { hearts: 2 } });
+    expect((await fetch(`http://127.0.0.1:${server.port}/rules`, { method: 'PUT', body: '{}' })).status).toBe(404);
+    await call('DELETE', TOKEN);
+  });
+
   it('rejects a body that is not JSON', async () => {
     const res = await fetch(`http://127.0.0.1:${server.port}/admin/config`, { method: 'PUT', headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }, body: '{nope' });
     expect(res.status).toBe(400);

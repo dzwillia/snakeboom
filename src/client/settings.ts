@@ -1,4 +1,5 @@
-import { DIFFICULTIES, type Difficulty } from '../sim';
+import { DEFAULT_CONFIG, DIFFICULTIES, type Config, type Difficulty } from '../sim';
+import { applyOverrides, type Overrides } from '../sim/configSchema';
 
 /** Who steers PINK: a second human on the keyboard, or the local AI at a difficulty. */
 export type OpponentMode = 'human' | Difficulty;
@@ -95,11 +96,31 @@ export function resetInPlace<T extends object>(target: T, defaults: T): void {
   }
 }
 
+/**
+ * Local play's config: the defaults, the relay's house rules on top (so local and online play
+ * feel the same), and this browser's saved tuning on top of that. `base` is what "defaults" mean
+ * here (house rules included): the panel resets to it and only differences from it are saved.
+ */
+export function localConfig(houseRules: Overrides, saved: unknown): { base: Config; cfg: Config } {
+  const base = applyOverrides(DEFAULT_CONFIG, houseRules);
+  return { base, cfg: mergeSaved(base, saved) };
+}
+
 /** Saved settings with any unknown opponent mode (from an older or edited save) put back to human. */
 export function loadSettings(storage: Pick<Storage, 'getItem'> | undefined, defaults: ClientSettings): ClientSettings {
   const settings = loadStored(storage, SETTINGS_KEY, defaults);
   if (!OPPONENT_MODES.includes(settings.opponent)) settings.opponent = 'human';
   return settings;
+}
+
+/** The raw saved value under `key`, or null when there is none or it can't be read. */
+export function readStored(storage: Pick<Storage, 'getItem'> | undefined, key: string): unknown {
+  try {
+    const raw = storage?.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function loadStored<T extends object>(

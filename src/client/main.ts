@@ -37,11 +37,11 @@ import { Screens } from './screens';
 import { easeView, fitView, type View } from './camera';
 import { deathBeatAt } from './deathBeat';
 import { Minimap } from './render/minimap';
-import { browserStorage, CONFIG_KEY, loadSettings, loadStored, saveStored, SETTINGS_KEY, settingsDefaults } from './settings';
+import { browserStorage, CONFIG_KEY, loadSettings, localConfig, readStored, saveStored, SETTINGS_KEY, settingsDefaults } from './settings';
 import { nextOpponent, nextPlayers, nextWins, PLAYER_NAMES } from './text';
 import { createTuningPanel } from './tuning';
 import { bootAdmin } from './admin';
-import { diffConfig, hasOverrides } from '../sim/configSchema';
+import { describeOverrides, diffConfig, hasOverrides, validateOverrides, type Overrides } from '../sim/configSchema';
 
 declare global {
   interface Window {
@@ -61,6 +61,18 @@ function element(id: string): HTMLElement {
   return el;
 }
 
+/** The relay's house rules, or none when it can't be reached quickly (local play then runs on the defaults). */
+async function fetchHouseRules(base: string): Promise<Overrides> {
+  try {
+    const res = await fetch(`${base.replace(/\/$/, '')}/rules`, { signal: AbortSignal.timeout(1500) });
+    if (!res.ok) return {};
+    const body = (await res.json()) as { overrides?: unknown };
+    return validateOverrides(body.overrides ?? {}).overrides;
+  } catch {
+    return {};
+  }
+}
+
 function relayBase(): string {
   const configured = import.meta.env.VITE_API_URL as string | undefined;
   return configured && configured.length > 0 ? configured : 'http://localhost:3001';
@@ -73,7 +85,9 @@ async function boot(): Promise<void> {
     bootAdmin(element('screens'), relayBase(), storage);
     return;
   }
-  const cfg = loadStored(storage, CONFIG_KEY, DEFAULT_CONFIG);
+  // House rules from the relay (best effort, 1.5 s): local play then feels like online play.
+  const houseRules = await fetchHouseRules(relayBase());
+  const { base, cfg } = localConfig(houseRules, readStored(storage, CONFIG_KEY));
   const prefersCalm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const settings = loadSettings(storage, settingsDefaults(prefersCalm));
 
@@ -111,9 +125,9 @@ async function boot(): Promise<void> {
   let tuningOpen = false;
   const now = () => performance.now() / 1000;
   const newSeed = () => Math.floor(Math.random() * 2 ** 31);
-  // Only what differs from the defaults is saved, so a slider you never touched follows the game's defaults as they change.
+  // Only what differs from the base (defaults plus house rules) is saved, so a slider you never touched follows them as they change.
   const persist = () => {
-    saveStored(storage, CONFIG_KEY, diffConfig(cfg));
+    saveStored(storage, CONFIG_KEY, diffConfig(cfg, base));
     saveStored(storage, SETTINGS_KEY, settings);
   };
   const activeCfg = () => (online ? online.cfg : cfg);
@@ -137,7 +151,8 @@ async function boot(): Promise<void> {
       hearts: cfg.hearts,
       opponent: settings.opponent,
       players: settings.players,
-      tuned: hasOverrides(diffConfig({ ...cfg, winsToWin: DEFAULT_CONFIG.winsToWin })),
+      tuned: hasOverrides(diffConfig({ ...cfg, winsToWin: base.winsToWin }, base)),
+      houseRules: describeOverrides(houseRules),
     });
   /**
    * Seats the bots for a new match (so a mid-match setting change waits for the next one): PINK
@@ -155,7 +170,7 @@ async function boot(): Promise<void> {
     hud.setLocal(0);
   };
 
-  const tuning = createTuningPanel(cfg, settings, {
+  const tuning = createTuningPanel(cfg, settings, base, {
     onChange: () => {
       applyBloom(world, settings);
       applyMusicSettings();
@@ -346,8 +361,16 @@ async function boot(): Promise<void> {
           state = null;
           fx.clear();
           showTitle();
+        } else if (paused) {
+          // ESC while paused leaves the match; SPACE resumes it.
+          paused = false;
+          state = null;
+          bots = new Map();
+          fx.clear();
+          sink.beat = null;
+          showTitle();
         } else {
-          setPaused(!paused);
+          setPaused(true);
         }
         return;
       case 'ArrowLeft':
@@ -376,6 +399,10 @@ async function boot(): Promise<void> {
         return;
       case 'Space':
         if (screens.showing === 'powers') return;
+        if (paused) {
+          setPaused(false);
+          return;
+        }
         if (!state) {
           if (menuRow === 'create') beginOnline({ kind: 'create', winsToWin: cfg.winsToWin, size: settings.players });
           else if (menuRow === 'quick') beginOnline({ kind: 'quick', winsToWin: cfg.winsToWin, size: settings.players });
