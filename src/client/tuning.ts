@@ -1,5 +1,5 @@
 import GUI from 'lil-gui';
-import { CLASSIC_CONFIG, DEFAULT_CONFIG, type Config, type PickupKind } from '../sim';
+import { CLASSIC_CONFIG, type Config, type PickupKind } from '../sim';
 import { CONFIG_FOLDERS } from '../sim/configSchema';
 import { DEFAULT_SETTINGS, OPPONENT_MODES, resetInPlace, type ClientSettings } from './settings';
 import { describeOpponent } from './text';
@@ -35,19 +35,19 @@ export function addConfigFolders(gui: GUI, cfg: Config): void {
 }
 
 /** Live sliders for every M1 tunable. The sim reads `cfg` each tick, so changes apply at once. */
-export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: { onChange(): void }): TuningPanel {
+export function createTuningPanel(cfg: Config, settings: ClientSettings, base: Config, hooks: { onChange(): void }): TuningPanel {
   const gui = new GUI({ title: 'SnakeBoom tuning  ( ` to hide )' });
 
   // Presets: the current defaults, or the v0.7.0 feel for a side-by-side.
   const presets = {
     preset: 'pace',
     apply() {
-      resetInPlace(cfg, presets.preset === 'classic' ? CLASSIC_CONFIG : DEFAULT_CONFIG);
+      resetInPlace(cfg, presets.preset === 'classic' ? CLASSIC_CONFIG : base);
       refresh();
       hooks.onChange();
     },
   };
-  gui.add(presets, 'preset', { 'Pace (default)': 'pace', 'Classic (v0.7)': 'classic' }).name('preset').onChange(() => presets.apply());
+  gui.add(presets, 'preset', { 'Pace (default + house rules)': 'pace', 'Classic (v0.7)': 'classic' }).name('preset').onChange(() => presets.apply());
 
   const opponent = gui.addFolder('Opponent');
   opponent
@@ -78,7 +78,7 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   }
   const actions = {
     reset: () => {
-      resetInPlace(cfg, DEFAULT_CONFIG);
+      resetInPlace(cfg, base);
       resetInPlace(settings, DEFAULT_SETTINGS);
       refresh();
       hooks.onChange();

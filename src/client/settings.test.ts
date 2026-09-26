@@ -8,6 +8,7 @@ import {
   resetInPlace,
   saveStored,
   settingsDefaults,
+  localConfig,
 } from './settings';
 
 describe('mergeSaved', () => {
@@ -53,6 +54,21 @@ describe('loadSettings', () => {
     expect(loadSettings(saved('impossible'), DEFAULT_SETTINGS).opponent).toBe('human');
     expect(loadSettings(saved(3), DEFAULT_SETTINGS).opponent).toBe('human');
     expect(loadSettings(undefined, DEFAULT_SETTINGS).opponent).toBe('human');
+  });
+});
+
+describe('localConfig', () => {
+  it('layers the house rules under this browser\'s saved tuning, and calls that the base', () => {
+    const { base, cfg } = localConfig({ hearts: 3, baseSpeed: 320 }, { baseSpeed: 200, turnRate: 7 });
+    expect(base.hearts).toBe(3);
+    expect(base.baseSpeed).toBe(320);
+    expect(cfg.hearts).toBe(3); // a house rule you never touched locally
+    expect(cfg.baseSpeed).toBe(200); // your own tuning wins where you set it
+    expect(cfg.turnRate).toBe(7);
+    expect(DEFAULT_CONFIG.hearts).toBe(1);
+    const plain = localConfig({}, null);
+    expect(plain.cfg).toEqual(DEFAULT_CONFIG);
+    expect(plain.base).toEqual(DEFAULT_CONFIG);
   });
 });
 

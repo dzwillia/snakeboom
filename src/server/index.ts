@@ -98,6 +98,9 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     if (!ok) log({ event: 'adminRefused', ip });
     return ok;
   };
+  // The game reads the rules at startup so local play matches online play; no token needed.
+  app.use('/rules', cors({ origin: (origin) => (originAllowed(origin || undefined, opts.allowedOrigin) ? origin : ''), allowMethods: ['GET', 'OPTIONS'] }));
+  app.get('/rules', (c) => c.json({ overrides: houseRules.get(), updatedAt: houseRules.updated }));
   app.get('/admin/config', (c) => {
     if (!adminToken) return c.notFound();
     const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
