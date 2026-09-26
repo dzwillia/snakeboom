@@ -1,0 +1,13 @@
+# One release at its own subdomain, rendered by infra/render.sh from infra/caddy.d/snakeboom-release.caddy.tmpl
+# (the slug is the tag with dots as dashes) and installed by the deploy as conf.d/snakeboom-<slug>.caddy.
+# Both names resolve through the wildcard record *.snakeboom.com; Caddy gets their certificates on first load.
+${SLUG}.snakeboom.com {
+	encode gzip zstd
+	reverse_proxy snakeboom-web-${SLUG}:3000
+}
+
+api.${SLUG}.snakeboom.com {
+	reverse_proxy snakeboom-api-${SLUG}:3001 {
+		header_up X-Real-IP {remote_host}
+	}
+}
