@@ -18,8 +18,9 @@ function drive(state: MatchState, bots: BotState[], ticks: number): void {
  * Updated 2026-09-25 when Turbo and Slow were removed (M9 Task 1) and again for the closing border and the pace defaults (M9 Tasks 2 and 3), and for the hunt rules (M10).
  * Updated 2026-09-26 for item selection (#28): SnakeState.selected joined the hashed state.
  * Unchanged by length-as-storage (M14): tick 4000 falls in a countdown with no pickups out, and the simple bots fire what they grab at once.
+ * Updated 2026-09-26 for collecting by loop and the wider pickup clearance (M15); re-pinned after the rebase.
  */
-const GOLDEN_HASH = 0x49910671;
+const GOLDEN_HASH = 0xf5770070;
 
 describe('determinism', () => {
   it('produces the golden hash for a fixed seed and input script', () => {

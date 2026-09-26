@@ -207,7 +207,10 @@ export type SimEvent =
   | { type: 'matchOver'; winner: number }
   /** `dropped` is set when it fell off a snake instead of spawning. */
   | { type: 'pickupSpawned'; id: number; kind: PickupKind; x: number; y: number; dropped?: boolean }
-  | { type: 'pickupCollected'; id: number; kind: PickupKind; player: number }
+  /** `player` took the pickup that was at (x, y). */
+  | { type: 'pickupCollected'; id: number; kind: PickupKind; player: number; x: number; y: number }
+  /** `player` closed `loop` (flat and thinned) around the pickups `ids`, which the pickupCollected events that follow name one by one. */
+  | { type: 'loopCollected'; player: number; loop: number[]; ids: number[] }
   | { type: 'pickupExpired'; id: number }
   | { type: 'missileFired'; id: number; player: number; x: number; y: number; heading: number }
   | { type: 'missileHit'; id: number; player: number; x: number; y: number }

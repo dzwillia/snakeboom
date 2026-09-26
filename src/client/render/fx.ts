@@ -47,7 +47,7 @@ export class Fx {
   private particles: Particle[] = [];
   private rings: Ring[] = [];
   private flashes: Flash[] = [];
-  private loops: { points: number[]; color: number; life: number; maxLife: number }[] = [];
+  private loops: { points: number[]; color: number; life: number; maxLife: number; strength: number }[] = [];
   private shake = 0;
   private screenFlash = 0;
   private chainFlash = 0;
@@ -88,10 +88,13 @@ export class Fx {
     this.addShake(4);
   }
 
-  /** A loop that just caught someone: the polygon flares in the looper's colour and fades. */
-  loopSnap(points: number[], color: number, _victim: number): void {
-    this.loops.push({ points, color, life: 0.7, maxLife: 0.7 });
-    this.addShake(8);
+  /**
+   * A loop that just closed around something: the polygon flares in the looper's colour and fades.
+   * Full strength for a kill; less (thinner, dimmer, a smaller jolt) for a loop that took a pickup.
+   */
+  loopSnap(points: number[], color: number, strength = 1): void {
+    this.loops.push({ points, color, life: 0.7, maxLife: 0.7, strength });
+    this.addShake(8 * strength);
   }
 
   /** A missile finding its mark: a flash, two rings and a fan of sparks in the victim's colour. */
@@ -229,8 +232,8 @@ export class Fx {
         g.moveTo(pts[0], pts[1]);
         for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]);
         g.closePath();
-        g.stroke({ width: 6 + 10 * (1 - k), color: l.color, alpha: 0.9 * (1 - k), join: 'round' });
-        g.fill({ color: l.color, alpha: 0.18 * (1 - k) });
+        g.stroke({ width: (6 + 10 * (1 - k)) * l.strength, color: l.color, alpha: 0.9 * (1 - k) * l.strength, join: 'round' });
+        g.fill({ color: l.color, alpha: 0.18 * (1 - k) * l.strength });
       }
     }
 

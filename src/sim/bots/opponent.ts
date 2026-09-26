@@ -2,8 +2,12 @@ import { circleHitsTiles, circleHitsWall } from '../arena';
 import { insetAt } from '../border';
 import { forEachSolidPointNear } from '../collision';
 import { ARENA_HEIGHT, ARENA_WIDTH, DT, TICK_RATE, TILE_COLS, TILE_ROWS, TILE_SIZE, type Config, type PickupKind } from '../config';
-import { detAtan2, detCos, detSin, wrapAngle } from '../detmath';
+import { detAtan2, detCos, detSin, TWO_PI, wrapAngle } from '../detmath';
+import { spansJump } from '../encircle';
+import { pointInPolygon } from '../geometry';
+import { canCarry } from '../pickups';
 import { createRng, rngInt, rngNext, type RngState } from '../rng';
+import { growthRate } from '../snake';
 import { slotsFor } from '../storage';
 import { headCum } from '../trail';
 import { NO_INPUT, type MatchState, type PlayerInput, type SnakeState } from '../types';
@@ -15,9 +19,10 @@ import { NO_INPUT, type MatchState, type PlayerInput, type SnakeState } from '..
  * A/B combinations, rolls each one forward through walls, blocks, bodies, its own future path, the
  * opponent's predicted path and pending blasts, and scores it by how long it stays clear, how much
  * open floor it ends in, how much of that floor it can reach before the opponent can (territory,
- * the classic Tron heuristic: walling the opponent off scores, being walled off costs) and how far
- * it gets toward a goal: a pickup, or a point ahead of the opponent's head. Difficulty tunes how far
- * it looks, how often it re-plans, how greedy and aggressive it is, and how often it slips up.
+ * the classic Tron heuristic: walling the opponent off scores, being walled off costs), how far
+ * it gets toward a goal (a pickup, or a point ahead of the opponent's head), and whether the path
+ * closes a loop around a pickup (which is how pickups are taken). Difficulty tunes how far it
+ * looks, how often it re-plans, how greedy and aggressive it is, and how often it slips up.
  *
  * Pure and deterministic: same seed, same state, same inputs.
  */
@@ -47,7 +52,8 @@ export interface OpponentProfile {
 
 export const PROFILES: Record<Difficulty, OpponentProfile> = {
   easy: {
-    lookSteps: 16,
+    // 22 steps (1.1 s) is the least that fits a whole turning circle, which is how a pickup is taken.
+    lookSteps: 22,
     decideEvery: 12,
     panicSteps: 0,
     aggression: 0,
@@ -130,6 +136,8 @@ const SPACE_W = 250;
 const TERRITORY_W = 200;
 const CUT_W = 150;
 const GOAL_W = 50;
+/** A pickup's approach pulls harder than an intercept: taking one needs a precise line, not a general drift. */
+const PICKUP_W = 150;
 const STICK_W = 4;
 /**
  * A cut: crossing the opponent's predicted line between CUT_MIN and CUT_MAX steps before they
@@ -145,6 +153,19 @@ const BORDER_BAND = 320;
 const INTERCEPT_RANGE = 700;
 /** Ticks before the Bulldozer runs out during which blocks count as solid again. */
 const DOZER_MARGIN = 20;
+/**
+ * Loop plans: a full-rate turn held until the path closes a loop (a hold of UNTIL_LOOP), then
+ * straight. Any plan that closes a loop around pickups the bot can carry scores LOOP_W per pickup
+ * (times greed) plus up to LOOP_SOON_W for closing it early: more than the space or territory
+ * difference between two open lines, less than dying.
+ */
+const UNTIL_LOOP = -1;
+const LOOP_W = 600;
+const LOOP_SOON_W = 150;
+/** Lead-in holds tried before a loop plan's turn, besides starting the turn at once. */
+const LOOP_LEADS = [2, HOLD_STEPS];
+/** Body length to spare beyond a loop's perimeter, so the tail hasn't left the crossing point. */
+const LOOP_BODY_MARGIN = 10;
 
 interface Rollout {
   /** Turns in order; each is held for the matching entry of `holds`, the last to the horizon. */
@@ -159,6 +180,9 @@ interface Rollout {
   py: number[];
   /** True when the path crosses the opponent's predicted line just before they get there. */
   cut: boolean;
+  /** Pickups the first loop this path closes would take (0 when it closes none), and the step it closes at. */
+  captures: number;
+  captureStep: number;
 }
 
 interface Plan extends Rollout {
@@ -170,6 +194,16 @@ interface Goal {
   y: number;
   /** 0..1 pull strength. */
   weight: number;
+  /** True when the goal is the approach to a pickup, so loop plans are worth trying. */
+  pickup?: boolean;
+}
+
+/** A pickup on the field the bot has room for. */
+interface Wanted {
+  x: number;
+  y: number;
+  ttl: number;
+  shield: boolean;
 }
 
 /** Everything a decision needs, computed once per tick. */
@@ -193,6 +227,12 @@ interface Ctx {
   saws: { x: number; y: number; vx: number; vy: number; ttl: number }[];
   /** Ticks the opponent's flamethrower keeps burning; its cone follows the opponent's predicted path. */
   oppFlameTicks: number;
+  /** Pickups the bot could carry, and how many item slots are free. */
+  wanted: Wanted[];
+  freeSlots: number;
+  /** Body growth in units per second, and the steps a full-rate turning circle takes. */
+  growth: number;
+  circleSteps: number;
   opp: SnakeState | null;
   /** The opponent's predicted head position at each step, holding course. */
   oppX: number[];
@@ -312,6 +352,10 @@ function buildCtx(state: MatchState, idx: number, cfg: Config, look: number): Ct
     missiles: state.missiles.filter((m) => m.owner !== idx).map((m) => ({ x: m.x, y: m.y, heading: m.heading, ttl: m.ttl })),
     saws: state.saws.map((s) => ({ x: s.x, y: s.y, vx: s.vx, vy: s.vy, ttl: s.ttl })),
     oppFlameTicks: opp ? opp.effects.flame : 0,
+    wanted: state.pickups.filter((p) => canCarry(me, p.kind, cfg)).map((p) => ({ x: p.x, y: p.y, ttl: p.ttl, shield: p.kind === 'shield' })),
+    freeSlots: Math.max(0, cfg.itemSlots - me.items.length),
+    growth: growthRate(cfg, state.overtime),
+    circleSteps: Math.ceil(TWO_PI / Math.max(1e-6, cfg.turnRate * DT * STEP_TICKS)),
     opp,
     oppX,
     oppY,
@@ -319,9 +363,18 @@ function buildCtx(state: MatchState, idx: number, cfg: Config, look: number): Ct
   };
 }
 
+/** The step at which segment `seg` of a plan ends, given the previous one ended at `prevEnd`. */
+function holdEnd(holds: readonly number[], seg: number, prevEnd: number, loopMax: number): number {
+  if (seg >= holds.length) return Infinity;
+  return prevEnd + (holds[seg] === UNTIL_LOOP ? loopMax : holds[seg]);
+}
+
 /**
- * Rolls a plan forward: each turn held for its `holds` entry, the last to the horizon. Returns how
- * many steps stayed clear (up to `limit`) and where the path ended.
+ * Rolls a plan forward: each turn held for its `holds` entry (UNTIL_LOOP: until the path closes a
+ * loop, or a circle and a bit), the last to the horizon. Returns how many steps stayed clear (up
+ * to `limit`), where the path ended, and what the first loop it closes would take. Loops are
+ * found as the sim finds them: the head within 2r of its own trail (the real one or the path
+ * just planned) beyond the loopIgnore neck, latched so skimming the trail doesn't close one every step.
  */
 function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], speed: number, limit: number): Rollout {
   const { state, idx, me, cfg, r } = ctx;
@@ -336,6 +389,14 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
   let y = me.y;
   let h = me.heading;
   let cut = false;
+  const trail = me.trail;
+  const headCum0 = headCum(trail);
+  const touch = 2 * r;
+  const touch2 = touch * touch;
+  let touching = me.crossing;
+  let captures = 0;
+  let captureStep = 0;
+  const loopMax = ctx.circleSteps + 6;
   // Missiles chase the path being planned: pure pursuit at their real speed and turn rate.
   const mx = ctx.missiles.map((m) => m.x);
   const my = ctx.missiles.map((m) => m.y);
@@ -347,12 +408,12 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
   const sawReach = cfg.sawRadius + r + 8;
   const sawReach2 = sawReach * sawReach;
   let seg = 0;
-  let segEnd = holds.length > 0 ? holds[0] : Infinity;
+  let segEnd = holdEnd(holds, 0, 0, loopMax);
   const probe = { blocked: false };
   for (let k = 1; k <= limit; k++) {
     if (k > segEnd) {
       seg++;
-      segEnd = seg < holds.length ? segEnd + holds[seg] : Infinity;
+      segEnd = holdEnd(holds, seg, segEnd, loopMax);
     }
     // Midpoint rule: the sim turns a little and moves a little each tick, so a step's travel is
     // along the average heading, not the heading at its end.
@@ -361,7 +422,7 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
     y += detSin(h + dh / 2) * stepDist;
     h += dh;
     const tick = k * STEP_TICKS;
-    const fail = () => ({ turns, holds, steps: k - 1, x: px[k - 1], y: py[k - 1], pathLen: (k - 1) * stepDist, px, py, cut });
+    const fail = () => ({ turns, holds, steps: k - 1, x: px[k - 1], y: py[k - 1], pathLen: (k - 1) * stepDist, px, py, cut, captures, captureStep });
 
     // Walls are exact, and a deflection leaves the head only half a pixel clear of one.
     if (circleHitsWall(x, y, r + 1, insetAt(state, cfg, tick))) return fail();
@@ -385,16 +446,52 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
         if (dist2(sx, sy, x, y) < sawReach2) return fail();
       }
     }
+    // One pass over the bodies nearby: the opponent's points block (hunt rules: own body is safe),
+    // unless protected or the scissors are out; own points older than the neck mean the trail is touched.
+    const bodiesHurt = tick > ctx.protectedTicks && tick > ctx.scissorTicks;
+    const newestAllowed = headCum0 + k * stepDist - cfg.loopIgnore;
+    probe.blocked = false;
+    let oldest = -1;
+    forEachSolidPointNear(state, x, y, bodyReach, (snake, index) => {
+      if (snake !== idx) {
+        if (bodiesHurt) probe.blocked = true;
+        return;
+      }
+      if (trail.cum[index] >= newestAllowed) return;
+      const ddx = trail.xs[index] - x;
+      const ddy = trail.ys[index] - y;
+      if (ddx * ddx + ddy * ddy < touch2) oldest = oldest < 0 ? index : Math.min(oldest, index);
+    });
+    if (probe.blocked) return fail();
+    // The path just planned is trail too by the time the head gets back to it.
+    let hit = -1;
+    if (oldest < 0) {
+      for (let j = 1; j < k && (k - j) * stepDist > cfg.loopIgnore; j++) {
+        if (dist2(px[j], py[j], x, y) < touch2) {
+          hit = j;
+          break;
+        }
+      }
+    }
+    const now = oldest >= 0 || hit >= 0;
+    if (now && !touching) {
+      if (holds[seg] === UNTIL_LOOP) segEnd = k;
+      if (captures === 0 && ctx.wanted.length > 0 && (oldest < 0 || !spansJump(trail.solid, oldest))) {
+        // The crossing point must still be body when the head gets back to it.
+        const perimeter = oldest >= 0 ? headCum0 + k * stepDist - trail.cum[oldest] : (k - hit) * stepDist;
+        if (perimeter <= me.targetLength + ctx.growth * tick * DT - LOOP_BODY_MARGIN) {
+          const poly: number[] = [];
+          if (oldest >= 0) for (let i = oldest; i < trail.xs.length; i++) poly.push(trail.xs[i], trail.ys[i]);
+          for (let j = oldest >= 0 ? 1 : hit; j < k; j++) poly.push(px[j], py[j]);
+          poly.push(x, y);
+          captures = countCaptures(ctx, poly, tick);
+          if (captures > 0) captureStep = k;
+        }
+      }
+    }
+    touching = now;
     if (tick > ctx.protectedTicks) {
       if (tick > ctx.dozerTicks && circleHitsTiles(state.tiles, x, y, r + 2)) return fail();
-      // Own body is safe (hunt rules): only the opponent's points block, and not while the scissors are out.
-      if (tick > ctx.scissorTicks) {
-        probe.blocked = false;
-        forEachSolidPointNear(state, x, y, bodyReach, (snake) => {
-          if (snake !== idx) probe.blocked = true;
-        });
-        if (probe.blocked) return fail();
-      }
       // The opponent's head, and the trail it will have laid by the time we get there.
       const upto = Math.min(k + 2, ctx.oppX.length - 1);
       for (let j = 0; j <= upto; j++) if (dist2(ctx.oppX[j], ctx.oppY[j], x, y) < headReach2) return fail();
@@ -419,7 +516,49 @@ function rollout(ctx: Ctx, turns: readonly Turn[], holds: readonly number[], spe
     px.push(x);
     py.push(y);
   }
-  return { turns, holds, steps: limit, x, y, pathLen: limit * stepDist, px, py, cut };
+  return { turns, holds, steps: limit, x, y, pathLen: limit * stepDist, px, py, cut, captures, captureStep };
+}
+
+/** How many wanted pickups a loop `poly` closing at `tick` would take: as many items as there are free slots, plus a Shield. */
+function countCaptures(ctx: Ctx, poly: readonly number[], tick: number): number {
+  let items = 0;
+  let shield = 0;
+  for (const pk of ctx.wanted) {
+    if (pk.ttl <= tick || !pointInPolygon(pk.x, pk.y, poly)) continue;
+    if (pk.shield) shield = 1;
+    else items++;
+  }
+  return Math.min(items, ctx.freeSlots) + shield;
+}
+
+/**
+ * Where to head to draw a loop around a pickup: the point where the tangent from the head meets
+ * the circle of one turning radius around it, on whichever side needs the smaller heading change.
+ * Arriving there along the tangent and holding a full-rate turn draws that circle, with the pickup
+ * in the middle. Within 1.2 radii the pickup itself is the goal: the loop is under way, and the
+ * rollouts decide the rest.
+ */
+function approachPoint(me: SnakeState, pk: { x: number; y: number }, radius: number): { x: number; y: number } {
+  const dx = pk.x - me.x;
+  const dy = pk.y - me.y;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d <= radius * 1.2) return { x: pk.x, y: pk.y };
+  const beta = detAtan2(dy, dx);
+  const along = Math.sqrt(d * d - radius * radius);
+  const alpha = detAtan2(radius, along);
+  let best = { x: pk.x, y: pk.y };
+  let bestCost = Infinity;
+  for (const dir of TURNS) {
+    if (dir === 0) continue;
+    // Turning `dir` at the tangent point keeps the pickup on the inside when it sits `alpha` to that side.
+    const phi = beta - dir * alpha;
+    const cost = Math.abs(wrapAngle(phi - me.heading));
+    if (cost < bestCost) {
+      bestCost = cost;
+      best = { x: me.x + detCos(phi) * along, y: me.y + detSin(phi) * along };
+    }
+  }
+  return best;
 }
 
 function pickGoal(ctx: Ctx, p: OpponentProfile): Goal | null {
@@ -429,19 +568,23 @@ function pickGoal(ctx: Ctx, p: OpponentProfile): Goal | null {
   const ahead = insetAt(ctx.state, cfg, ctx.look * STEP_TICKS);
   const closing = ahead > ctx.state.inset;
   if (closing && edgeMargin(me.x, me.y) - ahead < BORDER_BAND) return { x: ARENA_WIDTH / 2, y: ARENA_HEIGHT / 2, weight: 1 };
-  if (p.greed > 0 && me.items.length < slotsFor(me, cfg)) {
-    let target: { x: number; y: number } | null = null;
+  if (p.greed > 0 && ctx.wanted.length > 0) {
+    const radius = cfg.baseSpeed / Math.max(1e-6, cfg.turnRate);
+    const circumference = TWO_PI * radius;
+    let target: Wanted | null = null;
     let best = SEEK_RANGE * SEEK_RANGE;
-    for (const pk of ctx.state.pickups) {
-      // Skip pickups about to vanish before we could plausibly get there, or that the border will take.
+    for (const pk of ctx.wanted) {
+      // Skip pickups that will vanish before we could plausibly get there and loop them, that the
+      // border will take, or that the body won't be long enough to loop by the time we arrive.
       const d = dist2(pk.x, pk.y, me.x, me.y);
-      if (closing && edgeMargin(pk.x, pk.y) < ahead + BORDER_BAND / 2) continue;
-      if (d < best && pk.ttl * cfg.baseSpeed * DT > Math.sqrt(d) * 0.8) {
-        best = d;
-        target = pk;
-      }
+      if (d >= best || (closing && edgeMargin(pk.x, pk.y) < ahead + BORDER_BAND / 2)) continue;
+      const dist = Math.sqrt(d);
+      if (pk.ttl * cfg.baseSpeed * DT <= dist * 0.8 + circumference) continue;
+      if (me.targetLength + (ctx.growth * dist) / cfg.baseSpeed < circumference + cfg.loopIgnore + LOOP_BODY_MARGIN) continue;
+      best = d;
+      target = pk;
     }
-    if (target) return { x: target.x, y: target.y, weight: p.greed };
+    if (target) return { ...approachPoint(me, target, radius), weight: p.greed, pickup: true };
   }
   if (p.aggression > 0 && opp) {
     const d = Math.sqrt(dist2(opp.x, opp.y, me.x, me.y));
@@ -469,12 +612,18 @@ function edgeMargin(x: number, y: number): number {
   return Math.min(x, y, ARENA_WIDTH - x, ARENA_HEIGHT - y);
 }
 
-/** Scores the basic plan set, and the escape set too when nothing basic stays clear to the horizon. */
+/**
+ * Scores the basic plan set, the escape set too when nothing basic stays clear to the horizon,
+ * and, with a pickup in mind, the loop plans: a turn either way (at once, or after a short lead)
+ * held until the loop closes, then straight, so the end of the plan is judged on where the head
+ * goes after the loop rather than the middle of a circle. Loop plans that close no useful loop are dropped.
+ */
 function planAll(ctx: Ctx, bot: OpponentState, goal: Goal | null, speed: number): Plan[] {
   const plans: Plan[] = [];
   const before = goal ? Math.sqrt(dist2(goal.x, goal.y, ctx.me.x, ctx.me.y)) : 0;
-  const consider = (turns: readonly Turn[], holds: readonly number[]) => {
+  const consider = (turns: readonly Turn[], holds: readonly number[], loopOnly = false) => {
     const r = rollout(ctx, turns, holds, speed, ctx.look);
+    if (loopOnly && r.captures === 0) return r.steps;
     let score = r.steps * STEP_W;
     if (r.steps === ctx.look) {
       // Attacking rewards are scaled by the room left to do it in: a cut that ends in a pocket is bait.
@@ -482,9 +631,25 @@ function planAll(ctx: Ctx, bot: OpponentState, goal: Goal | null, speed: number)
       const attack = bot.profile.aggression * (TERRITORY_W * territory + (r.cut ? CUT_W : 0));
       score += space * (SPACE_W + Math.max(0, attack)) + Math.min(0, attack);
     }
-    if (goal && r.pathLen > 0) {
+    if (goal?.pickup && before > 0) {
+      // A pickup's approach point is somewhere to pass through, soon: score the closest the path
+      // comes to it (1 = through it), less a little for how far along the path that is.
+      let nearest = before;
+      let at = 0;
+      for (let k = 1; k < r.px.length; k++) {
+        const d = Math.sqrt(dist2(goal.x, goal.y, r.px[k], r.py[k]));
+        if (d < nearest) {
+          nearest = d;
+          at = k;
+        }
+      }
+      score += PICKUP_W * goal.weight * ((before - nearest) / before - (0.3 * at) / ctx.look);
+    } else if (goal && r.pathLen > 0) {
       const after = Math.sqrt(dist2(goal.x, goal.y, r.x, r.y));
       score += GOAL_W * goal.weight * ((before - after) / r.pathLen);
+    }
+    if (r.captures > 0 && r.steps === ctx.look) {
+      score += bot.profile.greed * (LOOP_W * r.captures + LOOP_SOON_W * (1 - r.captureStep / ctx.look));
     }
     if (turns[0] === bot.turn) score += STICK_W;
     plans.push({ ...r, score });
@@ -495,6 +660,13 @@ function planAll(ctx: Ctx, bot: OpponentState, goal: Goal | null, speed: number)
   for (const t1 of TURNS) for (const t2 of TURNS) clearest = Math.max(clearest, consider([t1, t2], [HOLD_STEPS]));
   if (clearest < ctx.look) {
     for (const t1 of TURNS) for (const t2 of TURNS) for (const t3 of TURNS) consider([t1, t2, t3], ESCAPE_HOLDS);
+  }
+  if (goal?.pickup) {
+    for (const dir of TURNS) {
+      if (dir === 0) continue;
+      for (const after of TURNS) consider([dir, after], [UNTIL_LOOP], true);
+      for (const lead of TURNS) for (const hold of LOOP_LEADS) consider([lead, dir, 0], [hold, UNTIL_LOOP], true);
+    }
   }
   return plans;
 }
@@ -680,8 +852,8 @@ function buildOccupancy(state: MatchState, inset: number): Uint8Array {
 function wantBoost(ctx: Ctx, bot: OpponentState, best: Plan, goal: Goal | null): boolean {
   const { me, cfg } = ctx;
   const p = bot.profile;
-  // Boost burns body; keep enough to draw a loop with.
-  if (best.steps < ctx.look || me.targetLength < 200) return false;
+  // Boost burns body (keep enough to draw a loop with) and doubles the turning circle: never while looping.
+  if (best.steps < ctx.look || me.targetLength < 200 || best.captures > 0) return false;
 
   let reason = false;
   if (goal) {

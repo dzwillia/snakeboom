@@ -1,23 +1,23 @@
 import { forEachSolidPointNear } from './collision';
 import type { Config } from './config';
-import { decimatePolygon, pointInPolygon } from './geometry';
+import { decimatePolygon, LOOP_EVENT_POINTS, pointInPolygon } from './geometry';
+import { collectInLoop } from './pickups';
 import { headCum } from './trail';
 import type { DeathRecord, MatchState, SimEvent } from './types';
 
-const LOOP_POINTS_FOR_EVENT = 64;
-
-/**
- * Encirclement (hunt rules): when a head crosses its own trail, the loop it just closed is tested
- * once. Every other live, non-Ghost head inside it is hit with cause `encircled`. `crossing`
- * remembers that the head is touching its trail, so skimming along your own body doesn't close
- * a new loop every tick. Returns the hits for the caller to resolve with the collision hits.
- */
 /** A wormhole jump between `from` and the head: the "loop" would include a chord across the map. */
-function spansJump(solid: readonly boolean[], from: number): boolean {
+export function spansJump(solid: readonly boolean[], from: number): boolean {
   for (let k = from; k < solid.length; k++) if (!solid[k]) return true;
   return false;
 }
 
+/**
+ * Encirclement (hunt rules): when a head crosses its own trail, the loop it just closed is tested
+ * once. Every other live, non-Ghost head inside it is hit with cause `encircled`, and (with
+ * collectByLoop) every pickup inside it is taken. `crossing` remembers that the head is touching
+ * its trail, so skimming along your own body doesn't close a new loop every tick. Returns the hits
+ * for the caller to resolve with the collision hits.
+ */
 export function detectEncirclements(state: MatchState, cfg: Config, events: SimEvent[]): DeathRecord[] {
   const hits: DeathRecord[] = [];
   const touch = 2 * cfg.snakeRadius;
@@ -41,8 +41,9 @@ export function detectEncirclements(state: MatchState, cfg: Config, events: SimE
         if (!pointInPolygon(other.x, other.y, poly)) return;
         caught.add(j);
         hits.push({ player: j, cause: 'encircled', killer: i, x: other.x, y: other.y });
-        events.push({ type: 'encircled', player: j, by: i, loop: decimatePolygon(poly, LOOP_POINTS_FOR_EVENT) });
+        events.push({ type: 'encircled', player: j, by: i, loop: decimatePolygon(poly, LOOP_EVENT_POINTS) });
       });
+      if (cfg.collectByLoop) collectInLoop(state, cfg, i, poly, events);
     }
     me.crossing = touching;
   });

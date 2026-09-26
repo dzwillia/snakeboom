@@ -24,6 +24,9 @@ export function pointInPolygon(x: number, y: number, poly: readonly number[]): b
   return inside;
 }
 
+/** How many points a loop polygon is thinned to in events (encircled, loopCollected). */
+export const LOOP_EVENT_POINTS = 64;
+
 /** At most `max` points from a flat polygon, keeping the first and last, for effects. */
 export function decimatePolygon(poly: readonly number[], max: number): number[] {
   const n = poly.length >> 1;

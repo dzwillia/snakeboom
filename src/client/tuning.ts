@@ -92,6 +92,7 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
 
   const loops = gui.addFolder('Loops');
   loops.add(cfg, 'loopIgnore', 8, 80, 2).name('own neck ignored (units)');
+  loops.add(cfg, 'collectByLoop').name('loop a pickup to take it');
 
   const power = gui.addFolder('Power-ups');
   power.add(cfg, 'ghostDuration', 0.5, 10, 0.25).name('ghost (s)');

@@ -88,12 +88,13 @@ export class EventSink {
         case 'pickupSpawned':
           sound.play('pickupSpawn', 0.5);
           break;
-        case 'pickupCollected': {
-          const s = state.snakes[e.player];
-          fx.pickupBurst(s.x, s.y, PICKUP_COLORS[e.kind]);
+        case 'pickupCollected':
+          fx.pickupBurst(e.x, e.y, PICKUP_COLORS[e.kind]);
           sound.play('pickup');
           break;
-        }
+        case 'loopCollected':
+          fx.loopSnap(e.loop, PLAYER_COLORS[e.player], 0.5);
+          break;
         case 'missileFired':
           sound.play('missileFire');
           break;
@@ -106,7 +107,7 @@ export class EventSink {
           sound.play('snip');
           break;
         case 'encircled':
-          fx.loopSnap(e.loop, PLAYER_COLORS[e.by], e.player);
+          fx.loopSnap(e.loop, PLAYER_COLORS[e.by]);
           sound.play('snap');
           break;
         case 'missileFizzled':

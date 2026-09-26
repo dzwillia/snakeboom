@@ -68,7 +68,7 @@ describe('item queue', () => {
   it('turns a Shield pickup into a bubble that never takes a slot', () => {
     const s = playing();
     s.snakes[0].items = [createItem('missile', cfg), createItem('ghost', cfg), createItem('dozer', cfg)];
-    expect(grab(s, 'shield', 9)).toEqual([{ type: 'pickupCollected', id: 9, kind: 'shield', player: 0 }]);
+    expect(grab(s, 'shield', 9)).toEqual([{ type: 'pickupCollected', id: 9, kind: 'shield', player: 0, x: s.snakes[0].x, y: s.snakes[0].y }]);
     expect(s.snakes[0].shield).toBe(true);
     expect(s.snakes[0].items).toHaveLength(3);
   });

@@ -91,7 +91,8 @@ function stepPlaying(state: MatchState, inputs: readonly PlayerInput[], cfg: Con
   });
 
   enterWormholes(state, cfg, events);
-  collectPickups(state, cfg, events);
+  // Pickups are taken by looping them (in detectEncirclements below); the run-over rule is the tuning-panel alternative.
+  if (!cfg.collectByLoop) collectPickups(state, cfg, events);
   applyScissors(state, cfg, events);
   cutBySaws(state, cfg, events);
   const torched = applyFlames(state, cfg, events);

@@ -102,7 +102,7 @@ export function describePower(kind: PickupKind, cfg: Config): PowerInfo {
         stats: `one hit · ${secs(cfg.shieldGrace)} grace · ${share}`,
         detail:
           `A bubble that takes your next hit so you keep the heart, then a moment of grace to get clear. ` +
-          `It goes up the moment you collect it, stays until it takes a hit, never takes an item slot, and you can't carry two.`,
+          `It goes up the moment you loop it, stays until it takes a hit, never takes an item slot, and you can't carry two.`,
       };
     case 'scissors':
       return {
