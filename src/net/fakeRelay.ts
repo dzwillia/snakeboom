@@ -3,7 +3,7 @@ import { createRng, rngNext, type RngState } from '../sim/rng';
 import { NetSession, type SessionOptions } from './session';
 
 export interface FakeLinkOptions {
-  /** One-way latency between the two players (through the relay). */
+  /** One-way latency between any two players (through the relay). */
   latencyMs: number;
   jitterMs: number;
   seed: number;
@@ -20,21 +20,23 @@ const SPIKE_WINDOW_MS = 200;
 interface Packet {
   due: number;
   seq: number;
+  from: number;
   to: number;
   tick: number;
   input: PlayerInput;
 }
 
 /**
- * Connects two sessions through a virtual clock. Inputs arrive latency ± jitter later, so they
- * can overtake each other, and either side's traffic can be held to simulate a dropped connection.
+ * Connects N sessions through a virtual clock, like the relay does: every input a seat sends
+ * reaches each other seat latency ± jitter later, so packets can overtake each other, and any
+ * side's traffic can be held to simulate a dropped connection.
  */
 export class FakeLink {
   now = 0;
-  private sessions: [NetSession, NetSession] | null = null;
+  private sessions: NetSession[] | null = null;
   private queue: Packet[] = [];
-  private readonly held: [Packet[], Packet[]] = [[], []];
-  private readonly paused = [false, false];
+  private held: Packet[][] = [];
+  private paused: boolean[] = [];
   private readonly rng: RngState;
   private seq = 0;
   private nextSpikeAt = Number.POSITIVE_INFINITY;
@@ -67,16 +69,22 @@ export class FakeLink {
     }
   }
 
-  attach(sessions: [NetSession, NetSession]): void {
+  attach(sessions: NetSession[]): void {
     this.sessions = sessions;
+    this.held = sessions.map(() => []);
+    this.paused = sessions.map(() => false);
   }
 
-  /** Called by a session's `send`: side `from` sends its input for `tick`. */
+  /** Called by a session's `send`: seat `from` sends its input for `tick`, to every other seat. */
   enqueue(from: number, tick: number, input: PlayerInput): void {
-    const packet: Packet = { due: 0, seq: this.seq++, to: 1 - from, tick, input };
     this.sent.push({ from, tick, input });
-    if (this.paused[from]) this.held[from].push(packet);
-    else this.post(packet);
+    const count = this.sessions?.length ?? 2;
+    for (let to = 0; to < count; to++) {
+      if (to === from) continue;
+      const packet: Packet = { due: 0, seq: this.seq++, from, to, tick, input };
+      if (this.paused[from]) this.held[from].push(packet);
+      else this.post(packet);
+    }
   }
 
   /** Holds (or releases) all traffic from one side. Released packets get fresh delivery times. */
@@ -95,11 +103,11 @@ export class FakeLink {
     if (!this.sessions) throw new Error('attach sessions first');
     const due = this.queue.filter((p) => p.due <= this.now).sort((a, b) => a.due - b.due || a.seq - b.seq);
     this.queue = this.queue.filter((p) => p.due > this.now);
-    for (const p of due) this.sessions[p.to].receive(p.tick, p.input);
+    for (const p of due) this.sessions[p.to].receive(p.from, p.tick, p.input);
   }
 
   get pending(): number {
-    return this.queue.length + this.held[0].length + this.held[1].length;
+    return this.queue.length + this.held.reduce((n, h) => n + h.length, 0);
   }
 
   private post(packet: Packet): void {
@@ -112,13 +120,14 @@ export class FakeLink {
   }
 }
 
-/** Two sessions, one per seat, wired through a FakeLink. */
+/** One session per seat, wired through a FakeLink. */
 export function createLinkedSessions(
   linkOpts: FakeLinkOptions,
   sessionOpts: Omit<SessionOptions, 'local' | 'send' | 'onConfirmed'>,
   onConfirmed?: (side: number, tick: number, state: MatchState, events: readonly SimEvent[]) => void,
-): { link: FakeLink; sessions: [NetSession, NetSession] } {
+): { link: FakeLink; sessions: NetSession[] } {
   const link = new FakeLink(linkOpts);
+  const players = sessionOpts.players ?? 2;
   const make = (side: number) =>
     new NetSession({
       ...sessionOpts,
@@ -126,7 +135,7 @@ export function createLinkedSessions(
       send: (tick, input) => link.enqueue(side, tick, input),
       onConfirmed: onConfirmed && ((tick, state, events) => onConfirmed(side, tick, state, events)),
     });
-  const sessions: [NetSession, NetSession] = [make(0), make(1)];
+  const sessions = Array.from({ length: players }, (_, side) => make(side));
   link.attach(sessions);
   return { link, sessions };
 }

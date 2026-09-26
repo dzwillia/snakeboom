@@ -1,4 +1,4 @@
-import { botInput, createBot, DEFAULT_CONFIG, hashState, type BotState } from '../src/sim';
+import { botInput, createBot, DEFAULT_CONFIG, hashState } from '../src/sim';
 import { createLinkedSessions, type FakeLinkOptions } from '../src/net/fakeRelay';
 import { inputDelayFor } from '../src/net/room';
 import type { NetSession } from '../src/net/session';
@@ -30,18 +30,19 @@ const link: FakeLinkOptions = {
   holdEveryMs: num('hold-every', profile.holdEvery),
 };
 const seconds = num('seconds', 300)!;
+const players = Math.min(8, Math.max(2, num('players', 2)!));
 const inputDelay = num('delay', inputDelayFor(rtt, rtt))!;
 const maxRollback = num('window', undefined);
 const cfg = { ...DEFAULT_CONFIG, winsToWin: 50 };
 
-const hashes: [Map<number, number>, Map<number, number>] = [new Map(), new Map()];
-const { link: fake, sessions } = createLinkedSessions(link, { seed: 7, cfg, inputDelay, ...(maxRollback ? { maxRollback } : {}) }, (side, tick, state) => {
+const hashes: Map<number, number>[] = Array.from({ length: players }, () => new Map());
+const { link: fake, sessions } = createLinkedSessions(link, { seed: 7, cfg, players, inputDelay, ...(maxRollback ? { maxRollback } : {}) }, (side, tick, state) => {
   if (tick % 60 === 0) hashes[side].set(tick, hashState(state));
 });
-const bots: [BotState, BotState] = [createBot(3), createBot(4)];
+const bots = Array.from({ length: players }, (_, i) => createBot(3 + i));
 const frames = Math.round(seconds * 60);
 const depths: number[] = [];
-let lastRollbacks = [0, 0];
+const lastRollbacks = new Array<number>(players).fill(0);
 const t0 = performance.now();
 for (let f = 0; f < frames; f++) {
   sessions.forEach((s: NetSession, side) => {
@@ -55,14 +56,14 @@ for (let f = 0; f < frames; f++) {
 }
 const wall = (performance.now() - t0) / 1000;
 
-const shared = [...hashes[0].keys()].filter((t) => hashes[1].has(t));
-const mismatches = shared.filter((t) => hashes[0].get(t) !== hashes[1].get(t)).length;
+const shared = [...hashes[0].keys()].filter((t) => hashes.every((h) => h.has(t)));
+const mismatches = shared.filter((t) => hashes.some((h) => h.get(t) !== hashes[0].get(t))).length;
 const minutes = seconds / 60;
 console.log(
   `profile: rtt ${rtt} ms ± ${link.jitterMs}` +
     (link.spikeMs ? `, spikes +${link.spikeMs} ms every ~${link.spikeEveryMs} ms` : '') +
     (link.holdMs ? `, holds ${link.holdMs} ms every ~${link.holdEveryMs} ms` : '') +
-    ` · input delay ${inputDelay} · window ${sessions[0].maxRollback} · ${seconds} s (${wall.toFixed(1)} s wall)`,
+    ` · ${players} players · input delay ${inputDelay} · window ${sessions[0].maxRollback} · ${seconds} s (${wall.toFixed(1)} s wall)`,
 );
 sessions.forEach((s, side) => {
   const st = s.stats;
@@ -71,5 +72,6 @@ sessions.forEach((s, side) => {
     `side ${side}: stalls ${(st.stalledTicks / minutes).toFixed(1)} ticks/min (${st.stalledTicks} total) · rollbacks ${(st.rollbacks / minutes).toFixed(1)}/min, depth mean ${mean} max ${st.maxRollbackDepth} · late ${st.receivedLate}`,
   );
 });
-console.log(`tick difference at the end: ${sessions[0].tick - sessions[1].tick} · hash checkpoints compared: ${shared.length}, mismatches: ${mismatches}`);
+const ticksAtEnd = sessions.map((s) => s.tick);
+console.log(`tick spread at the end: ${Math.max(...ticksAtEnd) - Math.min(...ticksAtEnd)} · hash checkpoints compared: ${shared.length}, mismatches: ${mismatches}`);
 if (mismatches > 0) process.exit(1);

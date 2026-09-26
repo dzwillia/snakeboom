@@ -80,16 +80,19 @@ describe('relayed frames', () => {
     expect([...encodeRelayed(1, 7, { turn: 0, boost: false, use: false, select: false })]).toEqual([FRAME_RELAYED, 1, 7, 0, 0, 0, 0]);
   });
 
-  it('rejects a player above 1, the wrong frame byte and the wrong length', () => {
+  it('rejects a player above 7, the wrong frame byte and the wrong length', () => {
     const good = encodeRelayed(0, 7, { turn: 0, boost: false, use: false, select: false });
+    const seven = Uint8Array.from(good);
+    seven[1] = 7;
+    expect(decodeRelayed(seven)).toMatchObject({ player: 7, tick: 7 });
     const badPlayer = Uint8Array.from(good);
-    badPlayer[1] = 2;
+    badPlayer[1] = 8;
     expect(decodeRelayed(badPlayer)).toBeNull();
+    expect(() => encodeRelayed(8, 7, { turn: 0, boost: false, use: false, select: false })).toThrow(RangeError);
     const badFrame = Uint8Array.from(good);
     badFrame[0] = FRAME_INPUT;
     expect(decodeRelayed(badFrame)).toBeNull();
     expect(decodeRelayed(good.subarray(1))).toBeNull();
-    expect(() => encodeRelayed(2, 7, { turn: 0, boost: false, use: false, select: false })).toThrow(RangeError);
   });
 });
 

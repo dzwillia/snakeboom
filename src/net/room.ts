@@ -57,10 +57,13 @@ interface Seat {
 /**
  * Input delay in ticks from the players' round trips to the relay. Rollback absorbs the network,
  * so the local delay stays small: 1 tick on a LAN, 2 normally, 3 only when the one-way latency
- * between the players (about the mean of their round trips) is above 200 ms.
+ * between the two slowest players (about the mean of their round trips) is above 200 ms.
  */
-export function inputDelayFor(rttA: number | null, rttB: number | null): number {
-  const oneWayBetween = ((rttA ?? UNKNOWN_RTT_MS) + (rttB ?? UNKNOWN_RTT_MS)) / 2;
+export function inputDelayFor(...rtts: (number | null)[]): number {
+  const known = rtts.map((r) => r ?? UNKNOWN_RTT_MS).sort((a, b) => b - a);
+  const slowest = known.length === 0 ? UNKNOWN_RTT_MS : known[0];
+  const next = known.length > 1 ? known[1] : slowest;
+  const oneWayBetween = (slowest + next) / 2;
   if (oneWayBetween <= 20) return 1;
   if (oneWayBetween > 200) return 3;
   return 2;

@@ -496,7 +496,7 @@ export class OnlineMatch {
     if (!entries || !this.session) return;
     for (const e of entries) {
       if (e.player === this.me) this.session.restoreLocal(e.tick, e.input);
-      else this.session.receive(e.tick, e.input);
+      else this.session.receive(e.player, e.tick, e.input);
     }
     this.replayFrames = 0;
   }
@@ -620,7 +620,7 @@ export class OnlineMatch {
     if (frame[0] === FRAME_REPLAY) return this.onReplay(frame);
     const decoded = decodeRelayed(frame);
     if (!decoded || !this.session || decoded.player === this.me) return;
-    this.session.receive(decoded.tick, decoded.input);
+    this.session.receive(decoded.player, decoded.tick, decoded.input);
   }
 
   private onSocketClosed(code: number): void {
