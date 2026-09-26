@@ -18,9 +18,18 @@ export interface DeathBeat {
   y: number;
 }
 
+/** What the music does on the big moments. */
+export interface MusicCues {
+  duck(amount: number, seconds: number): void;
+  sting(holdSeconds?: number): void;
+}
+
 export interface EventSinkDeps {
   fx: Fx;
   sound: Sound;
+  music: MusicCues;
+  /** How long the death beat runs, so the music ducks for it. */
+  beatSeconds: () => number;
   screens: Screens;
   /** The config of the match being played. */
   cfg: () => Config;
@@ -42,7 +51,7 @@ export class EventSink {
   constructor(private readonly deps: EventSinkDeps) {}
 
   handle(events: readonly SimEvent[], state: MatchState): void {
-    const { fx, sound, screens } = this.deps;
+    const { fx, sound, screens, music } = this.deps;
     const cfg = this.deps.cfg();
     const names = this.deps.names();
     for (const e of events) {
@@ -70,6 +79,7 @@ export class EventSink {
           fx.deathBurst(state.snakes[e.player], PLAYER_COLORS[e.player]);
           sound.play('death');
           this.beat = { start: this.deps.now(), x: e.x, y: e.y };
+          music.duck(0.3, this.deps.beatSeconds());
           break;
         case 'nearMiss':
           fx.nearMissSparks(e.x, e.y, PLAYER_COLORS[e.player]);
@@ -79,11 +89,13 @@ export class EventSink {
           const { title, detail } = describeRound(e.winner, e.deaths, names);
           screens.roundOver(title, detail, e.winner);
           sound.play(e.winner === null ? 'draw' : 'roundWin');
+          music.sting(cfg.roundOverSeconds);
           break;
         }
         case 'matchOver':
           screens.matchOver(e.winner, state.scores, names, this.deps.matchOverHint());
           sound.play('matchWin');
+          music.sting();
           break;
         case 'pickupSpawned':
           sound.play('pickupSpawn', 0.5);

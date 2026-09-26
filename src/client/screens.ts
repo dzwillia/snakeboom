@@ -12,7 +12,7 @@ function roomNameProblemFor(raw: string): string | null {
   return name === '' ? null : roomNameProblem(name);
 }
 
-type ScreenKind = 'none' | 'title' | 'countdown' | 'banner' | 'matchOver' | 'paused' | 'lobby' | 'form' | 'notice' | 'powers';
+export type ScreenKind = 'none' | 'title' | 'countdown' | 'banner' | 'matchOver' | 'paused' | 'lobby' | 'form' | 'notice' | 'powers';
 
 export interface TitleOptions {
   row: MenuRow;
@@ -103,7 +103,7 @@ export class Screens {
         <h2>POWERS</h2>
         <p class="lead">PICKUPS SPAWN ALL ROUND · ${cfg.collectByLoop ? 'LOOP ONE TO TAKE IT' : 'RUN OVER ONE TO TAKE IT'} · YOUR BODY STORES THEM: ONE SLOT PER ${cfg.slotLength} UNITS, ${slots.toUpperCase()} · SELECT PICKS ONE, FIRE USES IT · A CUT DROPS WHAT NO LONGER FITS · TIMED POWERS FLASH FOR THEIR LAST ${cfg.effectWarning} S</p>
         <div class="grid">${cards.join('')}</div>
-        <div class="small footer"><kbd>H</kbd> OR <kbd>ESC</kbd> BACK TO ${back === 'title' ? 'TITLE' : 'PAUSE'}</div>
+        <div class="small footer"><kbd>H</kbd> OR <kbd>ESC</kbd> BACK TO ${back === 'title' ? 'TITLE' : 'PAUSE'} · MUSIC: ORIGINAL TRACKS, PLAYED BY YOUR BROWSER</div>
       </div>`,
       'powers',
     );

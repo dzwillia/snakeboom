@@ -15,6 +15,8 @@ import {
   type OpponentState,
 } from '../sim';
 import { Sound } from './audio';
+import { ZZFX } from 'zzfx';
+import { Music, trackFor } from './music';
 import { EventSink } from './events';
 import { Hud } from './hud';
 import { KeyboardInput } from './input';
@@ -38,7 +40,11 @@ import { createTuningPanel } from './tuning';
 declare global {
   interface Window {
     /** Read-only handle for browser checks and console debugging. */
-    __snakeboom?: { readonly state: MatchState | null; readonly online: OnlineMatch | null };
+    __snakeboom?: {
+      readonly state: MatchState | null;
+      readonly online: OnlineMatch | null;
+      readonly music: { current: string | null; wanted: string | null; ready: boolean; rendered: string[] };
+    };
   }
 }
 
@@ -73,6 +79,12 @@ async function boot(): Promise<void> {
   const hud = new Hud(element('hud'));
   const screens = new Screens(element('screens'));
   const sound = new Sound(settings);
+  const music = new Music(() => ZZFX.audioContext);
+  const applyMusicSettings = () => {
+    music.setVolume(settings.musicOn ? settings.musicVolume : 0);
+    music.setMuted(settings.muted);
+  };
+  applyMusicSettings();
   const input = new KeyboardInput(window);
 
   /** Local play. */
@@ -97,6 +109,8 @@ async function boot(): Promise<void> {
   const sink = new EventSink({
     fx,
     sound,
+    music,
+    beatSeconds: () => settings.hitStopSeconds + settings.slowMoSeconds + 0.3,
     screens,
     cfg: activeCfg,
     names: () => names,
@@ -115,6 +129,7 @@ async function boot(): Promise<void> {
   const tuning = createTuningPanel(cfg, settings, {
     onChange: () => {
       applyBloom(world, settings);
+      applyMusicSettings();
       persist();
       if (!state && !online) showTitle();
     },
@@ -148,6 +163,8 @@ async function boot(): Promise<void> {
       fx.setCamera(f ? f.zoom : 1, beat ? beat.x : 0, beat ? beat.y : 0);
       fx.setFlash(f ? f.flash : 0);
       const s = activeState();
+      const track = trackFor(s?.phase ?? null, screens.showing);
+      if (track !== music.wanted) music.play(track);
       // The camera: fit every live head locally; follow your own head online.
       const heads = s ? s.snakes.filter((sn) => sn.alive).map((sn) => ({ x: sn.x, y: sn.y })) : [];
       let target: View;
@@ -254,8 +271,10 @@ async function boot(): Promise<void> {
 
   input.onKey((code) => {
     sound.unlock();
+    music.unlock();
     if (code === 'KeyM') {
       settings.muted = !settings.muted;
+      applyMusicSettings();
       tuning.refresh();
       persist();
       return;
@@ -347,12 +366,17 @@ async function boot(): Promise<void> {
     get online() {
       return online;
     },
+    get music() {
+      return { current: music.current, wanted: music.wanted, ready: music.ready, rendered: music.rendered };
+    },
   };
 
   if (rejoin && early) startOnline({ kind: 'rejoin', ...rejoin }, early);
   else if (joinCode) beginOnline({ kind: 'join', room: joinCode });
   else showTitle();
   loop.start();
+  // The songs render in idle time once the title is up, so the first play doesn't wait.
+  music.prerender();
 }
 
 boot().catch((err: unknown) => {

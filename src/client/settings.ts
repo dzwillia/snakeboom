@@ -16,6 +16,9 @@ export interface ClientSettings {
   shakeScale: number;
   masterVolume: number;
   muted: boolean;
+  /** Background music, 0–1, and whether it plays at all (M mutes everything either way). */
+  musicVolume: number;
+  musicOn: boolean;
   /** Freeze-frame at the moment of death. */
   hitStopSeconds: number;
   /** Effect speed during the slow-motion shatter. */
@@ -34,6 +37,8 @@ export const DEFAULT_SETTINGS: ClientSettings = {
   shakeScale: 2,
   masterVolume: 0.8,
   muted: false,
+  musicVolume: 0.6,
+  musicOn: true,
   hitStopSeconds: 0.12,
   slowMoScale: 0.3,
   slowMoSeconds: 0.8,

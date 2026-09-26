@@ -126,6 +126,8 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   const audio = gui.addFolder('Audio');
   audio.add(settings, 'masterVolume', 0, 1, 0.05).name('volume');
   audio.add(settings, 'muted');
+  audio.add(settings, 'musicOn').name('music');
+  audio.add(settings, 'musicVolume', 0, 1, 0.05).name('music volume');
 
   for (const folder of gui.folders.slice(1)) folder.close();
   function refresh(): void {
