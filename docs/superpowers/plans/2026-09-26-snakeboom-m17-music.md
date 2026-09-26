@@ -20,11 +20,11 @@
 
 ### Task 1: The tracker and the songs
 - `tracker.ts` (types, pattern parser, renderer), `songs.ts` (three tracks), tests for the data and the rendered audio.
-- [ ] Commit `feat(client): a tiny tracker and three original tracks`.
+- [x] Commit `feat(client): a tiny tracker and three original tracks`.
 
 ### Task 2: The player and the wiring
 - `music.ts` (`Music`, `trackFor`), settings, tuning rows, `EventSink` cues, `main.ts` wiring, debug hook `__snakeboom.music`, README and Powers footer.
-- [ ] Commit `feat(client): background music`.
+- [x] Commit `feat(client): background music`.
 
 ### Task 3: Verify and ship
 - `pnpm test`, typecheck, build; headless browser check of the track per state; offline WAV render of each track and a Node check for silence, clipping and band energy; PR.
