@@ -1,6 +1,7 @@
 import { circleHitsWall } from './arena';
 import type { Config } from './config';
 import { slotsFor } from './storage';
+import { maxPickupsFor } from './players';
 import { trailLength } from './trail';
 import type { MatchState } from './types';
 
@@ -43,11 +44,16 @@ export function checkInvariants(state: MatchState, cfg: Config): string[] {
     }
     if (!Number.isInteger(s.portalCooldown) || s.portalCooldown < 0) problems.push(`snake ${i}: portal cooldown ${s.portalCooldown}`);
   });
+  const players = state.snakes.length;
+  if (state.scores.length !== players) problems.push(`${state.scores.length} scores for ${players} snakes`);
+  // A round hands out at most (N−1) to the survivor plus (N−2) to everyone else tied for second: (N−1)².
   const points = state.scores.reduce((a, b) => a + b, 0);
-  if (points > state.round) problems.push(`${points} points after ${state.round} rounds`);
+  const perRound = (players - 1) * (players - 1);
+  if (points > state.round * perRound) problems.push(`${points} points after ${state.round} rounds of ${players}`);
+  if (state.lastPlaces.length !== 0 && state.lastPlaces.length !== players) problems.push(`${state.lastPlaces.length} places for ${players} snakes`);
   // Drops (what a cut or boost shed) don't count: they may take the field past the cap and expire as usual.
   const spawned = state.pickups.filter((p) => !p.dropped).length;
-  if (spawned > Math.max(0, cfg.maxPickups)) problems.push(`${spawned} spawned pickups on the field (max ${cfg.maxPickups})`);
+  if (spawned > maxPickupsFor(cfg, players)) problems.push(`${spawned} spawned pickups on the field (max ${maxPickupsFor(cfg, players)})`);
   for (const p of state.pickups) {
     if (circleHitsWall(p.x, p.y, 0, state.inset)) problems.push(`pickup ${p.id} outside the live area`);
     if (p.ttl <= 0) problems.push(`pickup ${p.id} outlived its lifetime`);

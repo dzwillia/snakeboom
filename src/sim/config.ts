@@ -29,6 +29,12 @@ export interface Config {
   overtimeGrowthMultiplier: number;
   /** The border starts closing this long before the cap; after the cap it closes fast until someone dies. */
   roundMaxSeconds: number;
+  /** Added to the round cap for every player beyond two (see players.ts). */
+  roundSecondsPerExtraPlayer: number;
+  /** The round cap never exceeds this, however many play. */
+  roundMaxSecondsCap: number;
+  /** With more than two players, blocks within this of a spawn are cleared for the round. */
+  spawnClearance: number;
   /** Seconds before roundMaxSeconds at which the border starts moving in. */
   borderCloseSeconds: number;
   /** Units per second, per side, while closing before the cap. */
@@ -131,6 +137,9 @@ export const DEFAULT_CONFIG: Config = {
   overtimeAt: 9999,
   overtimeGrowthMultiplier: 3,
   roundMaxSeconds: 45,
+  roundSecondsPerExtraPlayer: 10,
+  roundMaxSecondsCap: 90,
+  spawnClearance: 140,
   borderCloseSeconds: 15,
   borderCloseSpeed: 24,
   borderCrushSpeed: 120,

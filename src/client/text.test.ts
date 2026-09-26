@@ -14,7 +14,7 @@ import {
   spawnShare,
 } from './text';
 
-const d = (player: number, cause: DeathCause, killer: number | null): DeathRecord => ({ player, cause, killer, x: 0, y: 0 });
+const d = (player: number, cause: DeathCause, killer: number | null): DeathRecord => ({ player, cause, killer, x: 0, y: 0, tick: 0 });
 
 describe('text', () => {
   it('describes every cause of death', () => {
