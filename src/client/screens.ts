@@ -19,6 +19,8 @@ export interface TitleOptions {
   winsToWin: number;
   hearts: number;
   opponent: OpponentMode;
+  /** Seats in a local match and the size of the rooms you open, 2–8. */
+  players: number;
 }
 
 export interface LobbyOptions {
@@ -26,6 +28,8 @@ export interface LobbyOptions {
   link: string;
   players: ({ name: string; ready: boolean; connected: boolean } | null)[];
   winsToWin: number;
+  /** Seats in the room (players has this many entries). */
+  size: number;
   pingMs: number | null;
   /** Which seat is ours. */
   me: number;
@@ -63,6 +67,8 @@ export class Screens {
       opts.opponent === 'human'
         ? `<p><kbd>←</kbd> <kbd>→</kbd> steer</p><p><kbd>↑</kbd> boost</p><p><kbd>↓</kbd> fire</p><p><kbd>R SHIFT</kbd> select</p>`
         : `<p>${describeOpponent(opts.opponent)}</p><p class="dim">plays this seat</p>`;
+    // More than two: the extra seats are bots at the chosen level (NORMAL when PINK is a human).
+    const extra = opts.players > 2 ? `<p class="dim">+ ${opts.players - 2} MORE · AI ${(opts.opponent === 'human' ? 'normal' : opts.opponent).toUpperCase()}</p>` : '';
     this.show(
       `
       <div class="panel">
@@ -70,10 +76,11 @@ export class Screens {
         <div class="controls">
           <div class="p1"><h3>${PLAYER_NAMES[0]}</h3>
             <p><kbd>A</kbd> <kbd>D</kbd> steer</p><p><kbd>W</kbd> boost</p><p><kbd>S</kbd> fire</p><p><kbd>Q</kbd> select</p></div>
-          <div class="p2"><h3>${PLAYER_NAMES[1]}</h3>${pink}</div>
+          <div class="p2"><h3>${PLAYER_NAMES[1]}</h3>${pink}${extra}</div>
         </div>
         <div class="menu">
           ${row('local', `LOCAL · <kbd>◀</kbd> <span class="mode">${describeOpponent(opts.opponent)}</span> <kbd>▶</kbd>`)}
+          ${row('players', `PLAYERS <kbd>◀</kbd> <span class="players">${opts.players}</span> <kbd>▶</kbd>`)}
           ${row('wins', `FIRST TO <kbd>◀</kbd> <span class="wins">${opts.winsToWin}</span> <kbd>▶</kbd>`)}
           ${row('create', 'CREATE LINK')}
           ${row('quick', 'QUICK MATCH')}
@@ -181,21 +188,25 @@ export class Screens {
   }
 
   lobby(opts: LobbyOptions): void {
+    const size = Math.max(2, opts.size || opts.players.length);
     const seat = (i: number) => {
       const p = opts.players[i];
       const you = i === opts.me ? ' <span class="dim">(YOU)</span>' : '';
-      if (!p) return `<div class="seat p${i + 1} empty">waiting for a player…</div>`;
+      if (!p) return `<div class="seat empty">waiting for a player…</div>`;
       const state = !p.connected ? 'AWAY' : p.ready ? 'READY' : 'NOT READY';
-      return `<div class="seat p${i + 1}${p.ready ? ' ready' : ''}">${escapeHtml(p.name) || PLAYER_NAMES[i]}${you}<span class="state">${state}</span></div>`;
+      return `<div class="seat${p.ready ? ' ready' : ''}" style="color:${PLAYER_CSS[i] ?? 'var(--text)'}">${escapeHtml(p.name) || PLAYER_NAMES[i]}${you}<span class="state">${state}</span></div>`;
     };
+    const seated = opts.players.filter((p) => p !== null);
+    const ready = seated.filter((p) => p?.ready).length;
     const ping = opts.pingMs === null ? '' : ` · PING ${opts.pingMs} ms`;
+    const readiness = size > 2 ? `${ready}/${seated.length} READY · STARTS WHEN EVERYONE IS · ` : '';
     this.show(
       `
       <div class="panel lobby">
         <div class="banner-detail">ROOM <span class="code">${opts.code}</span></div>
         <div class="link"><span class="url">${escapeHtml(opts.link)}</span><button class="copy" type="button">COPY</button></div>
-        <div class="seats">${seat(0)}${seat(1)}</div>
-        <div class="small">FIRST TO ${opts.winsToWin}${ping}</div>
+        <div class="seats${size > 2 ? ' many' : ''}">${Array.from({ length: size }, (_, i) => seat(i)).join('')}</div>
+        <div class="small">${readiness}FIRST TO ${opts.winsToWin}${ping}</div>
         <div class="hint">SPACE READY · ESC LEAVE</div>
       </div>`,
       'lobby',
@@ -271,10 +282,19 @@ export class Screens {
   private matchOverTemplate = '';
 
   matchOver(winner: number, scores: readonly number[], names: readonly string[] = PLAYER_NAMES, hint = 'SPACE REMATCH · ESC MENU'): void {
+    // Two players: the score line. More: standings, best first.
+    const detail =
+      scores.length <= 2
+        ? scores.join(' – ')
+        : scores
+            .map((score, p) => ({ score, p }))
+            .sort((a, b) => b.score - a.score || a.p - b.p)
+            .map(({ score, p }) => `<span style="color:${PLAYER_CSS[p] ?? 'var(--text)'}">${escapeHtml(names[p] ?? PLAYER_NAMES[p])} ${score}</span>`)
+            .join(' · ');
     this.matchOverTemplate = `
       <div class="panel">
-        <div class="banner-title" style="color:${PLAYER_CSS[winner]}">${escapeHtml(names[winner])} WINS</div>
-        <div class="banner-detail">${scores.join(' – ')}</div>
+        <div class="banner-title" style="color:${PLAYER_CSS[winner] ?? 'var(--text)'}">${escapeHtml(names[winner] ?? PLAYER_NAMES[winner])} WINS</div>
+        <div class="banner-detail">${detail}</div>
         <div class="small rematch-line">{{line}}</div>
         <div class="hint">${hint}</div>
       </div>`;

@@ -1,6 +1,7 @@
 import type { PickupKind } from '../sim';
 
-export const PLAYER_COLORS: number[] = [0x22f3ff, 0xff2e97];
+/** Eight seat colours that read on the dark arena, in seat order: CYAN, PINK, LIME, AMBER, VIOLET, ORANGE, ICE, CORAL. */
+export const PLAYER_COLORS: number[] = [0x22f3ff, 0xff2e97, 0x7cff4d, 0xffb020, 0xb388ff, 0xff7a1a, 0xdff6ff, 0xff3b5c];
 
 export const PALETTE = {
   background: 0x05060d,
@@ -24,4 +25,4 @@ export const PICKUP_COLORS: Record<PickupKind, number> = {
   dozer: 0xff9f1c,
 };
 
-export const PLAYER_CSS = ['var(--cyan)', 'var(--pink)'];
+export const PLAYER_CSS = ['var(--cyan)', 'var(--pink)', 'var(--lime)', 'var(--amber)', 'var(--violet)', 'var(--orange)', 'var(--ice)', 'var(--coral)'];

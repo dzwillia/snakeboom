@@ -2,6 +2,12 @@
   --bg: #05060d;
   --cyan: #22f3ff;
   --pink: #ff2e97;
+  --lime: #7cff4d;
+  --amber: #ffb020;
+  --violet: #b388ff;
+  --orange: #ff7a1a;
+  --ice: #dff6ff;
+  --coral: #ff3b5c;
   --text: #e8f4ff;
   --dim: #7d8db0;
   --red: #ff3b3b;
@@ -69,12 +75,45 @@ body {
   flex-direction: row-reverse;
 }
 
-.side.p1 {
-  color: var(--cyan);
+/* Side colours come inline from PLAYER_CSS. The scoreboard replaces the right side with more than two players. */
+.board {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
 }
 
-.side.p2 {
-  color: var(--pink);
+.board .entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.95;
+}
+
+.board .entry.dead {
+  opacity: 0.35;
+}
+
+.board .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.board .score {
+  min-width: 2ch;
+  text-align: right;
+  font-weight: 900;
+}
+
+.board .item {
+  color: var(--dim);
+  min-width: 7ch;
+  text-align: right;
 }
 
 .name {
@@ -115,6 +154,12 @@ body {
   border-radius: 50%;
   border: 2px solid currentColor;
   opacity: 0.45;
+}
+
+.points {
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.1em;
 }
 
 .pip.on {
@@ -428,12 +473,15 @@ kbd {
   letter-spacing: 0.1em;
 }
 
-.lobby .seat.p1 {
-  color: var(--cyan);
+/* Seat colours come inline (style="color: …") from PLAYER_CSS, so eight seats need no classes. */
+.lobby .seats.many {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.lobby .seat.p2 {
-  color: var(--pink);
+.lobby .seats.many .seat {
+  padding: 10px 8px;
+  font-size: 13px;
 }
 
 .lobby .seat.empty {

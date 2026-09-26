@@ -45,6 +45,12 @@ export class SnakeView {
     style: { fontFamily: 'Orbitron, system-ui, sans-serif', fontSize: LABEL_PX, fontWeight: '700', fill: 0xffffff },
   });
   private lastLabel = '';
+  /** A name tag under the head (rooms of more than two), constant screen size. */
+  private readonly tag = new Text({
+    text: '',
+    style: { fontFamily: 'Orbitron, system-ui, sans-serif', fontSize: 11, fontWeight: '700', fill: 0xffffff },
+  });
+  private lastTag = '';
   private readonly chunks = new Map<number, Chunk>();
   private lastHoleVersion = -1;
 
@@ -55,7 +61,11 @@ export class SnakeView {
     const layer = new Container();
     this.label.anchor.set(0.5, 1);
     this.label.visible = false;
-    layer.addChild(this.tubes, this.cores, this.head, this.timer, this.label);
+    this.tag.anchor.set(0.5, 0);
+    this.tag.visible = false;
+    this.tag.alpha = 0.85;
+    this.tag.style.fill = color;
+    layer.addChild(this.tubes, this.cores, this.head, this.timer, this.label, this.tag);
     parent.addChild(layer);
   }
 
@@ -66,6 +76,7 @@ export class SnakeView {
     this.head.clear();
     this.timer.clear();
     this.label.visible = false;
+    this.tag.visible = false;
     this.setVisible(true);
   }
 
@@ -74,7 +85,7 @@ export class SnakeView {
   }
 
   /** `worldScale` is screen pixels per world unit, so the countdown can keep its size on screen. */
-  update(s: SnakeState, alpha: number, cfg: Config, t: number, offset?: { x: number; y: number }, worldScale = 1): void {
+  update(s: SnakeState, alpha: number, cfg: Config, t: number, offset?: { x: number; y: number }, worldScale = 1, tag = ''): void {
     this.setVisible(true);
     const radius = cfg.snakeRadius;
     const trail = s.trail;
@@ -111,6 +122,23 @@ export class SnakeView {
     }
     this.drawHead(s, hx, hy, cfg, t);
     this.drawCountdown(s, hx, hy, cfg, worldScale);
+    this.drawTag(tag, hx, hy, cfg, worldScale);
+  }
+
+  /** The player's name just below the head, in their colour, at a constant size on screen. */
+  private drawTag(tag: string, x: number, y: number, cfg: Config, worldScale: number): void {
+    if (!tag) {
+      this.tag.visible = false;
+      return;
+    }
+    if (tag !== this.lastTag) {
+      this.lastTag = tag;
+      this.tag.text = tag;
+    }
+    const px = 1 / Math.max(1e-6, worldScale);
+    this.tag.scale.set(px);
+    this.tag.position.set(x, y + cfg.snakeRadius * 1.5 + 8 * px);
+    this.tag.visible = true;
   }
 
   private setVisible(visible: boolean): void {
@@ -118,7 +146,10 @@ export class SnakeView {
     this.cores.visible = visible;
     this.head.visible = visible;
     this.timer.visible = visible;
-    if (!visible) this.label.visible = false;
+    if (!visible) {
+      this.label.visible = false;
+      this.tag.visible = false;
+    }
   }
 
   /**

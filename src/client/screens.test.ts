@@ -35,11 +35,12 @@ describe('Screens powers', () => {
 });
 
 describe('Screens title', () => {
-  it('renders the four rows with the active one marked', () => {
+  it('renders the five rows with the active one marked', () => {
     const root = fakeRoot();
     const screens = new Screens(root);
-    screens.title({ row: 'create', winsToWin: 5, hearts: 3, opponent: 'human' });
-    expect(root.innerHTML.match(/class="row/g)).toHaveLength(4);
+    screens.title({ row: 'create', winsToWin: 5, hearts: 3, opponent: 'human', players: 2 });
+    expect(root.innerHTML.match(/class="row/g)).toHaveLength(5);
+    expect(root.innerHTML).toContain('<span class="players">2</span>');
     expect(root.innerHTML).toContain('class="row active" data-row="create"');
     expect(root.innerHTML).toContain('HUMAN');
     expect(root.innerHTML).toContain('select</p></div>\n          <div class="p2">');
@@ -48,7 +49,7 @@ describe('Screens title', () => {
   it('shows the build version on the title and pause screens', () => {
     const root = fakeRoot();
     const screens = new Screens(root, 'v0.16.0');
-    screens.title({ row: 'local', winsToWin: 5, hearts: 1, opponent: 'human' });
+    screens.title({ row: 'local', winsToWin: 5, hearts: 1, opponent: 'human', players: 2 });
     expect(root.innerHTML).toContain('<div class="version" title="The build you are playing">v0.16.0</div>');
     screens.paused();
     expect(root.innerHTML).toContain('v0.16.0');
@@ -60,9 +61,17 @@ describe('Screens title', () => {
 
   it("shows PINK's seat as the AI when an AI level is chosen", () => {
     const root = fakeRoot();
-    new Screens(root).title({ row: 'local', winsToWin: 5, hearts: 3, opponent: 'hard' });
+    new Screens(root).title({ row: 'local', winsToWin: 5, hearts: 3, opponent: 'hard', players: 2 });
     expect(root.innerHTML).toContain('AI · HARD');
     expect(root.innerHTML).toContain('plays this seat');
+  });
+
+  it('says the extra seats are bots when more than two play', () => {
+    const root = fakeRoot();
+    new Screens(root).title({ row: 'players', winsToWin: 5, hearts: 1, opponent: 'human', players: 5 });
+    expect(root.innerHTML).toContain('+ 3 MORE · AI NORMAL');
+    new Screens(root).title({ row: 'players', winsToWin: 5, hearts: 1, opponent: 'hard', players: 8 });
+    expect(root.innerHTML).toContain('+ 6 MORE · AI HARD');
   });
 });
 
@@ -147,6 +156,22 @@ describe('Screens room name box', () => {
 });
 
 describe('Screens lobby', () => {
+  it('lists every seat of a bigger room with the ready count', () => {
+    const root = fakeRoot();
+    new Screens(root).lobby({
+      code: 'dave',
+      link: 'x',
+      players: [{ name: 'Ada', ready: true, connected: true }, { name: 'Bob', ready: false, connected: true }, null, null, null],
+      winsToWin: 3,
+      size: 5,
+      pingMs: null,
+      me: 1,
+    });
+    expect((root.innerHTML.match(/class="seat[ "]/g) ?? []).length).toBe(5);
+    expect(root.innerHTML).toContain('1/2 READY · STARTS WHEN EVERYONE IS');
+    expect(root.innerHTML).toContain('class="seats many"');
+  });
+
   it('shows the code, the link, both seats and the ping', () => {
     const root = fakeRoot();
     new Screens(root).lobby({
@@ -157,6 +182,7 @@ describe('Screens lobby', () => {
         { name: '', ready: false, connected: true },
       ],
       winsToWin: 5,
+      size: 2,
       pingMs: 48,
       me: 0,
     });
@@ -176,6 +202,7 @@ describe('Screens lobby', () => {
       link: 'x',
       players: [{ name: '<b>x</b>', ready: false, connected: true }, null],
       winsToWin: 3,
+      size: 2,
       pingMs: null,
       me: 0,
     });

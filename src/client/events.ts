@@ -86,7 +86,7 @@ export class EventSink {
           sound.play('nearMiss', 0.5);
           break;
         case 'roundOver': {
-          const { title, detail } = describeRound(e.winner, e.deaths, names);
+          const { title, detail } = describeRound(e.winner, e.deaths, names, e.places);
           screens.roundOver(title, detail, e.winner);
           sound.play(e.winner === null ? 'draw' : 'roundWin');
           music.sting(cfg.roundOverSeconds);

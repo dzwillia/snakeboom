@@ -15,7 +15,7 @@ import type { World } from './world';
 export class Renderer {
   private readonly arena: ArenaView;
   private readonly pickups: PickupView;
-  private readonly snakes: SnakeView[];
+  private readonly snakes: SnakeView[] = [];
   private readonly missiles: MissileView;
   private readonly wormholes: WormholeView;
   private readonly saws: SawView;
@@ -25,13 +25,27 @@ export class Renderer {
   constructor(private readonly world: World) {
     this.arena = new ArenaView(world);
     this.pickups = new PickupView(world.glow);
-    this.snakes = PLAYER_COLORS.map((color) => new SnakeView(world.glow, color));
+    for (let i = 0; i < 2; i++) this.view(i);
     this.missiles = new MissileView(world.glow);
     this.wormholes = new WormholeView(world.glow);
     this.saws = new SawView(world.glow);
   }
 
-  draw(state: MatchState | null, alpha: number, cfg: Config, timeSeconds = 0, offsets?: readonly { x: number; y: number }[]): void {
+  /** The view for player `i`, made on first use (rooms grow to eight). */
+  private view(i: number): SnakeView {
+    while (this.snakes.length <= i) this.snakes.push(new SnakeView(this.world.glow, PLAYER_COLORS[this.snakes.length % PLAYER_COLORS.length]));
+    return this.snakes[i];
+  }
+
+  /** `labels`: name tags by the heads (with more than two players), skipped for `local`, your own. */
+  draw(
+    state: MatchState | null,
+    alpha: number,
+    cfg: Config,
+    timeSeconds = 0,
+    offsets?: readonly { x: number; y: number }[],
+    labels?: { names: readonly string[]; local: number; show: boolean },
+  ): void {
     if (!state) {
       if (this.lastTiles) {
         this.arena.drawTiles([]);
@@ -64,9 +78,9 @@ export class Renderer {
     // Screen pixels per world unit as of the last frame, for things that keep their size on screen.
     const worldScale = this.world.base.scale * this.world.view.zoom;
     state.snakes.forEach((s, i) => {
-      const view = this.snakes[i];
-      if (!view) return;
-      if (s.alive) view.update(s, state.phase === 'playing' ? alpha : 1, cfg, timeSeconds, offsets?.[i], worldScale);
+      const view = this.view(i);
+      const tag = labels?.show && i !== labels.local ? (labels.names[i] ?? '') : '';
+      if (s.alive) view.update(s, state.phase === 'playing' ? alpha : 1, cfg, timeSeconds, offsets?.[i], worldScale, tag);
       else view.hide();
     });
     this.missiles.draw(state.missiles, cfg, timeSeconds);

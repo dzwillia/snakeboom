@@ -41,6 +41,9 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
   growth.add(cfg, 'overtimeAt', 10, 300, 5).name('overtime at (s)');
   growth.add(cfg, 'overtimeGrowthMultiplier', 1, 10, 0.5).name('overtime growth ×');
   growth.add(cfg, 'roundMaxSeconds', 20, 600, 5).name('round cap (s)');
+  growth.add(cfg, 'roundSecondsPerExtraPlayer', 0, 30, 1).name('cap + per extra player (s)');
+  growth.add(cfg, 'roundMaxSecondsCap', 30, 600, 5).name('cap at most (s)');
+  growth.add(cfg, 'spawnClearance', 0, 400, 10).name('spawn clearance (3+ players)');
 
   const border = gui.addFolder('Border');
   border.add(cfg, 'borderCloseSeconds', 0, 60, 1).name('closes from (s before cap)');

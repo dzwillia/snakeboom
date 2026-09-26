@@ -1,7 +1,8 @@
 import { PLOW_PUSH_LIMIT, type Config, type DeathRecord, type ItemState, type PickupKind } from '../sim';
 import { OPPONENT_MODES, type OpponentMode } from './settings';
 
-export const PLAYER_NAMES: readonly string[] = ['CYAN', 'PINK'];
+/** Default names by seat, matching PLAYER_COLORS. */
+export const PLAYER_NAMES: readonly string[] = ['CYAN', 'PINK', 'LIME', 'AMBER', 'VIOLET', 'ORANGE', 'ICE', 'CORAL'];
 
 /** The title screen's opponent selector: HUMAN, then the AI difficulties, wrapping around. */
 export function nextOpponent(current: OpponentMode, delta: number): OpponentMode {
@@ -37,12 +38,24 @@ export function describeDeath(d: DeathRecord, names: readonly string[] = PLAYER_
   }
 }
 
+/** "1. AMBER · 2. CYAN · 3. PINK": the round's places, best first (ties share a number). */
+export function describePlaces(places: readonly number[], names: readonly string[] = PLAYER_NAMES): string {
+  const order = places.map((place, player) => ({ place, player })).sort((a, b) => a.place - b.place || a.player - b.player);
+  return order.map(({ place, player }) => `${place}. ${names[player] ?? PLAYER_NAMES[player]}`).join(' · ');
+}
+
+/**
+ * The round-over banner: who scored and how everyone died (two players), or the places (more).
+ * `places` is the sim's per-player finishing place; with two players it isn't needed.
+ */
 export function describeRound(
   winner: number | null,
   deaths: readonly DeathRecord[],
   names: readonly string[] = PLAYER_NAMES,
+  places: readonly number[] = [],
 ): { title: string; detail: string } {
-  const title = winner === null ? 'DRAW' : `${names[winner]} SCORES`;
+  const title = winner === null ? 'DRAW' : places.length > 2 ? `${names[winner]} SURVIVES` : `${names[winner]} SCORES`;
+  if (places.length > 2) return { title, detail: describePlaces(places, names) };
   const lines: string[] = [];
   for (const d of deaths) {
     const line = describeDeath(d, names);
@@ -50,6 +63,11 @@ export function describeRound(
   }
   if (lines.length > 0) return { title, detail: lines.join(' · ') };
   return { title, detail: winner === null ? 'Nobody survived' : `${names[winner]} outlasted the border` };
+}
+
+/** The title screen's PLAYERS selector: 2–8, clamped. */
+export function nextPlayers(current: number, delta: number): number {
+  return Math.min(8, Math.max(2, Math.round(current) + delta));
 }
 
 /** The order the Powers page lists pickups in: the same as the title screen's line. */

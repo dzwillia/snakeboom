@@ -12,6 +12,7 @@ import {
   step,
   type Difficulty,
   type MatchState,
+  NO_INPUT,
   type OpponentState,
 } from '../sim';
 import { Sound } from './audio';
@@ -30,11 +31,11 @@ import { Fx } from './render/fx';
 import { Renderer } from './render/renderer';
 import { applyBloom, createWorld } from './render/world';
 import { Screens } from './screens';
-import { easeView, fitView, followView, type View } from './camera';
+import { easeView, fitView, type View } from './camera';
 import { deathBeatAt } from './deathBeat';
 import { Minimap } from './render/minimap';
 import { browserStorage, CONFIG_KEY, loadSettings, loadStored, saveStored, SETTINGS_KEY, settingsDefaults } from './settings';
-import { nextOpponent, nextWins, PLAYER_NAMES } from './text';
+import { nextOpponent, nextPlayers, nextWins, PLAYER_NAMES } from './text';
 import { createTuningPanel } from './tuning';
 
 declare global {
@@ -89,9 +90,8 @@ async function boot(): Promise<void> {
 
   /** Local play. */
   let state: MatchState | null = null;
-  /** Steers PINK when the opponent setting isn't human. */
-  let ai: OpponentState | null = null;
-  const AI_SEAT = 1;
+  /** Bots by seat: PINK when the opponent setting isn't human, and every seat past the second. */
+  let bots = new Map<number, OpponentState>();
   let paused = false;
   /** Online play, while in a room. */
   let online: OnlineMatch | null = null;
@@ -118,12 +118,22 @@ async function boot(): Promise<void> {
     matchOverHint: () => (online ? 'SPACE REMATCH · ESC LOBBY' : 'SPACE REMATCH · ESC MENU'),
   });
 
-  const showTitle = () => screens.title({ row: menuRow, winsToWin: cfg.winsToWin, hearts: cfg.hearts, opponent: settings.opponent });
-  /** Seats the AI (or a human) for a new match, so a mid-match setting change waits for the next one. */
-  const seatOpponent = (force?: Difficulty) => {
-    const level = force ?? (settings.opponent === 'human' ? null : settings.opponent);
-    ai = level ? createOpponent(level, newSeed()) : null;
-    hud.setTag(AI_SEAT, ai ? 'AI' : '');
+  const showTitle = () =>
+    screens.title({ row: menuRow, winsToWin: cfg.winsToWin, hearts: cfg.hearts, opponent: settings.opponent, players: settings.players });
+  /**
+   * Seats the bots for a new match (so a mid-match setting change waits for the next one): PINK
+   * is the chosen opponent, and every seat past the second is a bot at that level (NORMAL when
+   * PINK is a human). `force` makes PINK a bot at that level whatever the setting.
+   */
+  const seatOpponents = (players: number, force?: Difficulty) => {
+    bots = new Map();
+    const pink = force ?? (settings.opponent === 'human' ? null : settings.opponent);
+    const others: Difficulty = pink ?? 'normal';
+    for (let seat = 0; seat < 8; seat++) hud.setTag(seat, '');
+    if (pink && players >= 2) bots.set(1, createOpponent(pink, newSeed()));
+    for (let seat = 2; seat < players; seat++) bots.set(seat, createOpponent(others, newSeed() + seat));
+    for (const seat of bots.keys()) hud.setTag(seat, 'AI');
+    hud.setLocal(0);
   };
 
   const tuning = createTuningPanel(cfg, settings, {
@@ -151,8 +161,12 @@ async function boot(): Promise<void> {
         return;
       }
       if (!state || paused) return;
-      const inputs = input.sample();
-      if (ai) inputs[AI_SEAT] = opponentInput(ai, state, AI_SEAT, cfg);
+      const keys = input.sample();
+      const current = state;
+      const inputs = current.snakes.map((_, seat) => {
+        const bot = bots.get(seat);
+        return bot ? opponentInput(bot, current, seat, cfg) : (keys[seat] ?? NO_INPUT);
+      });
       sink.handle(step(state, inputs, cfg), state);
     },
     (alpha, frameSeconds) => {
@@ -169,13 +183,16 @@ async function boot(): Promise<void> {
       const heads = s ? s.snakes.filter((sn) => sn.alive).map((sn) => ({ x: sn.x, y: sn.y })) : [];
       let target: View;
       if (!s) target = { cx: ARENA_WIDTH / 2, cy: ARENA_HEIGHT / 2, zoom: 1 };
-      else if (online && online.localPlayer >= 0 && s.snakes[online.localPlayer]?.alive) target = followView(s.snakes[online.localPlayer], ARENA_WIDTH, ARENA_HEIGHT);
-      else target = fitView(heads, ARENA_WIDTH, ARENA_HEIGHT);
+      else target = (online ? online.cameraTarget(s) : null) ?? fitView(heads, ARENA_WIDTH, ARENA_HEIGHT);
       // A wormhole moves a head across the map: no easing there, the camera snaps with it.
       const snap = sink.warped !== null && (!online || sink.warped === online.localPlayer);
       sink.warped = null;
       world.view = easeView(world.view, target, frameSeconds, snap);
-      renderer.draw(s, alpha, activeCfg(), performance.now() / 1000, online?.offsets);
+      renderer.draw(s, alpha, activeCfg(), performance.now() / 1000, online?.offsets, {
+        names,
+        local: online ? online.localPlayer : 0,
+        show: (s?.snakes.length ?? 0) > 2,
+      });
       minimap.draw(s, world.view);
       fx.update(frameSeconds);
       hud.update(s, activeCfg(), performance.now() / 1000);
@@ -198,8 +215,8 @@ async function boot(): Promise<void> {
 
   const startOnline = (mode: OnlineMode, connection?: RelayConnection) => {
     state = null;
-    ai = null;
-    hud.setTag(AI_SEAT, '');
+    bots = new Map();
+    for (let seat = 0; seat < 8; seat++) hud.setTag(seat, '');
     fx.clear();
     input.clearLatches();
     online = new OnlineMatch(relayUrl(relayBase()), settings.name, mode, {
@@ -214,7 +231,7 @@ async function boot(): Promise<void> {
         // Nobody came: play the Hard AI locally at the chosen length, leaving the saved opponent alone.
         leaveOnline();
         cfg.winsToWin = winsToWin;
-        startLocal('hard');
+        startLocal('hard', 2);
       },
       onNames: (n) => (names = n),
       onRoomNameRefused: (name, message) => {
@@ -237,7 +254,8 @@ async function boot(): Promise<void> {
         return;
       }
       lastRoomName = name;
-      startOnline(name ? { kind: 'create', winsToWin, name } : { kind: 'create', winsToWin });
+      const size = settings.players;
+      startOnline(name ? { kind: 'create', winsToWin, size, name } : { kind: 'create', winsToWin, size });
     });
   };
 
@@ -262,9 +280,9 @@ async function boot(): Promise<void> {
     });
   };
 
-  const startLocal = (forceAi?: Difficulty) => {
-    state = createMatch(cfg, newSeed());
-    seatOpponent(forceAi);
+  const startLocal = (forceAi?: Difficulty, players = settings.players) => {
+    state = createMatch(cfg, newSeed(), players);
+    seatOpponents(players, forceAi);
     input.clearLatches();
     screens.clear();
   };
@@ -320,6 +338,7 @@ async function boot(): Promise<void> {
         if (state || screens.showing === 'powers') return;
         const delta = code === 'ArrowLeft' || code === 'KeyA' ? -1 : 1;
         if (menuRow === 'local') settings.opponent = nextOpponent(settings.opponent, delta);
+        else if (menuRow === 'players') settings.players = nextPlayers(settings.players, delta);
         else if (menuRow === 'wins') cfg.winsToWin = nextWins(cfg.winsToWin, delta);
         else return;
         tuning.refresh();
@@ -339,12 +358,12 @@ async function boot(): Promise<void> {
       case 'Space':
         if (screens.showing === 'powers') return;
         if (!state) {
-          if (menuRow === 'create') beginOnline({ kind: 'create', winsToWin: cfg.winsToWin });
-          else if (menuRow === 'quick') beginOnline({ kind: 'quick', winsToWin: cfg.winsToWin });
+          if (menuRow === 'create') beginOnline({ kind: 'create', winsToWin: cfg.winsToWin, size: settings.players });
+          else if (menuRow === 'quick') beginOnline({ kind: 'quick', winsToWin: cfg.winsToWin, size: settings.players });
           else startLocal();
         } else if (state.phase === 'matchOver') {
           rematch(state, cfg, newSeed());
-          seatOpponent();
+          seatOpponents(state.snakes.length);
           fx.clear();
           screens.clear();
         }

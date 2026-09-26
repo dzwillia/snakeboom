@@ -8,6 +8,8 @@ export const OPPONENT_MODES: readonly OpponentMode[] = ['human', ...DIFFICULTIES
 /** Client-only preferences (effects, audio and who the opponent is); gameplay values live in the sim Config. */
 export interface ClientSettings {
   opponent: OpponentMode;
+  /** Seats in a local match (bots fill the rest) and the size of the online rooms you open, 2–8. */
+  players: number;
   /** Display name online; empty means CYAN or PINK. */
   name: string;
   bloom: boolean;
@@ -30,6 +32,7 @@ export interface ClientSettings {
 
 export const DEFAULT_SETTINGS: ClientSettings = {
   opponent: 'human',
+  players: 2,
   name: '',
   bloom: true,
   bloomStrength: 1.5,

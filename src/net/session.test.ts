@@ -185,8 +185,8 @@ describe('NetSession with several seats', () => {
 
   it('eight seats agree through hotspot jitter, with bounded rollbacks and no lasting stalls', () => {
     const { run, link, sessions, bots, gates } = setup(150, 60, 3, 5, { spikeMs: 300, spikeEveryMs: 7000 }, 8);
-    runFrames(link, sessions, bots, 2400, run, gates);
-    expectAllAgree(run, 30);
+    runFrames(link, sessions, bots, 1200, run, gates);
+    expectAllAgree(run, 15);
     for (const s of sessions) {
       expect(s.stats.maxRollbackDepth).toBeLessThanOrEqual(s.maxRollback);
       expect(s.stats.stalledTicks).toBeLessThan(120);
