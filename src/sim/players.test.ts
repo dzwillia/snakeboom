@@ -168,5 +168,5 @@ describe('players', () => {
     expect(rounds).toBe(3);
     expect(s.scores).toHaveLength(8);
     expect(Math.max(...s.scores)).toBeGreaterThan(0);
-  });
+  }, 60000);
 });

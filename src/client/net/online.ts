@@ -463,11 +463,8 @@ export class OnlineMatch {
         this.pingMs = m.pingMs;
         // An empty seat keeps its last name, so "Ada left" reads right after Ada leaves.
         this.names = m.players.map((p, i) => (p ? displayName(p.name, i) : (this.names[i] ?? displayName('', i))));
-        if (this.seatMap.length === 0) {
-          this.playerNames = [...this.names];
-          this.deps.hud.setNames(this.playerNames);
-          this.deps.onNames(this.playerNames);
-        }
+        // A rejoining tab gets its resume before this lobby message, so the names catch up here.
+        this.refreshPlayerNames();
         // Quick match: the lobby shows as soon as someone else is in; a bigger room keeps filling from there.
         if (this.phase === 'queue' && m.players.filter((p) => p !== null).length >= 2) this.phase = 'lobby';
         if (this.phase === 'connecting' && this.mode.kind === 'rejoin') this.phase = 'lobby';
@@ -552,17 +549,27 @@ export class OnlineMatch {
   }
 
   /** A mid-match rejoin: build the session, then wait for the replay frame. */
+  /** Names in sim order (through the seat map during a match, seat order otherwise), for the HUD and banners. */
+  private refreshPlayerNames(): void {
+    if (this.seatMap.length === 0) {
+      this.playerNames = [...this.names];
+    } else {
+      const players = this.seatMap.filter((p) => p >= 0).length;
+      this.playerNames = Array.from({ length: players }, (_, p) => PLAYER_NAMES[p]);
+      this.seatMap.forEach((p, seat) => {
+        if (p >= 0) this.playerNames[p] = this.names[seat] ?? PLAYER_NAMES[seat];
+      });
+    }
+    this.deps.hud.setNames(this.playerNames);
+    this.deps.onNames(this.playerNames);
+  }
+
   /** Seats compact to sim players for a match: remember the map and the names in sim order. */
   private seatMatch(m: { players: number; seats: number[]; rttMs: number[] }): void {
     this.seatMap = m.seats;
     this.player = m.seats[this.me] ?? -1;
-    this.playerNames = Array.from({ length: m.players }, (_, p) => PLAYER_NAMES[p]);
-    m.seats.forEach((p, seat) => {
-      if (p >= 0) this.playerNames[p] = this.names[seat] ?? PLAYER_NAMES[seat];
-    });
     this.deps.hud.setLocal(this.player);
-    this.deps.hud.setNames(this.playerNames);
-    this.deps.onNames(this.playerNames);
+    this.refreshPlayerNames();
     const present = m.rttMs.filter((_, seat) => m.seats[seat] >= 0);
     const meanRtt = present.length ? present.reduce((a, b) => a + b, 0) / present.length : 100;
     this.oneWayTicks = meanRtt / 2 / TICK_MS;
