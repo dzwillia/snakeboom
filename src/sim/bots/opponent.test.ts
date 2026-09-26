@@ -194,11 +194,11 @@ describe('AI opponent', () => {
         const me = state.snakes[1];
         Object.assign(me, { x: 1400, y: 1000, prevX: 1400, prevY: 1000, heading: 0, targetLength: 400 });
         Object.assign(state.snakes[0], { x: 300, y: 1800, prevX: 300, prevY: 1800, heading: 0 });
-        state.pickups.push({ id: 1, kind: 'missile', x: 1400 + ax, y: 1000 + ay, ttl: 100_000 });
+        state.pickups.push({ id: 1, kind: 'missile', x: 1400 + ax, y: 1000 + ay, ttl: 100_000, dropped: false });
         const bot = createOpponent(kind, 5);
         let took = -1;
         for (let t = 0; t < 4 * TICK_RATE && took < 0 && me.alive; t++) {
-          const events = step(state, [{ turn: 1, boost: false, use: false }, opponentInput(bot, state, 1, quiet)], quiet);
+          const events = step(state, [{ turn: 1, boost: false, use: false, select: false }, opponentInput(bot, state, 1, quiet)], quiet);
           if (events.some((e) => e.type === 'loopCollected' && e.player === 1)) took = t;
         }
         // Easy slips up on purpose and decides slowly; it gets the easy placements only.

@@ -4,8 +4,9 @@ import { createMatch } from './state';
 import { step } from './step';
 import type { MatchState, PlayerInput, SimEvent } from './types';
 
-const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000, wormholeInterval: 0, sawInterval: 0, borderCloseSeconds: 0 };
-const straight: PlayerInput = { turn: 0, boost: false, use: false };
+// Three slots however long the body is, so the slot arithmetic below stays readable.
+const cfg: Config = { ...DEFAULT_CONFIG, firstPickupDelay: 1000, wormholeInterval: 0, sawInterval: 0, borderCloseSeconds: 0, itemSlots: 3 };
+const straight: PlayerInput = { turn: 0, boost: false, use: false, select: false };
 const right: PlayerInput = { ...straight, turn: 1 };
 const left: PlayerInput = { ...straight, turn: -1 };
 /** A full-rate turning circle: radius baseSpeed / turnRate, about 44 at the defaults. */
@@ -24,7 +25,7 @@ function scene(c: Config = cfg): MatchState {
 }
 
 function drop(s: MatchState, id: number, kind: PickupKind, x: number, y: number): void {
-  s.pickups.push({ id, kind, x, y, ttl: 10_000 });
+  s.pickups.push({ id, kind, x, y, ttl: 10_000, dropped: false });
 }
 
 function run(s: MatchState, ticks: number, cyan: PlayerInput, c: Config = cfg): SimEvent[] {

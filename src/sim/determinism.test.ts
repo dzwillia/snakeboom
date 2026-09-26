@@ -20,7 +20,7 @@ function drive(state: MatchState, bots: BotState[], ticks: number): void {
  * Unchanged by length-as-storage (M14): tick 4000 falls in a countdown with no pickups out, and the simple bots fire what they grab at once.
  * Updated 2026-09-26 for collecting by loop and the wider pickup clearance (M15); re-pinned after the rebase.
  */
-const GOLDEN_HASH = 0xbcfbcae4;
+const GOLDEN_HASH = 0xf5770070;
 
 describe('determinism', () => {
   it('produces the golden hash for a fixed seed and input script', () => {

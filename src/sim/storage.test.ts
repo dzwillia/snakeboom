@@ -166,7 +166,8 @@ describe('a cut drops the weapons that no longer fit', () => {
   });
 
   it('may take the field past maxPickups, and the cutter can pick a drop up', () => {
-    const c: Config = { ...cfg, maxPickups: 1 };
+    // Run-over collecting here: looping a drop is the M15 rule and has its own tests.
+    const c: Config = { ...cfg, maxPickups: 1, collectByLoop: false };
     const s = crossing(c);
     const pink = s.snakes[1];
     const filler: PickupState = { id: 900, kind: 'shield', x: 2000, y: 1500, ttl: 1000, dropped: false };
