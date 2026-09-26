@@ -1,6 +1,6 @@
 import { ARENA_HEIGHT, ARENA_WIDTH, TICK_RATE, type Config } from './config';
 import { createGrid, gridClear, gridInsert } from './grid';
-import { MAPS } from './maps';
+import { generateMap, mapCatalogue, MAPS, type ParsedMap } from './maps';
 import { createRng, shuffleInPlace } from './rng';
 import { createSnake } from './snake';
 import type { MatchState } from './types';
@@ -19,6 +19,7 @@ export function createMatch(cfg: Config, seed: number): MatchState {
     lastRoundWinner: null,
     mapIndex: 0,
     mapBag: [],
+    mapName: '',
     rng: createRng(seed),
     tiles: [],
     tilesVersion: 0,
@@ -38,9 +39,21 @@ export function createMatch(cfg: Config, seed: number): MatchState {
   return state;
 }
 
+/**
+ * The map for `state.mapIndex` under the current `maps` setting: a hand-made map, or a fresh layout
+ * generated from `state.rng` (the only rng use here, so it happens after pickNextMap's shuffle and
+ * both peers, and every rollback, build the same one). Indices wrap if the setting changed mid-match.
+ */
+function loadMap(state: MatchState, cfg: Config): ParsedMap {
+  const catalogue = mapCatalogue(cfg.maps);
+  const entry = catalogue[state.mapIndex % catalogue.length];
+  return entry.kind === 'handmade' ? MAPS[entry.index] : generateMap(state.rng, { density: cfg.mapDensity });
+}
+
 /** Loads the current map and respawns everyone into a fresh countdown. */
 export function startRound(state: MatchState, cfg: Config): void {
-  const map = MAPS[state.mapIndex];
+  const map = loadMap(state, cfg);
+  state.mapName = map.name;
   state.tiles = map.tiles.slice();
   state.tilesVersion++;
   state.snakes = map.spawns.map((sp, i) => createSnake(i, sp.x, sp.y, sp.heading, cfg));

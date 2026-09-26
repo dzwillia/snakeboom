@@ -5,7 +5,7 @@ import { applyScissors } from './scissors';
 import { DT, TICK_RATE, type Config } from './config';
 import { borderSpeedAt, maxInset } from './border';
 import { selectNextItem, tickItemTimers, useItem } from './items';
-import { MAPS } from './maps';
+import { mapCatalogue } from './maps';
 import { plow } from './dozer';
 import { detectNearMisses } from './nearMiss';
 import { collectPickups, updatePickups } from './pickups';
@@ -172,6 +172,6 @@ function stepRoundOver(state: MatchState, cfg: Config, events: SimEvent[]): void
     return;
   }
   state.round++;
-  state.mapIndex = pickNextMap(state, MAPS.length);
+  state.mapIndex = pickNextMap(state, mapCatalogue(cfg.maps).length);
   startRound(state, cfg);
 }

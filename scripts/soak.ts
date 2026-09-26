@@ -85,7 +85,7 @@ while (lengths.length < rounds) {
         const other = state.snakes[1];
         console.log(
           `  [round ${state.round} t=${state.roundTicks}] ${names[0]} ${e.type} ${e.cause} at (${Math.round(s.x)},${Math.round(s.y)}) ` +
-            `${s.boosting ? 'boosting ' : ''}effects[${fx.join(' ')}] map ${state.mapIndex} opp-dozer ${other.effects.dozer} ` +
+            `${s.boosting ? 'boosting ' : ''}effects[${fx.join(' ')}] map ${state.mapIndex} (${state.mapName}) opp-dozer ${other.effects.dozer} ` +
             `plan-clear last 40 ticks: ${clearHistory.join(' ')}`,
         );
       }

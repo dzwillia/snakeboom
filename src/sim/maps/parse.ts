@@ -24,6 +24,27 @@ export interface ParsedMap {
 
 const TILES_PER_CELL = MAP_CELL / TILE_SIZE;
 
+/** Expands a 40×25 cell grid (MAP_COLS * MAP_ROWS entries, 1 = solid) to the tile grid, 4×4 tiles per cell. */
+export function cellsToTiles(cells: readonly number[]): number[] {
+  const tiles = createTiles();
+  for (let r = 0; r < MAP_ROWS; r++) {
+    for (let c = 0; c < MAP_COLS; c++) {
+      if (cells[r * MAP_COLS + c] !== 1) continue;
+      for (let dy = 0; dy < TILES_PER_CELL; dy++) {
+        for (let dx = 0; dx < TILES_PER_CELL; dx++) {
+          tiles[(r * TILES_PER_CELL + dy) * TILE_COLS + (c * TILES_PER_CELL + dx)] = 1;
+        }
+      }
+    }
+  }
+  return tiles;
+}
+
+/** A spawn at the centre of cell (c, r), heading in degrees (0 = east, clockwise). */
+export function cellSpawn(c: number, r: number, headingDeg: number): Spawn {
+  return { x: c * MAP_CELL + MAP_CELL / 2, y: r * MAP_CELL + MAP_CELL / 2, heading: (headingDeg * PI) / 180 };
+}
+
 export function mapRows(def: MapDef): string[] {
   return def.grid
     .split('\n')
@@ -36,7 +57,7 @@ export function parseMap(def: MapDef): ParsedMap {
   if (rows.length !== MAP_ROWS) {
     throw new Error(`Map ${def.name}: expected ${MAP_ROWS} rows, got ${rows.length}`);
   }
-  const tiles = createTiles();
+  const solid = new Array<number>(MAP_COLS * MAP_ROWS).fill(0);
   const cells: Array<{ c: number; r: number } | null> = [null, null];
   for (let r = 0; r < MAP_ROWS; r++) {
     const row = rows[r];
@@ -46,11 +67,7 @@ export function parseMap(def: MapDef): ParsedMap {
     for (let c = 0; c < MAP_COLS; c++) {
       const ch = row[c];
       if (ch === '#') {
-        for (let dy = 0; dy < TILES_PER_CELL; dy++) {
-          for (let dx = 0; dx < TILES_PER_CELL; dx++) {
-            tiles[(r * TILES_PER_CELL + dy) * TILE_COLS + (c * TILES_PER_CELL + dx)] = 1;
-          }
-        }
+        solid[r * MAP_COLS + c] = 1;
       } else if (ch === '1' || ch === '2') {
         const p = ch === '1' ? 0 : 1;
         if (cells[p]) throw new Error(`Map ${def.name}: more than one spawn ${ch}`);
@@ -62,11 +79,7 @@ export function parseMap(def: MapDef): ParsedMap {
   }
   const spawns = cells.map((cell, p) => {
     if (!cell) throw new Error(`Map ${def.name}: missing spawn ${p + 1}`);
-    return {
-      x: cell.c * MAP_CELL + MAP_CELL / 2,
-      y: cell.r * MAP_CELL + MAP_CELL / 2,
-      heading: (def.spawnHeadings[p] * PI) / 180,
-    };
+    return cellSpawn(cell.c, cell.r, def.spawnHeadings[p]);
   });
-  return { name: def.name, tiles, spawns };
+  return { name: def.name, tiles: cellsToTiles(solid), spawns };
 }
