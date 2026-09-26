@@ -16,6 +16,7 @@ No other secrets are needed:
 - The workflow pushes and pulls images with its own `GITHUB_TOKEN`; the box logs into GHCR with that token during the deploy.
 - The relay has no database, so there is no `DATABASE_URL`.
 - `ALLOWED_ORIGIN` is not a secret; it lives in `/opt/happypathsoft/snakeboom/.env` on the box.
+- `ADMIN_TOKEN` (the house-rules page at `/admin`) is a secret, but it is **not** a GitHub secret either: it lives only in that same `.env` on the box. Pick a memorable one there (three words with hyphens, at least 12 characters), add `ADMIN_TOKEN=…` to `.env`, and `docker compose up -d`. Without it the `/admin` endpoints don't exist (404). Rotate by changing the line and restarting the relay.
 
 ## Setting them with the GitHub CLI
 

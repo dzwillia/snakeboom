@@ -3,8 +3,10 @@
  * inputs are binary frames (see codec.ts). Times are milliseconds on the relay's clock.
  */
 
+import type { Overrides } from '../sim/configSchema';
+
 /** Bumped on every incompatible change; the relay refuses other values. */
-export const PROTOCOL = 8;
+export const PROTOCOL = 9;
 
 /** Netcode counters for one round, as the client measured them (deltas since the previous round). */
 export interface NetStats {
@@ -51,17 +53,17 @@ export type ErrorCode = 'version' | 'badMessage' | 'busy' | 'notInRoom' | 'roomN
 
 export type ServerMessage =
   | { type: 'welcome'; player: number; room: string; session: string; name: string }
-  /** One entry per seat (`size` of them); null is an empty seat. */
-  | { type: 'lobby'; players: (LobbyPlayer | null)[]; winsToWin: number; size: number; pingMs: number | null }
+  /** One entry per seat (`size` of them); null is an empty seat. `houseRules`: the relay's current overrides on the defaults. */
+  | { type: 'lobby'; players: (LobbyPlayer | null)[]; winsToWin: number; size: number; pingMs: number | null; houseRules: Overrides }
   /** Sent to every waiting quick-match player whenever the queue or the player count changes. */
   | { type: 'queued'; waiting: number; online: number }
   /**
    * `players` seats play; `seats[roomSeat]` is that seat's sim player index, or −1 for an empty
    * seat. Relayed frames carry room seats. `rttMs` is per room seat.
    */
-  | { type: 'start'; seed: number; winsToWin: number; players: number; seats: number[]; inputDelay: number; startAt: number; rttMs: number[] }
+  | { type: 'start'; seed: number; winsToWin: number; players: number; seats: number[]; inputDelay: number; startAt: number; rttMs: number[]; houseRules: Overrides }
   /** A rejoin mid-match: the match's parameters, followed by one binary replay frame with `frames` entries. */
-  | { type: 'resume'; seed: number; winsToWin: number; players: number; seats: number[]; inputDelay: number; rttMs: number[]; frames: number }
+  | { type: 'resume'; seed: number; winsToWin: number; players: number; seats: number[]; inputDelay: number; rttMs: number[]; frames: number; houseRules: Overrides }
   /** Every second; `pingMs` is the relay's current estimate of the latency between the players (null until both have answered). */
   | { type: 'ping'; t: number; pingMs: number | null }
   | { type: 'desync'; tick: number }

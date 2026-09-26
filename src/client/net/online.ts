@@ -1,4 +1,5 @@
 import { ARENA_HEIGHT, ARENA_WIDTH, DEFAULT_CONFIG, hashState, type Config, type MatchState } from '../../sim';
+import { applyOverrides, describeOverrides, type Overrides } from '../../sim/configSchema';
 import { decodeRelayed, decodeReplay, encodeInput, FRAME_REPLAY } from '../../net/codec';
 import { EventGate } from '../../net/events';
 import { displayName } from '../../net/names';
@@ -86,8 +87,8 @@ const CATCH_UP_PER_FRAME = 600;
 
 /** One visit to a room: connect, lobby, ready-up, a match through NetSession, and the ways it ends. */
 export class OnlineMatch {
-  /** Fixed for the match: the defaults plus the room's first-to-N. */
-  readonly cfg: Config = { ...DEFAULT_CONFIG };
+  /** Fixed for the match: the defaults, the relay's house rules, and the room's first-to-N. */
+  cfg: Config = applyOverrides(DEFAULT_CONFIG, {});
 
   private readonly conn: RelayConnection;
   private readonly clock = new RelayClock();
@@ -565,7 +566,10 @@ export class OnlineMatch {
   }
 
   /** Seats compact to sim players for a match: remember the map and the names in sim order. */
-  private seatMatch(m: { players: number; seats: number[]; rttMs: number[] }): void {
+  private seatMatch(m: { players: number; seats: number[]; rttMs: number[]; winsToWin: number; houseRules?: Overrides }): void {
+    // Both peers build the same config: the defaults, the relay's house rules, the room's length.
+    this.cfg = applyOverrides(DEFAULT_CONFIG, m.houseRules ?? {});
+    this.cfg.winsToWin = m.winsToWin;
     this.seatMap = m.seats;
     this.player = m.seats[this.me] ?? -1;
     this.deps.hud.setLocal(this.player);
@@ -578,7 +582,6 @@ export class OnlineMatch {
   }
 
   private resume(m: Extract<ServerMessage, { type: 'resume' }>): void {
-    this.cfg.winsToWin = m.winsToWin;
     this.rttMs = m.rttMs[this.me] ?? null;
     this.seatMatch(m);
     this.replayFrames = m.frames;
@@ -699,11 +702,11 @@ export class OnlineMatch {
       size: this.lobby.size,
       pingMs: this.lobby.pingMs,
       me: this.me,
+      houseRules: describeOverrides(this.lobby.houseRules ?? {}),
     });
   }
 
   private start(m: Extract<ServerMessage, { type: 'start' }>): void {
-    this.cfg.winsToWin = m.winsToWin;
     this.rttMs = m.rttMs[this.me] ?? null;
     this.seatMatch(m);
     this.session = new NetSession({

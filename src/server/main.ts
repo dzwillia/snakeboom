@@ -6,6 +6,8 @@ const server = await startServer({
   allowedOrigin: process.env.ALLOWED_ORIGIN || undefined,
   version: process.env.APP_VERSION ?? 'dev',
   lagMs: Number(process.env.RELAY_LAG_MS ?? 0) || 0,
+  adminToken: process.env.ADMIN_TOKEN || undefined,
+  configPath: process.env.CONFIG_PATH || undefined,
 });
 
 const shutdown = () => {

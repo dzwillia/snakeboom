@@ -333,6 +333,7 @@ describe('Room disconnects', () => {
       seats: [0, 1],
       inputDelay: start.inputDelay,
       rttMs: [60, 80],
+      houseRules: {},
       frames: 5,
     });
     const replay = decodeReplay(host.frames(1)[0]);
@@ -411,6 +412,27 @@ function bigRoom(host: FakeHost, size: number, seated: number, ready = true): Ro
   if (ready) for (let i = 0; i < seated; i++) room.onMessage(i, { type: 'ready', ready: true });
   return room;
 }
+
+describe('Room house rules', () => {
+  it('reads the rules when a match starts and shows them in the lobby', () => {
+    const host = new FakeHost();
+    let rules: Record<string, unknown> = { hearts: 3 };
+    const room = new Room(host, { code: 'RULES1', winsToWin: 5, houseRules: () => rules as never });
+    room.join('Ada');
+    expect(host.last(0, 'lobby')).toMatchObject({ houseRules: { hearts: 3 } });
+    room.join('Bob');
+    rules = { hearts: 2, maps: 'random' };
+    room.onMessage(0, { type: 'ready', ready: true });
+    room.onMessage(1, { type: 'ready', ready: true });
+    expect(host.last(1, 'start')).toMatchObject({ houseRules: { hearts: 2, maps: 'random' } });
+    // The match keeps the rules it started with, even after they change.
+    rules = {};
+    const session = (host.last(1, 'welcome') as { session: string }).session;
+    room.onDisconnect(1);
+    room.rejoin(session, 0);
+    expect(host.last(1, 'resume')).toMatchObject({ houseRules: { hearts: 2, maps: 'random' } });
+  });
+});
 
 describe('Rooms of three or more', () => {
   it('seats up to its size, lists every seat, and starts once everyone present is ready', () => {

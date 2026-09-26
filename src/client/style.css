@@ -530,6 +530,116 @@ kbd {
   letter-spacing: 0.12em;
 }
 
+/* The /admin page: the tuning panel against the relay's house rules. */
+body.admin-page #game,
+body.admin-page #hud {
+  display: none;
+}
+
+body.admin-page #screens {
+  inset: 0;
+  place-items: start center;
+  overflow-y: auto;
+  pointer-events: auto;
+}
+
+.admin {
+  width: min(960px, 94vw);
+  padding: 28px 0 60px;
+  text-align: left;
+}
+
+.admin h1 {
+  margin: 0 0 6px;
+  font-size: clamp(22px, 3.5vw, 34px);
+  letter-spacing: 0.2em;
+  background: linear-gradient(90deg, var(--cyan), var(--pink));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.admin .lead,
+.admin .rules,
+.admin .status {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+  margin: 6px 0;
+}
+
+.admin .status.ok {
+  color: var(--shield);
+}
+
+.admin .status.bad {
+  color: var(--red);
+}
+
+.admin .row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.admin label {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--dim);
+}
+
+.admin input.token {
+  margin-left: 8px;
+  width: 260px;
+  padding: 6px 8px;
+  border: 1px solid var(--dim);
+  border-radius: 8px;
+  background: rgba(5, 6, 13, 0.6);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.admin button,
+.admin a.back {
+  padding: 8px 12px;
+  border: 1px solid var(--cyan);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cyan);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.admin button.publish {
+  border-color: var(--shield);
+  color: var(--shield);
+}
+
+.admin button.clear {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.admin .panel-host {
+  margin-top: 16px;
+}
+
+.admin .panel-host .lil-gui.root {
+  --width: 100%;
+  width: 100%;
+}
+
+.small.tuned,
+.small.house-rules {
+  color: var(--amber);
+}
+
 /* The build's version, tucked into the corner of the title screen. */
 .version {
   position: absolute;

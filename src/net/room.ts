@@ -1,6 +1,7 @@
 import { NO_INPUT } from '../sim';
 import { decodeInput, encodeRelayed, encodeReplay, relayedTick } from './codec';
 import { ROOM_ALPHABET } from './names';
+import type { Overrides } from '../sim/configSchema';
 import type { ClientMessage, CloseReason, LobbyPlayer, RoundResult, ServerMessage } from './protocol';
 
 /** What a room needs from its runtime: sockets, timers and a clock. Node and Durable Objects can both provide it. */
@@ -27,6 +28,8 @@ export interface RoomOptions {
   idleMs?: number;
   /** Time with nobody connected before the room is closed. */
   emptyMs?: number;
+  /** The relay's current house rules, read when a match starts (and shown in the lobby). */
+  houseRules?: () => Overrides;
 }
 
 /**
@@ -133,7 +136,8 @@ export class Room {
   private lastAgreed = -1;
   private seed = 0;
   /** The current match's parameters, for rejoins. `seats[roomSeat]` is the sim player index, or −1. */
-  private match: { seed: number; winsToWin: number; players: number; seats: number[]; inputDelay: number; rttMs: number[] } | null = null;
+  private match: { seed: number; winsToWin: number; players: number; seats: number[]; inputDelay: number; rttMs: number[]; houseRules: Overrides } | null = null;
+  private readonly houseRules: () => Overrides;
   /** Input frames are forwarded from start until the match is over, including the round-over play-out after a result. */
   private relaying = false;
 
@@ -148,6 +152,7 @@ export class Room {
     this.graceMs = opts.graceMs ?? DEFAULT_GRACE_MS;
     this.idleMs = opts.idleMs ?? DEFAULT_IDLE_MS;
     this.emptyMs = opts.emptyMs ?? DEFAULT_EMPTY_MS;
+    this.houseRules = opts.houseRules ?? (() => ({}));
     this.lastActivity = host.now();
     this.scheduleIdle();
     this.scheduleEmpty();
@@ -373,9 +378,10 @@ export class Room {
     this.lastAgreed = -1;
     this.relaying = true;
     this.setStatus('playing');
-    this.match = { seed: this.seed, winsToWin: this.winsToWin, players, seats, inputDelay, rttMs };
+    const houseRules = this.houseRules();
+    this.match = { seed: this.seed, winsToWin: this.winsToWin, players, seats, inputDelay, rttMs, houseRules };
     this.broadcast({ type: 'start', ...this.match, startAt });
-    this.host.log({ event: 'start', seed: this.seed, players, inputDelay, rttMs, names: present.map((s) => s.name) });
+    this.host.log({ event: 'start', seed: this.seed, players, inputDelay, rttMs, names: present.map((s) => s.name), houseRules: Object.keys(houseRules) });
   }
 
   /** The seats whose hashes and results count: connected and not ghosted. */
@@ -595,7 +601,7 @@ export class Room {
     );
     const pingMs = this.pingMs();
     this.lastPingShown = pingMs;
-    this.broadcast({ type: 'lobby', players, winsToWin: this.winsToWin, size: this.size, pingMs });
+    this.broadcast({ type: 'lobby', players, winsToWin: this.winsToWin, size: this.size, pingMs, houseRules: this.houseRules() });
   }
 
   /** The relay's estimate of the latency between the players: the mean of the known round trips (null until two are known). */

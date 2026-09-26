@@ -21,6 +21,8 @@ export interface TitleOptions {
   opponent: OpponentMode;
   /** Seats in a local match and the size of the rooms you open, 2–8. */
   players: number;
+  /** This browser's saved tuning differs from the defaults (local play only). */
+  tuned?: boolean;
 }
 
 export interface LobbyOptions {
@@ -33,6 +35,8 @@ export interface LobbyOptions {
   pingMs: number | null;
   /** Which seat is ours. */
   me: number;
+  /** The relay's house rules, described ("hearts 3"); empty when matches run on the defaults. */
+  houseRules?: string[];
 }
 
 function escapeHtml(text: string): string {
@@ -88,6 +92,7 @@ export class Screens {
         <div class="hint">SPACE TO GO</div>
         <div class="small"><kbd>▲</kbd> <kbd>▼</kbd> CHOOSE · <kbd>◀</kbd> <kbd>▶</kbd> ADJUST · ${opts.hearts} ${opts.hearts === 1 ? 'HEART' : 'HEARTS'} PER ROUND</div>
         <div class="small"><kbd>H</kbd> POWERS · <kbd>ESC</kbd> PAUSE · <kbd>M</kbd> MUTE · <kbd>\`</kbd> TUNING</div>
+        ${opts.tuned ? `<div class="small tuned">LOCAL PLAY IS TUNED · <kbd>\`</kbd> TO ADJUST OR RESET</div>` : ''}
       </div>
       <div class="version" title="The build you are playing">${escapeHtml(this.version)}</div>`,
       'title',
@@ -200,6 +205,7 @@ export class Screens {
     const ready = seated.filter((p) => p?.ready).length;
     const ping = opts.pingMs === null ? '' : ` · PING ${opts.pingMs} ms`;
     const readiness = size > 2 ? `${ready}/${seated.length} READY · STARTS WHEN EVERYONE IS · ` : '';
+    const rules = opts.houseRules && opts.houseRules.length > 0 ? `<div class="small house-rules">HOUSE RULES · ${escapeHtml(opts.houseRules.join(' · ')).toUpperCase()}</div>` : '';
     this.show(
       `
       <div class="panel lobby">
@@ -207,6 +213,7 @@ export class Screens {
         <div class="link"><span class="url">${escapeHtml(opts.link)}</span><button class="copy" type="button">COPY</button></div>
         <div class="seats${size > 2 ? ' many' : ''}">${Array.from({ length: size }, (_, i) => seat(i)).join('')}</div>
         <div class="small">${readiness}FIRST TO ${opts.winsToWin}${ping}</div>
+        ${rules}
         <div class="hint">SPACE READY · ESC LEAVE</div>
       </div>`,
       'lobby',

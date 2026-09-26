@@ -1,5 +1,6 @@
 import GUI from 'lil-gui';
 import { CLASSIC_CONFIG, DEFAULT_CONFIG, type Config, type PickupKind } from '../sim';
+import { CONFIG_FOLDERS } from '../sim/configSchema';
 import { DEFAULT_SETTINGS, OPPONENT_MODES, resetInPlace, type ClientSettings } from './settings';
 import { describeOpponent } from './text';
 
@@ -8,6 +9,29 @@ export interface TuningPanel {
   hide(): void;
   /** Re-reads values changed outside the panel (e.g. the M mute key). */
   refresh(): void;
+}
+
+/** One lil-gui folder per schema folder, bound to `cfg`. Shared with the /admin page. */
+export function addConfigFolders(gui: GUI, cfg: Config): void {
+  for (const folder of CONFIG_FOLDERS) {
+    const f = gui.addFolder(folder.name);
+    for (const row of folder.rows) {
+      switch (row.kind) {
+        case 'number':
+          f.add(cfg, row.key, row.min, row.max, row.step).name(row.label);
+          break;
+        case 'boolean':
+          f.add(cfg, row.key).name(row.label);
+          break;
+        case 'maps':
+          f.add(cfg, row.key, row.options).name(row.label);
+          break;
+        case 'weights':
+          for (const kind of Object.keys(cfg.pickupWeights) as PickupKind[]) f.add(cfg.pickupWeights, kind, row.min, row.max, row.step);
+          break;
+      }
+    }
+  }
 }
 
 /** Live sliders for every M1 tunable. The sim reads `cfg` each tick, so changes apply at once. */
@@ -30,91 +54,7 @@ export function createTuningPanel(cfg: Config, settings: ClientSettings, hooks: 
     .add(settings, 'opponent', Object.fromEntries(OPPONENT_MODES.map((m) => [describeOpponent(m), m])))
     .name('PINK is');
 
-  const move = gui.addFolder('Movement');
-  move.add(cfg, 'baseSpeed', 60, 400, 5).name('speed');
-  move.add(cfg, 'turnRate', 1, 8, 0.1).name('turn rate (rad/s)');
-  move.add(cfg, 'snakeRadius', 3, 14, 0.5).name('thickness (radius)');
-
-  const growth = gui.addFolder('Growth');
-  growth.add(cfg, 'startLength', 20, 600, 10).name('start length');
-  growth.add(cfg, 'growthPerSecond', 0, 200, 5).name('growth per second');
-  growth.add(cfg, 'overtimeAt', 10, 300, 5).name('overtime at (s)');
-  growth.add(cfg, 'overtimeGrowthMultiplier', 1, 10, 0.5).name('overtime growth ×');
-  growth.add(cfg, 'roundMaxSeconds', 20, 600, 5).name('round cap (s)');
-  growth.add(cfg, 'roundSecondsPerExtraPlayer', 0, 30, 1).name('cap + per extra player (s)');
-  growth.add(cfg, 'roundMaxSecondsCap', 30, 600, 5).name('cap at most (s)');
-  growth.add(cfg, 'spawnClearance', 0, 400, 10).name('spawn clearance (3+ players)');
-
-  const border = gui.addFolder('Border');
-  border.add(cfg, 'borderCloseSeconds', 0, 60, 1).name('closes from (s before cap)');
-  border.add(cfg, 'borderCloseSpeed', 0, 100, 1).name('close speed (units/s)');
-  border.add(cfg, 'borderCrushSpeed', 0, 400, 10).name('crush speed after cap');
-
-  const boost = gui.addFolder('Boost');
-  boost.add(cfg, 'boostMultiplier', 1, 3, 0.1).name('speed ×');
-  boost.add(cfg, 'boostBurnPerSecond', 0, 300, 5).name('burns body (units/s)');
-  boost.add(cfg, 'minLength', 20, 400, 10).name('min body to boost');
-
-  const match = gui.addFolder('Match');
-  match.add(cfg, 'winsToWin', 1, 10, 1).name('first to');
-  match.add(cfg, 'hearts', 1, 5, 1).name('hearts');
-  match.add(cfg, 'heartGrace', 0, 3, 0.1).name('grace after a hit (s)');
-  match.add(cfg, 'countdownSeconds', 1, 5, 1).name('countdown (s)');
-  match.add(cfg, 'roundOverSeconds', 1, 6, 0.5).name('round banner (s)');
-
-  const maps = gui.addFolder('Maps');
-  maps
-    .add(cfg, 'maps', { 'Hand-made and random': 'both', 'Hand-made only': 'handmade', 'Random only': 'random' })
-    .name('rotation (from next round)');
-  maps.add(cfg, 'mapDensity', 0, 1, 0.05).name('random map blocks');
-
-  const pickups = gui.addFolder('Pickups');
-  pickups.add(cfg, 'maxPickups', 0, 20, 1).name('max on field');
-  pickups.add(cfg, 'slotLength', 30, 600, 10).name('body per item slot');
-  pickups.add(cfg, 'itemSlots', 1, 8, 1).name('item slots (max)');
-  pickups.add(cfg, 'firstPickupDelay', 0, 20, 0.5).name('first spawn (s)');
-  pickups.add(cfg, 'pickupInterval', 0.5, 30, 0.5).name('spawn every (s)');
-  pickups.add(cfg, 'pickupLifetime', 3, 60, 1).name('lifetime (s)');
-  pickups.add(cfg, 'pickupRadius', 6, 30, 1).name('size');
-  pickups.add(cfg, 'pickupMinHeadDistance', 0, 800, 10).name('min distance from heads');
-  pickups.add(cfg, 'pickupClearance', 10, 120, 5).name('clearance');
-
-  const missiles = gui.addFolder('Missiles');
-  missiles.add(cfg, 'missileCharges', 1, 10, 1).name('shots per pickup');
-  missiles.add(cfg, 'missileCooldown', 0, 2, 0.05).name('cooldown (s)');
-  missiles.add(cfg, 'missileSpeed', 100, 900, 10).name('speed');
-  missiles.add(cfg, 'missileTurnRate', 0.5, 12, 0.1).name('turn rate (rad/s)');
-  missiles.add(cfg, 'missileLife', 0.5, 6, 0.1).name('life (s)');
-  missiles.add(cfg, 'missileRadius', 4, 30, 1).name('radius');
-
-  const hazards = gui.addFolder('Hazards');
-  hazards.add(cfg, 'wormholeInterval', 0, 60, 1).name('wormhole every (s, 0 = none)');
-  hazards.add(cfg, 'wormholeLifetime', 1, 60, 1).name('wormhole open for (s)');
-  hazards.add(cfg, 'wormholeRadius', 10, 80, 2).name('portal radius');
-  hazards.add(cfg, 'wormholeMinJump', 0, 3000, 50).name('min jump (units)');
-  hazards.add(cfg, 'portalCooldown', 0, 5, 0.1).name('re-entry cooldown (s)');
-  hazards.add(cfg, 'sawInterval', 0, 60, 1).name('saw every (s, 0 = none)');
-  hazards.add(cfg, 'sawLifetime', 1, 60, 1).name('saw roves for (s)');
-  hazards.add(cfg, 'sawRadius', 10, 80, 2).name('saw radius');
-  hazards.add(cfg, 'sawSpeed', 0, 600, 10).name('saw speed');
-  hazards.add(cfg, 'sawMinHeadDistance', 0, 1000, 20).name('saw min distance from heads');
-
-  const loops = gui.addFolder('Loops');
-  loops.add(cfg, 'loopIgnore', 8, 80, 2).name('own neck ignored (units)');
-  loops.add(cfg, 'collectByLoop').name('loop a pickup to take it');
-
-  const power = gui.addFolder('Power-ups');
-  power.add(cfg, 'ghostDuration', 0.5, 10, 0.25).name('ghost (s)');
-  power.add(cfg, 'effectWarning', 0, 10, 0.25).name('expiry warning (s)');
-  power.add(cfg, 'shieldGrace', 0, 3, 0.1).name('shield grace (s)');
-  power.add(cfg, 'dozerDuration', 0.5, 15, 0.5).name('bulldozer (s)');
-  power.add(cfg, 'scissorsDuration', 0.5, 15, 0.5).name('scissors (s)');
-  power.add(cfg, 'flameDuration', 0.5, 10, 0.25).name('flamethrower (s)');
-  power.add(cfg, 'flameRange', 40, 400, 10).name('flame reach');
-  power.add(cfg, 'flameSpread', 0.1, 1.5, 0.05).name('flame half-angle (rad)');
-
-  const mix = gui.addFolder('Pickup mix');
-  for (const kind of Object.keys(cfg.pickupWeights) as PickupKind[]) mix.add(cfg.pickupWeights, kind, 0, 100, 1);
+  addConfigFolders(gui, cfg);
 
   const fx = gui.addFolder('Effects');
   fx.add(settings, 'bloom');
