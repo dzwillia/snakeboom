@@ -1,6 +1,6 @@
 import GUI from 'lil-gui';
 import { DEFAULT_CONFIG, type Config } from '../sim';
-import { applyOverrides, describeOverrides, diffConfig, hasOverrides, type Overrides } from '../sim/configSchema';
+import { applyOverrides, describeOverrides, diffConfig, hasOverrides, overridesAsConfigLines, type Overrides } from '../sim/configSchema';
 import { resetInPlace } from './settings';
 import { addConfigFolders } from './tuning';
 
@@ -33,6 +33,14 @@ export function bootAdmin(root: HTMLElement, relayBase: string, storage: Pick<St
       </div>
       <div class="status"></div>
       <div class="rules"><span class="dim">ON THE SERVER NOW:</span> <span class="list">not loaded</span></div>
+      <div class="export">
+        <div class="row">
+          <span class="dim">FOR A PULL REQUEST · THE PANEL'S RULES AS <code>DEFAULT_CONFIG</code> LINES (src/sim/config.ts)</span>
+          <button class="copy-lines" type="button">COPY LINES</button>
+          <button class="copy-json" type="button">COPY JSON</button>
+        </div>
+        <textarea class="snippet" readonly rows="8" spellcheck="false"></textarea>
+      </div>
       <div class="panel-host"></div>
     </div>`;
   const q = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
@@ -40,6 +48,7 @@ export function bootAdmin(root: HTMLElement, relayBase: string, storage: Pick<St
   const status = q<HTMLElement>('.status');
   const list = q<HTMLElement>('.list');
   const host = q<HTMLElement>('.panel-host');
+  const snippet = q<HTMLTextAreaElement>('.snippet');
 
   try {
     tokenInput.value = storage?.getItem(ADMIN_TOKEN_KEY) ?? '';
@@ -61,9 +70,24 @@ export function bootAdmin(root: HTMLElement, relayBase: string, storage: Pick<St
   addConfigFolders(gui, serverCfg);
   const refresh = () => gui.controllersRecursive().forEach((c) => c.updateDisplay());
   const showPending = () => {
-    const pending = describeOverrides(diffConfig(serverCfg));
+    const overrides = diffConfig(serverCfg);
+    const pending = describeOverrides(overrides);
     say(pending.length ? `PANEL DIFFERS FROM THE DEFAULTS IN ${pending.length} ${pending.length === 1 ? 'PLACE' : 'PLACES'}: ${pending.join(' · ')}` : 'PANEL IS AT THE DEFAULTS', '');
+    const lines = overridesAsConfigLines(overrides);
+    snippet.value = lines ? `// House rules from snakeboom.com/admin, ${new Date().toISOString().slice(0, 10)}: replace these lines in DEFAULT_CONFIG.\n${lines}` : '// The panel is at the defaults: nothing to change in DEFAULT_CONFIG.';
   };
+  const copy = async (text: string, what: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      say(`COPIED ${what}`, 'ok');
+    } catch {
+      snippet.focus();
+      snippet.select();
+      say('CLIPBOARD BLOCKED: THE TEXT IS SELECTED BELOW, PRESS COPY', 'bad');
+    }
+  };
+  q<HTMLButtonElement>('.copy-lines').addEventListener('click', () => void copy(snippet.value, 'THE CONFIG LINES'));
+  q<HTMLButtonElement>('.copy-json').addEventListener('click', () => void copy(JSON.stringify({ overrides: diffConfig(serverCfg) }, null, 2), 'THE JSON'));
   gui.onChange(showPending);
 
   function say(text: string, cls: 'ok' | 'bad' | ''): void {
@@ -108,6 +132,7 @@ export function bootAdmin(root: HTMLElement, relayBase: string, storage: Pick<St
     resetInPlace(serverCfg, applyOverrides(DEFAULT_CONFIG, overrides));
     refresh();
     showServer(overrides, reply.updatedAt);
+    showPending();
     say(hasOverrides(overrides) ? 'LOADED THE SERVER RULES INTO THE PANEL' : 'THE SERVER HAS NO RULES; THE PANEL IS AT THE DEFAULTS', 'ok');
   });
   q<HTMLButtonElement>('.publish').addEventListener('click', async () => {
@@ -124,6 +149,7 @@ export function bootAdmin(root: HTMLElement, relayBase: string, storage: Pick<St
     resetInPlace(serverCfg, DEFAULT_CONFIG);
     refresh();
     showServer({}, reply.updatedAt);
+    showPending();
     say('CLEARED: ONLINE MATCHES ARE BACK ON THE DEFAULTS', 'ok');
   });
   q<HTMLButtonElement>('.reset').addEventListener('click', () => {

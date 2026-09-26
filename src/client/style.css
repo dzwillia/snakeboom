@@ -630,6 +630,28 @@ body.admin-page #screens {
   margin-top: 16px;
 }
 
+.admin .export {
+  margin-top: 14px;
+}
+
+.admin .export code {
+  color: var(--text);
+}
+
+.admin textarea.snippet {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--dim);
+  border-radius: 8px;
+  background: rgba(5, 6, 13, 0.6);
+  color: var(--text);
+  font: 12px/1.5 ui-monospace, Menlo, monospace;
+  resize: vertical;
+}
+
 .admin .panel-host .lil-gui.root {
   --width: 100%;
   width: 100%;

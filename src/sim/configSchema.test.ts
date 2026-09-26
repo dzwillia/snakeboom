@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG } from './config';
-import { applyOverrides, CONFIG_FOLDERS, describeOverrides, diffConfig, hasOverrides, OVERRIDABLE_KEYS, validateOverrides } from './configSchema';
+import { applyOverrides, CONFIG_FOLDERS, describeOverrides, diffConfig, hasOverrides, OVERRIDABLE_KEYS, overridesAsConfigLines, validateOverrides } from './configSchema';
 
 describe('config schema', () => {
   it('covers every numeric, boolean and map field of the config, and nothing else', () => {
@@ -45,6 +45,17 @@ describe('config schema', () => {
     expect(diffConfig(DEFAULT_CONFIG)).toEqual({});
     expect(hasOverrides(diffConfig(DEFAULT_CONFIG))).toBe(false);
     expect(hasOverrides({ hearts: 2 })).toBe(true);
+  });
+
+  it('renders overrides as DEFAULT_CONFIG lines in the config\'s order', () => {
+    const lines = overridesAsConfigLines({ pickupWeights: { ...DEFAULT_CONFIG.pickupWeights, missile: 50 }, hearts: 3, maps: 'random', baseSpeed: 320 });
+    expect(lines.split('\n')).toEqual([
+      '  baseSpeed: 320,',
+      '  pickupWeights: { missile: 50, scissors: 15, flame: 15, ghost: 15, shield: 15, dozer: 10 },',
+      '  hearts: 3,',
+      "  maps: 'random',",
+    ]);
+    expect(overridesAsConfigLines({})).toBe('');
   });
 
   it('describes overrides with the panel labels', () => {

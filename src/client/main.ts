@@ -41,7 +41,7 @@ import { browserStorage, CONFIG_KEY, loadSettings, localConfig, readStored, save
 import { nextOpponent, nextPlayers, nextWins, PLAYER_NAMES } from './text';
 import { createTuningPanel } from './tuning';
 import { bootAdmin } from './admin';
-import { describeOverrides, diffConfig, hasOverrides, validateOverrides, type Overrides } from '../sim/configSchema';
+import { diffConfig, hasOverrides, validateOverrides, type Overrides } from '../sim/configSchema';
 
 declare global {
   interface Window {
@@ -152,7 +152,6 @@ async function boot(): Promise<void> {
       opponent: settings.opponent,
       players: settings.players,
       tuned: hasOverrides(diffConfig({ ...cfg, winsToWin: base.winsToWin }, base)),
-      houseRules: describeOverrides(houseRules),
     });
   /**
    * Seats the bots for a new match (so a mid-match setting change waits for the next one): PINK
