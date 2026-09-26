@@ -66,12 +66,6 @@ describe('Screens title', () => {
     expect(root.innerHTML).toContain('plays this seat');
   });
 
-  it('shows the house rules on the title', () => {
-    const root = fakeRoot();
-    new Screens(root).title({ row: 'local', winsToWin: 5, hearts: 3, opponent: 'human', players: 2, houseRules: ['hearts 3'] });
-    expect(root.innerHTML).toContain('HOUSE RULES · HEARTS 3');
-  });
-
   it('notes when local play is tuned away from the defaults', () => {
     const root = fakeRoot();
     new Screens(root).title({ row: 'local', winsToWin: 5, hearts: 3, opponent: 'human', players: 2, tuned: true });

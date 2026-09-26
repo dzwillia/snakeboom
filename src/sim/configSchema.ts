@@ -233,6 +233,24 @@ export function describeOverrides(overrides: Overrides, base: Config = DEFAULT_C
   return lines;
 }
 
+/**
+ * The overrides as lines for `DEFAULT_CONFIG` in src/sim/config.ts, so published house rules
+ * can go into a pull request as the new defaults. Keys come out in the config's own order.
+ */
+export function overridesAsConfigLines(overrides: Overrides, base: Config = DEFAULT_CONFIG): string {
+  const lines: string[] = [];
+  for (const key of Object.keys(base) as (keyof Config)[]) {
+    const value = overrides[key];
+    if (value === undefined) continue;
+    if (key === 'pickupWeights') {
+      const w = value as Record<PickupKind, number>;
+      lines.push(`  pickupWeights: { ${(Object.keys(base.pickupWeights) as PickupKind[]).map((k) => `${k}: ${w[k]}`).join(', ')} },`);
+    } else if (typeof value === 'string') lines.push(`  ${key}: '${value}',`);
+    else lines.push(`  ${key}: ${String(value)},`);
+  }
+  return lines.join('\n');
+}
+
 export function hasOverrides(overrides: Overrides | undefined | null): boolean {
   return !!overrides && Object.keys(overrides).length > 0;
 }

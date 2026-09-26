@@ -23,8 +23,6 @@ export interface TitleOptions {
   players: number;
   /** This browser's saved tuning differs from the base (local play only). */
   tuned?: boolean;
-  /** The relay's house rules, described; local and online play both run on them. */
-  houseRules?: string[];
 }
 
 export interface LobbyOptions {
@@ -94,8 +92,7 @@ export class Screens {
         <div class="hint">SPACE TO GO</div>
         <div class="small"><kbd>▲</kbd> <kbd>▼</kbd> CHOOSE · <kbd>◀</kbd> <kbd>▶</kbd> ADJUST · ${opts.hearts} ${opts.hearts === 1 ? 'HEART' : 'HEARTS'} PER ROUND</div>
         <div class="small"><kbd>H</kbd> POWERS · <kbd>ESC</kbd> PAUSE · <kbd>M</kbd> MUTE · <kbd>\`</kbd> TUNING</div>
-        ${opts.houseRules && opts.houseRules.length > 0 ? `<div class="small house-rules">HOUSE RULES · ${escapeHtml(opts.houseRules.join(' · ')).toUpperCase()}</div>` : ''}
-        ${opts.tuned ? `<div class="small tuned">LOCAL PLAY IS TUNED ON TOP · <kbd>\`</kbd> TO ADJUST OR RESET</div>` : ''}
+        ${opts.tuned ? `<div class="small tuned">LOCAL PLAY IS TUNED · <kbd>\`</kbd> TO ADJUST OR RESET</div>` : ''}
       </div>
       <div class="version" title="The build you are playing">${escapeHtml(this.version)}</div>`,
       'title',
