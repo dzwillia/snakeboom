@@ -33,7 +33,7 @@ export function applyFlames(state: MatchState, cfg: Config, events: SimEvent[]):
         const t = victim.trail;
         if (inCone(me, cfg, t.xs[index], t.ys[index], r)) newest = index;
       });
-      if (newest >= 0) cutTrail(state, j, newest, i, me.x, me.y, events);
+      if (newest >= 0) cutTrail(state, j, newest, i, me.x, me.y, cfg, events);
     });
     if (state.missiles.some((m) => m.owner !== i && inCone(me, cfg, m.x, m.y, cfg.missileRadius))) {
       state.missiles = state.missiles.filter((m) => {

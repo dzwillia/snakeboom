@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Hud } from './hud';
+import { Hud, slotsHtml } from './hud';
 
 /** Just enough DOM for the HUD: innerHTML is parsed into named elements by class. */
 function fakeRoot(): HTMLElement {
@@ -29,5 +29,20 @@ describe('Hud net readout', () => {
     expect(net.textContent).toContain('lead -1.5 · ×0.990');
     hud.setNet(null);
     expect(net.textContent).toBe('');
+  });
+});
+
+describe('Hud item slots', () => {
+  // Length is storage (M14): open slots show as empty cells, the rest of the cap as locked ones.
+  it('draws the open slots, the locked ones and the queue with the selected item highlighted', () => {
+    const snake = { shield: false, selected: 0, items: [{ kind: 'missile', charges: 2 }] } as unknown as Parameters<typeof slotsHtml>[0];
+    const html = slotsHtml(snake, 2, 6);
+    expect(html).toContain('class="slot full selected" data-kind="missile"');
+    expect((html.match(/class="slot">—/g) ?? []).length).toBe(1);
+    expect((html.match(/class="slot locked"/g) ?? []).length).toBe(4);
+    expect(html).not.toContain('SHIELD');
+    const shielded = slotsHtml({ ...snake, shield: true }, 1, 3);
+    expect(shielded.startsWith('<span class="slot chip" data-kind="shield">SHIELD</span>')).toBe(true);
+    expect((shielded.match(/class="slot locked"/g) ?? []).length).toBe(2);
   });
 });

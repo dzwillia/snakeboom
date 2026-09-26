@@ -98,8 +98,8 @@ describe('the closing border', () => {
       expect(spot.y).toBeLessThanOrEqual(ARENA_HEIGHT - 300 - cfg.pickupClearance);
     }
     s.pickups = [
-      { id: 1, kind: 'missile', x: 100, y: 500, ttl: 500 },
-      { id: 2, kind: 'ghost', x: 800, y: 500, ttl: 500 },
+      { id: 1, kind: 'missile', x: 100, y: 500, ttl: 500, dropped: false },
+      { id: 2, kind: 'ghost', x: 800, y: 500, ttl: 500, dropped: false },
     ];
     const events: SimEvent[] = [];
     updatePickups(s, cfg, events);

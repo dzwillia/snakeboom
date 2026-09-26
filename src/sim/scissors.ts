@@ -1,6 +1,7 @@
 import { forEachSolidPointNear } from './collision';
 import type { Config } from './config';
 import { decimatePolygon } from './geometry';
+import { shedOverflow } from './storage';
 import { trailLength } from './trail';
 import type { MatchState, SimEvent } from './types';
 
@@ -23,7 +24,7 @@ export function applyScissors(state: MatchState, cfg: Config, events: SimEvent[]
         if (snake === j && index > newest) newest = index;
       });
       if (newest < 0) return;
-      cutTrail(state, j, newest, i, me.x, me.y, events);
+      cutTrail(state, j, newest, i, me.x, me.y, cfg, events);
     });
   });
 }
@@ -32,8 +33,18 @@ export function applyScissors(state: MatchState, cfg: Config, events: SimEvent[]
  * Cuts `victim`'s body at trail index `newest`: everything from there back to the tail is dropped
  * and the target length shrinks to what is left. Never cuts the head off (the newest point is the
  * head itself, and touching it is a head hit). `by` is the cutter, or -1 for the saw.
+ * Length is storage, so the items that no longer fit fall off too, as pickups along the dropped segment.
  */
-export function cutTrail(state: MatchState, victim: number, newest: number, by: number, x: number, y: number, events: SimEvent[]): boolean {
+export function cutTrail(
+  state: MatchState,
+  victim: number,
+  newest: number,
+  by: number,
+  x: number,
+  y: number,
+  cfg: Config,
+  events: SimEvent[],
+): boolean {
   const s = state.snakes[victim];
   const trail = s.trail;
   const last = trail.xs.length - 1;
@@ -45,5 +56,6 @@ export function cutTrail(state: MatchState, victim: number, newest: number, by: 
   s.targetLength = Math.max(0, trailLength(trail));
   s.holeVersion++;
   events.push({ type: 'cut', player: victim, by, x, y, dropped: before - s.targetLength, segment: decimatePolygon(dropped, CUT_POINTS_FOR_EVENT) });
+  shedOverflow(state, victim, dropped, cfg, events, true);
   return true;
 }

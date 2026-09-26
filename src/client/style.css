@@ -622,6 +622,12 @@ kbd {
   opacity: 0.7;
 }
 
+/* A slot the body hasn't grown into yet. */
+.slot.locked {
+  opacity: 0.12;
+  border-style: dashed;
+}
+
 /* The selected item (what Fire uses) and active chips glow; other carried items sit dimmer. */
 .slot.selected,
 .slot.chip {

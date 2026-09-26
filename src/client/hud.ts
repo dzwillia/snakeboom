@@ -1,4 +1,4 @@
-import { TICK_RATE, trailLength, type Config, type EffectName, type MatchState, type SnakeState } from '../sim';
+import { TICK_RATE, slotsFor, trailLength, type Config, type EffectName, type MatchState, type SnakeState } from '../sim';
 import { blinkOn } from './blink';
 import { PLAYER_NAMES, describeItem, formatClock } from './text';
 
@@ -158,10 +158,12 @@ export class Hud {
         chip.style.visibility = blinkOn(ticks / TICK_RATE, cfg.effectWarning, t) ? 'visible' : 'hidden';
       }
 
-      const slotsKey = `${cfg.itemSlots}|${s.shield}|${s.selected}|${s.items.map((it) => `${it.kind}:${it.charges}`).join(',')}`;
+      // Length is storage: the slots you have grown into are open, the rest of the cap is locked.
+      const open = slotsFor(s, cfg);
+      const slotsKey = `${open}/${cfg.itemSlots}|${s.shield}|${s.selected}|${s.items.map((it) => `${it.kind}:${it.charges}`).join(',')}`;
       if (slotsKey !== side.lastSlots) {
         side.lastSlots = slotsKey;
-        side.slots.innerHTML = slotsHtml(s, cfg.itemSlots);
+        side.slots.innerHTML = slotsHtml(s, open, cfg.itemSlots);
       }
     });
 
@@ -185,12 +187,15 @@ function heartsHtml(hearts: number, max: number): string {
   return Array.from({ length: Math.max(1, Math.round(max)) }, (_, k) => `<span class="heart${k < hearts ? '' : ' lost'}">♥</span>`).join('');
 }
 
-/** The Shield bubble chip, then the item queue with the selected item (what Fire uses) highlighted. */
-function slotsHtml(s: SnakeState, slotCount: number): string {
+/**
+ * The Shield bubble chip, then the item queue with the selected item (what Fire uses) highlighted:
+ * `open` slots the body can fill now, and the rest up to `cap` locked (dimmer) until it grows into them.
+ */
+export function slotsHtml(s: SnakeState, open: number, cap: number): string {
   const shield = s.shield ? '<span class="slot chip" data-kind="shield">SHIELD</span>' : '';
-  const cells = Array.from({ length: Math.max(slotCount, s.items.length) }, (_, k) => {
+  const cells = Array.from({ length: Math.max(cap, open, s.items.length) }, (_, k) => {
     const item = s.items[k];
-    if (!item) return '<span class="slot">—</span>';
+    if (!item) return k < open ? '<span class="slot">—</span>' : '<span class="slot locked">·</span>';
     return `<span class="slot full${k === s.selected ? ' selected' : ''}" data-kind="${item.kind}">${describeItem(item)}</span>`;
   });
   return shield + cells.join('');

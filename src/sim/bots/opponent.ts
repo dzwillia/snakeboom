@@ -4,6 +4,7 @@ import { forEachSolidPointNear } from '../collision';
 import { ARENA_HEIGHT, ARENA_WIDTH, DT, TICK_RATE, TILE_COLS, TILE_ROWS, TILE_SIZE, type Config, type PickupKind } from '../config';
 import { detAtan2, detCos, detSin, wrapAngle } from '../detmath';
 import { createRng, rngInt, rngNext, type RngState } from '../rng';
+import { slotsFor } from '../storage';
 import { headCum } from '../trail';
 import { NO_INPUT, type MatchState, type PlayerInput, type SnakeState } from '../types';
 
@@ -428,7 +429,7 @@ function pickGoal(ctx: Ctx, p: OpponentProfile): Goal | null {
   const ahead = insetAt(ctx.state, cfg, ctx.look * STEP_TICKS);
   const closing = ahead > ctx.state.inset;
   if (closing && edgeMargin(me.x, me.y) - ahead < BORDER_BAND) return { x: ARENA_WIDTH / 2, y: ARENA_HEIGHT / 2, weight: 1 };
-  if (p.greed > 0 && me.items.length < cfg.itemSlots) {
+  if (p.greed > 0 && me.items.length < slotsFor(me, cfg)) {
     let target: { x: number; y: number } | null = null;
     let best = SEEK_RANGE * SEEK_RANGE;
     for (const pk of ctx.state.pickups) {
@@ -711,7 +712,7 @@ function wantUse(ctx: Ctx, bot: OpponentState, best: Plan): number | null {
   const p = bot.profile;
   if (me.items.length === 0 || me.useCooldown > 0) return null;
   const boxed = best.steps < ctx.look * 0.4;
-  const unclog = me.items.length >= cfg.itemSlots && rngNext(bot.rng) < 0.01;
+  const unclog = me.items.length >= slotsFor(me, cfg) && rngNext(bot.rng) < 0.01;
   const oppDist = opp ? Math.sqrt(dist2(opp.x, opp.y, me.x, me.y)) : Infinity;
   const oppBoxed = opp !== null && p.itemSkill > 0.5 && straightClear(ctx, opp, 12) < 8;
   // How squarely the opponent sits ahead of us: 1 dead ahead, -1 behind.
