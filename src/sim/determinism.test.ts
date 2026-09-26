@@ -21,7 +21,7 @@ function drive(state: MatchState, bots: BotState[], ticks: number): void {
  * Updated 2026-09-26 for collecting by loop and the wider pickup clearance (M15); re-pinned after the rebase.
  * Updated 2026-09-26 for random maps (M16): the bag now holds eight entries and a random slot draws from the rng in startRound.
  */
-const GOLDEN_HASH = 0x00917e13;
+const GOLDEN_HASH = 0x4bd9bcdb;
 
 describe('determinism', () => {
   it('produces the golden hash for a fixed seed and input script', () => {
